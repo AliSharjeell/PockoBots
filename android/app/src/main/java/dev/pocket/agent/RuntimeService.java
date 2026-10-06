@@ -104,6 +104,7 @@ public class RuntimeService extends Service {
     }
     private static void stopProcess(java.lang.Process process, int pid) throws InterruptedException, IOException {
         if (!process.isAlive()) return;
+        if (pid <= 1) throw new IOException("No valid environment process ID was recorded");
         // PRoot deliberately ignores SIGTERM. SIGQUIT invokes its handler that
         // kills every traced child before exiting, including terminals/servers.
         try { android.system.Os.kill(pid, android.system.OsConstants.SIGQUIT); }
