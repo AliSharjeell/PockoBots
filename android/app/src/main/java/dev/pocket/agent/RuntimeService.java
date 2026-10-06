@@ -58,7 +58,10 @@ public class RuntimeService extends Service {
                 "POCKET_WORKSPACE=/workspace", "POCKET_STATE=/state", "POCKET_PORT=8787",
                 "LD_PRELOAD=/usr/local/lib/libpocket-compat.so", "UV_USE_IO_URING=0",
                 "node", "/opt/pocket-agent/dist/server.js"));
-            ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
+            File logFile = new File(files, "runtime.log");
+            // A pipe reader can block Process.destroy() on Android. Write directly
+            // to a file so lifecycle shutdown never waits on a stdout reader lock.
+            ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(logFile);
             builder.environment().put("PROOT_LOADER", nativeDir + "/libproot-loader.so");
             builder.environment().put("PROOT_LOADER_32", nativeDir + "/libproot-loader32.so");
             builder.environment().put("PROOT_TMP_DIR", files + "/tmp");
@@ -77,16 +80,14 @@ public class RuntimeService extends Service {
                 if (stopping) return;
                 backend = builder.start(); lastRuntime = backend;
             }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(backend.getInputStream()));
-                 FileWriter log = new FileWriter(new File(files, "runtime.log"), false)) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    log.write(line + "\n"); log.flush();
-                    if (!stopping && active == this) {
-                        if (line.contains("Pocket Agent listening")) { ready = true; status = "Ready"; }
-                        else if (!ready) status = line;
-                    }
+            long logSize = -1;
+            while (!stopping && backend.isAlive()) {
+                if (active == this && logFile.length() != logSize) {
+                    logSize = logFile.length(); String output = Io.text(logFile).trim();
+                    if (output.contains("Pocket Agent listening")) { ready = true; status = "Ready"; }
+                    else if (!ready && !output.isEmpty()) status = output.substring(output.lastIndexOf('\n') + 1);
                 }
+                Thread.sleep(200);
             }
             if (!stopping && active == this) { ready = false; status = "Environment stopped (" + backend.waitFor() + "). Reopen the app to restart. See runtime logs for details."; }
         } catch (Exception e) { if (!stopping && active == this) { ready = false; status = "Setup failed: " + e.getMessage(); } }
@@ -96,8 +97,8 @@ public class RuntimeService extends Service {
         stopping = true; if (active == this) ready = false;
         java.lang.Process process = backend;
         if (process != null) {
-            process.destroy();
             new Thread(() -> { try {
+                process.destroy();
                 if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly();
             } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }, "pocket-stop").start();
         }
