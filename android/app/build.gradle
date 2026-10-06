@@ -3,6 +3,15 @@ def runtimeAbi = providers.gradleProperty('runtimeAbi').orNull
 if (runtimeAbi != null && !(runtimeAbi in ['arm64-v8a', 'x86_64'])) {
     throw new GradleException('runtimeAbi must be arm64-v8a or x86_64')
 }
+if (runtimeAbi != null) {
+    tasks.register('prepareRuntimeAssets', Sync) {
+        from 'src/main/assets'
+        into layout.buildDirectory.dir("generated/runtimeAssets/${runtimeAbi}")
+        ['arm64-v8a', 'x86_64'].findAll { it != runtimeAbi }.each { other ->
+            exclude "runtime/${other}.*"
+        }
+    }
+}
 android {
     namespace 'dev.pocket.agent'
     compileSdk 35
@@ -13,9 +22,7 @@ android {
     sourceSets.main.java.srcDir '../terminal/src/main/java'
     if (runtimeAbi != null) {
         defaultConfig.ndk.abiFilters.add(runtimeAbi)
-        ['arm64-v8a', 'x86_64'].findAll { it != runtimeAbi }.each { other ->
-            sourceSets.main.assets.exclude("runtime/${other}.*")
-        }
+        sourceSets.main.assets.setSrcDirs([layout.buildDirectory.dir("generated/runtimeAssets/${runtimeAbi}")])
     }
     packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
 }
@@ -39,3 +46,4 @@ tasks.register('verifyPackagedRuntime') {
     }
 }
 tasks.named('preBuild').configure { dependsOn 'verifyPackagedRuntime' }
+if (runtimeAbi != null) tasks.named('preBuild').configure { dependsOn 'prepareRuntimeAssets' }
