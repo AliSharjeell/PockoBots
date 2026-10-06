@@ -24,6 +24,8 @@ assets = repo / "android/app/src/main/assets/runtime"
 libs = repo / "android/app/src/main/jniLibs" / abi
 assets.mkdir(parents=True, exist_ok=True)
 libs.mkdir(parents=True, exist_ok=True)
+generated = repo / "runtime/generated"
+generated.mkdir(parents=True, exist_ok=True)
 
 def run(*args):
     subprocess.run(args, check=True, cwd=repo)
@@ -38,7 +40,7 @@ try:
         run("docker", "export", "-o", str(archive), container)
         links = []
         modes = {}
-        output = assets / f"{abi}.zip"
+        output = generated / f"{abi}.zip"
         with tarfile.open(archive) as source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as target:
             for entry in source:
                 name = entry.name.lstrip("./")
@@ -89,6 +91,8 @@ try:
         for file in libs.iterdir():
             file.chmod(0o755)
         metadata = {"abi": abi, "sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "bytes": output.stat().st_size}
+        # Publish only complete archives. Interrupted builds keep the previous asset.
+        os.replace(output, assets / f"{abi}.zip")
         (assets / f"{abi}.json").write_text(json.dumps(metadata))
         print(json.dumps(metadata))
 finally:
