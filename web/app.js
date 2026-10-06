@@ -270,7 +270,9 @@ function handleEvent(data) {
     if (e.type === "message_update") current.streaming = e.message;
     if (e.type === "message_end") {
       current.streaming = null;
-      current.messages.push(e.message);
+      const index = current.messages.findIndex(m => m.role === e.message.role && m.timestamp === e.message.timestamp && m.toolCallId === e.message.toolCallId);
+      if (index === -1) current.messages.push(e.message);
+      else current.messages[index] = e.message;
     }
     if (e.type === "tool_execution_start")
       $("model-label").textContent = "Running " + e.toolName + "…";
