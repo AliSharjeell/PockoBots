@@ -6,13 +6,15 @@ The v0.2 implementation replaces the Android WebView/Termux pairing flow with na
 
 Completed backend checks: TypeScript compilation, ordinary Node build, Android backend bundle, and all nine integration tests against both backend builds. Tests dispatch real pi adapters against local OpenAI Chat Completions, OpenAI Responses, and Anthropic fixtures, exercise project isolation, and verify a real Linux PTY with resizing and Ctrl-C. These fixtures do not use paid provider accounts.
 
-Android SDK 35 compilation and lint pass with JDK 17 and Gradle 8.11.1. Lint reports zero errors and nine warnings, including vendored terminal reflection, localization, and the foreground service wake lock. APK v2 signing verification passes.
+Android SDK 35 compilation and lint pass with JDK 17 and Gradle 8.11.1. Final lint reports zero errors and ten warnings, including vendored terminal reflection, programmatic view accessibility/constructors, localization, and the foreground service wake lock. APK v2 signing verification passes for both architecture-specific APKs.
 
 On an Android 14 x86_64 emulator, a fresh APK installation automatically extracted the included runtime and launched its own backend without Termux. The packaged agent edited a project file using a local provider fixture. The native runtime executed Node 22.23.3, npm 10.9.9, Git 2.39.5, an interactive Bash PTY, a local Git clone, Ctrl-C, and an npm HTTP preview. Microsoft Dev Tunnels CLI 1.0.2094 launched and reported service metadata; authenticated tunnel hosting was not exercised.
 
 The full packaged-app smoke test passed on the Android 14 emulator in 76 seconds from a fresh installation, including automatic runtime extraction, agent tool dispatch, terminal resizing and interactive input, Git cloning, npm HTTP serving, shutdown, restart, and persisted project/conversation state. PRoot shutdown uses SIGQUIT because its normal handler ignores SIGTERM; runtime launches record their own PID and wait for the previous process to exit.
 
 Architecture-specific Gradle packaging was checked to include only the selected runtime archive and native-library ABI. The x86_64 debug APK is 271,249,519 bytes. Generated APKs and runtime payloads are build artifacts ignored by Git; all implementation changes are committed separately.
+
+The ARM64 debug APK is 250,928,440 bytes. Its included runtime archive was checked against its packaged SHA-256 metadata, and APK signing verification passed. APK SHA-256: `c27dec66103d5af3ba52ae8902e4a6b119d89ab00d64e647a2a48a3824138553`. The x86_64 APK SHA-256 is `955bb5011b8977e91bf6aabdb5075154d8e2e29018ffee32b1c3b744f1244841`.
 
 Remaining coverage: physical ARM64 phone installation; Android vendor battery/background behavior; real provider credentials; authenticated Dev Tunnels login/hosting; compatibility of individual third-party npm packages and native addons on Android. The ARM64 runtime is built, but execution coverage in this workspace is x86_64 Android emulation. Model inference is remote BYOK; project files, agent tools, terminals, and development servers execute on the device.
 
