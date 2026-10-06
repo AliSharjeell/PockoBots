@@ -36,6 +36,18 @@ public class RuntimeSmokeTest {
         String name="smoke-"+System.currentTimeMillis();
         JSONObject project=(JSONObject)api.request("POST","/projects",object("name",name));String projectId=project.getString("id");
         JSONObject conversation=(JSONObject)api.request("POST","/sessions",object("projectId",projectId));assertEquals(projectId,conversation.getString("projectId"));
+        JSONObject originalSettings=api.get("/state").getJSONObject("settings");
+        assertFalse("Run this smoke test with a fresh installation, without a saved real provider key",originalSettings.optBoolean("hasKey"));
+        try(MockModel mock=new MockModel()){
+            api.request("PUT","/settings",object("provider","openai","api","openai-completions","baseUrl",mock.baseUrl(),"model","android-mock","apiKey","android-mock-key"));
+            api.request("POST","/sessions/"+conversation.getString("id")+"/chat",object("text","Create a file in my project"));
+            long done=System.currentTimeMillis()+30000;JSONObject chat;
+            do{Thread.sleep(100);chat=api.get("/sessions/"+conversation.getString("id"));}while(chat.optBoolean("busy")&&System.currentTimeMillis()<done);
+            assertFalse("Agent did not finish",chat.optBoolean("busy"));
+            if(mock.failure!=null)throw mock.failure;
+            assertEquals("Created by the packaged Android agent",api.get("/file?projectId="+projectId+"&path=src/agent.txt").getString("content"));
+            assertFalse(api.get("/state").getJSONObject("settings").has("apiKey"));
+        }finally{originalSettings.put("clearKey",true);api.request("PUT","/settings",originalSettings);}
         api.request("PUT","/file",object("projectId",projectId,"path","src/index.js","content","console.log('phone')"));
         assertEquals("console.log('phone')",api.get("/file?projectId="+projectId+"&path=src/index.js").getString("content"));
         JSONObject terminal=(JSONObject)api.request("POST","/terminals",object("projectId",projectId));String id=terminal.getString("id");
