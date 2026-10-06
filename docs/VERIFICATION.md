@@ -16,6 +16,8 @@ Architecture-specific Gradle packaging was checked to include only the selected 
 
 The ARM64 debug APK is 250,928,440 bytes. Its included runtime archive was checked against its packaged SHA-256 metadata, and APK signing verification passed. APK SHA-256: `c27dec66103d5af3ba52ae8902e4a6b119d89ab00d64e647a2a48a3824138553`. The x86_64 APK SHA-256 is `955bb5011b8977e91bf6aabdb5075154d8e2e29018ffee32b1c3b744f1244841`.
 
+Manual emulator UI verification created `native-ui-check` through the native project dialog, opened its chat and terminal screens, and typed/executed `echo NATIVE_CANVAS_OK` through the terminal view with the phone keyboard open. The project prompt, wrapped command, output, cursor, and keyboard layout rendered correctly without a WebView or installed Termux app.
+
 Remaining coverage: physical ARM64 phone installation; Android vendor battery/background behavior; real provider credentials; authenticated Dev Tunnels login/hosting; compatibility of individual third-party npm packages and native addons on Android. The ARM64 runtime is built, but execution coverage in this workspace is x86_64 Android emulation. Model inference is remote BYOK; project files, agent tools, terminals, and development servers execute on the device.
 
 ## Historical external-Termux v0.1 verification
