@@ -42,7 +42,7 @@ try:
         with tarfile.open(archive) as source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as target:
             for entry in source:
                 name = entry.name.lstrip("./")
-                if not name or name == "etc/resolv.conf" or name.startswith(("dev/", "proc/", "sys/")):
+                if not name or name == "etc/resolv.conf" or name.startswith(("dev/", "proc/", "sys/", "root/.npm/")):
                     continue
                 if entry.issym():
                     # Relative host links also resolve correctly inside PRoot.
