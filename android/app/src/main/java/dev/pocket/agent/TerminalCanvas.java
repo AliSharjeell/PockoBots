@@ -10,7 +10,7 @@ import com.termux.view.TerminalRenderer;
 import java.nio.charset.StandardCharsets;
 
 final class TerminalCanvas extends View {
-    interface Input { void send(String value); void resize(int cols, int rows); }
+    interface Input { void send(String value); void resize(int cols, int rows); default void controlUsed() {} }
     private final Input input;
     private final TerminalEmulator emulator;
     private final TerminalRenderer renderer;
@@ -20,6 +20,7 @@ final class TerminalCanvas extends View {
     private float touchY;
     private boolean dragged;
     private long offset;
+    private boolean control;
     TerminalCanvas(Context context, Input input) {
         super(context); this.input = input;
         setFocusable(true); setFocusableInTouchMode(true); setBackgroundColor(Color.BLACK);
@@ -52,6 +53,15 @@ final class TerminalCanvas extends View {
     }
     int columns() { return emulator.mColumns; }
     int rows() { return emulator.mRows; }
+    void latchControl(boolean value) { control=value; }
+    private void sendKeyboard(String text) {
+        if(control&&!text.isEmpty()) {
+            control=false;input.controlUsed();char first=text.charAt(0);
+            if(first=='?')first=127;else if(first>='@'&&first<='_'||first>='a'&&first<='z')first=(char)(first&31);
+            text=first+text.substring(1);
+        }
+        input.send(text);
+    }
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         int cols = Math.max(10, Math.min(500, (int)(w / cellWidth)));
         int rows = Math.max(2, Math.min(200, h / cellHeight - 1));
@@ -83,7 +93,7 @@ final class TerminalCanvas extends View {
         out.inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
         out.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NONE;
         return new BaseInputConnection(this, false) {
-            @Override public boolean commitText(CharSequence text, int newCursorPosition) { input.send(text.toString()); return true; }
+            @Override public boolean commitText(CharSequence text, int newCursorPosition) { sendKeyboard(text.toString()); return true; }
             @Override public boolean setComposingText(CharSequence text, int newCursorPosition) { return super.setComposingText(text, newCursorPosition); }
             @Override public boolean deleteSurroundingText(int before, int after) { for (int i = 0; i < Math.min(before, 100); i++) input.send("\u007f"); return true; }
             @Override public boolean sendKeyEvent(KeyEvent event) { if (event.getAction() == KeyEvent.ACTION_DOWN) return onKeyDown(event.getKeyCode(), event); return true; }
@@ -91,12 +101,13 @@ final class TerminalCanvas extends View {
     }
     @Override public boolean onKeyDown(int code, KeyEvent event) {
         if (code == KeyEvent.KEYCODE_BACK) return super.onKeyDown(code, event);
-        int mods = (event.isCtrlPressed() ? KeyHandler.KEYMOD_CTRL : 0) | (event.isAltPressed() ? KeyHandler.KEYMOD_ALT : 0) | (event.isShiftPressed() ? KeyHandler.KEYMOD_SHIFT : 0);
+        boolean ctrl=control||event.isCtrlPressed();if(control){control=false;input.controlUsed();}
+        int mods = (ctrl ? KeyHandler.KEYMOD_CTRL : 0) | (event.isAltPressed() ? KeyHandler.KEYMOD_ALT : 0) | (event.isShiftPressed() ? KeyHandler.KEYMOD_SHIFT : 0);
         String sequence = KeyHandler.getCode(code, mods, emulator.isCursorKeysApplicationMode(), emulator.isKeypadApplicationMode());
         if (sequence != null) { input.send(sequence); return true; }
-        int unicode = event.getUnicodeChar(event.isCtrlPressed() ? 0 : event.getMetaState());
+        int unicode = event.getUnicodeChar(ctrl ? 0 : event.getMetaState());
         if (unicode != 0) {
-            if (event.isCtrlPressed()) unicode &= 31;
+            if (ctrl) unicode &= 31;
             input.send((event.isAltPressed() ? "\u001b" : "") + new String(Character.toChars(unicode))); return true;
         }
         return super.onKeyDown(code, event);
