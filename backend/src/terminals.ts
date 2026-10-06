@@ -11,7 +11,7 @@ export class Terminals {
   start(cwd: string, cols = 80, rows = 24) {
     if (this.terminals.size >= 8) throw Error("Close a terminal before opening another");
     const id = randomUUID();
-    const helper = fileURLToPath(new URL("../runtime/pty.py", import.meta.url));
+    const helper = fileURLToPath(new URL("../runtime/terminal_bridge.py", import.meta.url));
     const child = spawn("python3", [helper, cwd, String(cols), String(rows)], { stdio: "pipe" });
     const terminal = { child, output: Buffer.alloc(0), total: 0, exited: false };
     this.terminals.set(id, terminal);

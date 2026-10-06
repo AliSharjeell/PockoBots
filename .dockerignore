@@ -6,3 +6,4 @@ ui-test
 test-results
 playwright-report
 runtime/generated
+**/__pycache__

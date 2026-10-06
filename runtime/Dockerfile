@@ -13,7 +13,7 @@ RUN npm ci
 COPY backend ./backend
 COPY web ./web
 RUN npx tsc && npm prune --omit=dev && \
-    mkdir -p runtime /workspace /state && cp backend/runtime/pty.py runtime/pty.py && \
+    mkdir -p runtime /workspace /state && cp backend/runtime/terminal_bridge.py runtime/terminal_bridge.py && \
     rm -rf backend/test
 COPY LICENSE /opt/pocket-agent/LICENSE
 ENV HOME=/root POCKET_WORKSPACE=/workspace POCKET_STATE=/state
