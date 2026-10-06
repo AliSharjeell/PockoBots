@@ -227,6 +227,10 @@ public class MainActivity extends Activity {
         button(content,"Test connection (uses a small model request)",() -> {try{request("POST","/settings/test",connection.get(),v -> Toast.makeText(this,"Connected · "+((JSONObject)v).optLong("latencyMs")+" ms",Toast.LENGTH_LONG).show());}catch(Exception e){error(e);}});
         button(content,"Save connection",() -> {try{request("PUT","/settings",connection.get(),v -> {state.put("settings",v);key.setText("");Toast.makeText(this,"Connection saved",Toast.LENGTH_SHORT).show();});}catch(Exception e){error(e);}});
         button(content,"Remove saved key",() -> request("PUT","/settings",json("clearKey",true),v -> {state.put("settings",v);show("Settings");}));
+        content.addView(label("Git commit identity",20));
+        EditText gitName=field(content,"Your name","",false),gitEmail=field(content,"Your email","",false);
+        request("GET","/git/identity",null,v -> {if(tab.equals("Settings")){gitName.setText(((JSONObject)v).optString("name"));gitEmail.setText(((JSONObject)v).optString("email"));}});
+        button(content,"Save Git identity",() -> request("PUT","/git/identity",json("name",gitName.getText().toString(),"email",gitEmail.getText().toString()),v -> Toast.makeText(this,"Git identity saved",Toast.LENGTH_SHORT).show()));
         CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");content.addView(trust);trust.setOnCheckedChangeListener((v,checked) -> {if(!session.isEmpty())request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {});});
         content.addView(label("Files and tools run on this device. Model requests go to your provider. Closing this screen keeps servers running; use the notification to stop the environment.",14));
         button(content,"Stop coding environment",() -> {startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});

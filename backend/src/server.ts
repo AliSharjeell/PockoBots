@@ -16,6 +16,8 @@ import { Sessions } from "./sessions.js";
 import { Projects } from "./projects.js";
 import { Terminals } from "./terminals.js";
 import { testConnection } from "./models.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 const here = dirname(fileURLToPath(import.meta.url));
 export async function createApp(options: {
   stateDir: string;
@@ -140,6 +142,23 @@ export async function createApp(options: {
   app.post("/api/projects", async (req, res) =>
     res.status(201).json(await projects.create(req.body.name)),
   );
+  app.get("/api/git/identity", async (_req, res) => {
+    const read = async (key: string) => {
+      try { return (await promisify(execFile)("git", ["config", "--global", "--get", key])).stdout.trim(); }
+      catch (e: any) { if (e.code === 1) return ""; throw e; }
+    };
+    res.json({ name: await read("user.name"), email: await read("user.email") });
+  });
+  app.put("/api/git/identity", async (req, res) => {
+    for (const key of ["name", "email"]) {
+      const value = req.body[key];
+      if (typeof value !== "string" || !value.trim() || value.length > 200 || /[\r\n\0]/.test(value))
+        throw Error("Enter a valid Git name and email");
+    }
+    for (const key of ["name", "email"])
+      await promisify(execFile)("git", ["config", "--global", "user." + key, req.body[key].trim()]);
+    res.json({ ok: true });
+  });
   app.get("/api/files", async (req, res) =>
     res.json(await (await projects.workspace(req.query.projectId as string)).list(String(req.query.path || "."))),
   );
