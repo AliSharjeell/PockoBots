@@ -3,7 +3,7 @@ WORKDIR /build
 COPY package.json package-lock.json tsconfig.json ./
 RUN npm ci
 COPY backend ./backend
-COPY scripts/bundle-backend.mjs ./scripts/bundle-backend.mjs
+COPY scripts/bundle-backend.mjs scripts/copy-runtime.mjs ./scripts/
 RUN npm run build:android
 
 FROM node:22-bookworm-slim AS runtime

@@ -4,7 +4,7 @@
   "description": "On-device Android coding agent powered by pi-agent-core and Termux",
   "scripts": {
     "dev": "tsx watch backend/src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-runtime.mjs",
     "build:android": "node scripts/bundle-backend.mjs",
     "start": "node dist/server.js",
     "test": "tsx --test backend/test/*.test.ts",

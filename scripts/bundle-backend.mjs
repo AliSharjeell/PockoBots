@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import "./copy-runtime.mjs";
 await build({
   entryPoints: ["backend/src/server.ts"],
   outfile: "dist/server.js",
