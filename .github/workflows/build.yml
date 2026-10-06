@@ -4,6 +4,15 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_preview:
+        description: Publish an APK preview release after verification
+        type: boolean
+        default: false
+      release_tag:
+        description: New preview release tag
+        type: string
+        default: v0.1.0
 permissions:
   contents: read
 jobs:
@@ -50,3 +59,21 @@ jobs:
         with:
           name: android-lint-report
           path: android/app/build/reports/lint-results-debug.html
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_preview
+    needs: [backend, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: pocket-agent-debug-apk
+          path: release-assets
+      - name: Publish verified preview APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: bash scripts/publish-preview.sh release-assets/app-debug.apk
