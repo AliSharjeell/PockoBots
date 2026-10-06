@@ -4,7 +4,9 @@ import http from "node:http";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createApp } from "../src/server.js";
+const { createApp } = process.env.POCKET_TEST_BUNDLE
+  ? await import("../../dist/server.js")
+  : await import("../src/server.js");
 import { defaults } from "../src/storage.js";
 import { testConnection } from "../src/models.js";
 async function listen(server: http.Server) {
