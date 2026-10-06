@@ -20,7 +20,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=backend /build/dist ./dist
 COPY backend/runtime/terminal_bridge.py ./runtime/terminal_bridge.py
 COPY web ./web
-RUN mkdir -p /workspace /state
+COPY runtime/android-compat.c /opt/pocket-agent/runtime/android-compat.c
+RUN gcc -shared -fPIC -O2 /opt/pocket-agent/runtime/android-compat.c -o /usr/local/lib/libpocket-compat.so && \
+    mkdir -p /workspace /state
 COPY LICENSE /opt/pocket-agent/LICENSE
 ENV HOME=/root POCKET_WORKSPACE=/workspace POCKET_STATE=/state
 CMD ["node", "/opt/pocket-agent/dist/server.js"]

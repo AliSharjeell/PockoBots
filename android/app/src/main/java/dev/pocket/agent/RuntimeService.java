@@ -52,6 +52,7 @@ public class RuntimeService extends Service {
                 "-w", "/opt/pocket-agent", "/usr/bin/env", "-i", "HOME=/root", "USER=root", "LANG=C.UTF-8",
                 "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "POCKET_WORKSPACE=/workspace", "POCKET_STATE=/state", "POCKET_PORT=8787",
+                "LD_PRELOAD=/usr/local/lib/libpocket-compat.so", "UV_USE_IO_URING=0",
                 "node", "/opt/pocket-agent/dist/server.js"));
             ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
             builder.environment().put("PROOT_LOADER", nativeDir + "/libproot-loader.so");

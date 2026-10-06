@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-sources-") as source_dir:
             url = f"https://raw.githubusercontent.com/termux/termux-packages/{recipes_commit}/packages/{package}/build.sh"
             with urllib.request.urlopen(url) as response:
                 archive.writestr(f"recipes/{package}/build.sh", response.read())
-        for name in ("Dockerfile", "package.py", "native-lock.json", "source-lock.json", "NOTICE.md"):
+        for name in ("Dockerfile", "package.py", "android-compat.c", "native-lock.json", "source-lock.json", "NOTICE.md"):
             archive.write(repo / "runtime" / name, f"pocket-agent/{name}")
     import shutil
     shutil.copyfile(repo / "runtime/NOTICE.md", licenses / "NOTICE.md")
