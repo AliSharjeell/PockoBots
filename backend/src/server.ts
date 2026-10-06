@@ -14,6 +14,7 @@ import { Workspace } from "./workspace.js";
 import { Processes, validPort, tunnelCommand } from "./processes.js";
 import { Sessions } from "./sessions.js";
 import { Projects } from "./projects.js";
+import { Terminals } from "./terminals.js";
 import { testConnection } from "./models.js";
 const here = dirname(fileURLToPath(import.meta.url));
 export async function createApp(options: {
@@ -46,6 +47,7 @@ export async function createApp(options: {
     for (const client of clients) client.write(data);
   };
   const processes = new Processes(publish);
+  const terminals = new Terminals(publish);
   const sessions = new Sessions(
     store,
     workspace,
@@ -184,6 +186,19 @@ export async function createApp(options: {
         ),
       ),
   );
+  app.post("/api/terminals", async (req, res) => res.status(201).json(terminals.start(
+    await (await projects.workspace(req.body.projectId)).path(req.body.cwd),
+    req.body.cols, req.body.rows,
+  )));
+  app.get("/api/terminals/:id", (req, res) => res.json(terminals.state(req.params.id)));
+  app.post("/api/terminals/:id/input", (req, res) => {
+    terminals.input(req.params.id, req.body.data, req.body.cols, req.body.rows);
+    res.json({ ok: true });
+  });
+  app.delete("/api/terminals/:id", (req, res) => {
+    terminals.stop(req.params.id);
+    res.json({ ok: true });
+  });
   app.post("/api/servers", async (req, res) =>
     res
       .status(201)
@@ -257,6 +272,7 @@ export async function createApp(options: {
     close: () => {
       sessions.stopAll();
       processes.stopAll();
+      terminals.stopAll();
       for (const c of clients) c.end();
     },
   };
