@@ -9,8 +9,8 @@ import java.util.*;
 public class RuntimeService extends Service {
     static volatile String status = "Starting coding environment…";
     static volatile boolean ready = false;
-    private java.lang.Process backend;
-    private boolean starting;
+    private volatile java.lang.Process backend;
+    private volatile boolean starting;
     private PowerManager.WakeLock wakeLock;
     private volatile boolean stopping;
     @Override public void onCreate() {

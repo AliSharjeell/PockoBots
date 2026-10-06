@@ -13,7 +13,7 @@ import java.util.zip.ZipInputStream;
 
 final class RuntimeInstaller {
     interface Progress { void update(String message); }
-    static File install(Context context, Progress progress) throws Exception {
+    static synchronized File install(Context context, Progress progress) throws Exception {
         String abi = null;
         for (String candidate : Build.SUPPORTED_ABIS) {
             try (InputStream ignored = context.getAssets().open("runtime/" + candidate + ".json")) {
