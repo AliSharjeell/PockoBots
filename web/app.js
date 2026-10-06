@@ -270,7 +270,12 @@ function handleEvent(data) {
     if (e.type === "message_update") current.streaming = e.message;
     if (e.type === "message_end") {
       current.streaming = null;
-      const index = current.messages.findIndex(m => m.role === e.message.role && m.timestamp === e.message.timestamp && m.toolCallId === e.message.toolCallId);
+      const index = current.messages.findIndex(
+        (m) =>
+          m.role === e.message.role &&
+          m.timestamp === e.message.timestamp &&
+          m.toolCallId === e.message.toolCallId,
+      );
       if (index === -1) current.messages.push(e.message);
       else current.messages[index] = e.message;
     }
@@ -385,6 +390,29 @@ function renderJobs() {
     );
     output.textContent = "$ " + job.command + "\n\n" + job.output;
     output.scrollTop = output.scrollHeight;
+    const links = $(job.kind === "command" ? "terminal-links" : "server-links");
+    links.replaceChildren();
+    const urls = [
+      ...new Set(
+        job.output.match(/https:\/\/[a-z0-9.-]+(?:\/[a-z0-9_/?=&%.-]*)?/gi) ||
+          [],
+      ),
+    ];
+    for (const url of urls.slice(0, 5)) {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname.endsWith(".devtunnels.ms") ||
+        ["github.com", "microsoft.com", "login.microsoftonline.com"].includes(
+          parsed.hostname,
+        )
+      ) {
+        links.append(
+          action("Open " + parsed.hostname + " ↗", () =>
+            window.open(url, "_blank", "noopener,noreferrer"),
+          ),
+        );
+      }
+    }
   }
 }
 async function startJob(path, body) {
