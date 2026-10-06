@@ -38,7 +38,6 @@ export class Sessions {
     if(this.busy.has(id))throw Error('Agent is already running');
     if(typeof text!=='string'||!text.trim()||text.length>32000)throw Error('Enter a prompt of at most 32000 characters');
     const settings={...this.settings()};const {model,models}=connection(settings);
-    this.busy.add(id);
     if(record.title==='New conversation')record.title=text.slice(0,50);
     const agent=new Agent({
       streamFn:models.streamSimple.bind(models),getApiKey:()=>settings.apiKey || undefined,toolExecution:'sequential',
@@ -55,6 +54,7 @@ export class Sessions {
     // Replay conversation without the prior baseline so current tool declarations take effect.
     if(record.messages.length) agent.state.messages=[...agent.state.messages,...record.messages.filter(m=>m.role!=='system')];
     this.agents.set(id,agent);
+    this.busy.add(id);
     agent.subscribe(async event=>{
       this.publish({type:'agent',sessionId:id,event});
       if(event.type==='message_end'||event.type==='agent_end') {record.messages=[...agent.state.messages];await this.persist();}

@@ -1,6 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 repo_dir="$(cat "$HOME/.config/pocket-agent/source")"
+[[ ! -f "$HOME/.config/pocket-agent/env" ]] || source "$HOME/.config/pocket-agent/env"
 state_dir="${POCKET_STATE:-$HOME/.local/share/pocket-agent}"
 if [[ -f "$state_dir/backend.pid" ]]; then
   backend_pid="$(cat "$state_dir/backend.pid")"

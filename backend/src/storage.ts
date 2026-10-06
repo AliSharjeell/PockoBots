@@ -26,7 +26,7 @@ export type Settings = {
 };
 export const defaults: Settings = { provider: 'openai', api: 'openai-responses', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1', apiKey: '', contextWindow: 128000, maxTokens: 8192 };
 export function validateSettings(input: any, previous: Settings): Settings {
-  const s = { ...previous, ...input, apiKey: input.apiKey === undefined || input.apiKey === '' ? previous.apiKey : input.apiKey };
+  const s = { ...previous, ...input, apiKey: input.apiKey === undefined || input.apiKey === '' ? (input.provider && input.provider !== previous.provider ? '' : previous.apiKey) : input.apiKey };
   if (input.clearKey === true) s.apiKey = '';
   if (!['openai', 'anthropic'].includes(s.provider) || !['openai-completions', 'openai-responses', 'anthropic-messages'].includes(s.api)) throw Error('Unsupported provider or API');
   if ((s.provider === 'anthropic') !== (s.api === 'anthropic-messages')) throw Error('Provider and API protocol must match');
