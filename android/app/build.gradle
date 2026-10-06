@@ -1,4 +1,8 @@
 plugins { id 'com.android.application' }
+def runtimeAbi = providers.gradleProperty('runtimeAbi').orNull
+if (runtimeAbi != null && !(runtimeAbi in ['arm64-v8a', 'x86_64'])) {
+    throw new GradleException('runtimeAbi must be arm64-v8a or x86_64')
+}
 android {
     namespace 'dev.pocket.agent'
     compileSdk 35
@@ -7,6 +11,12 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
     sourceSets.main.java.srcDir '../terminal/src/main/java'
+    if (runtimeAbi != null) {
+        defaultConfig.ndk.abiFilters.add(runtimeAbi)
+        ['arm64-v8a', 'x86_64'].findAll { it != runtimeAbi }.each { other ->
+            sourceSets.main.assets.exclude("runtime/${other}.*")
+        }
+    }
     packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
 }
 dependencies {
@@ -18,7 +28,7 @@ dependencies {
 tasks.register('verifyPackagedRuntime') {
     doLast {
         if (!project.hasProperty('compileOnly')) {
-            def abis = ['arm64-v8a', 'x86_64'].findAll { file("src/main/assets/runtime/${it}.zip").exists() }
+            def abis = (runtimeAbi != null ? [runtimeAbi] : ['arm64-v8a', 'x86_64']).findAll { file("src/main/assets/runtime/${it}.zip").exists() }
             if (abis.empty) throw new GradleException('Run python3 runtime/package.py arm64 (or amd64) before building the standalone APK.')
             abis.each { abi ->
                 ['libproot.so', 'libproot-loader.so', 'libtalloc.so', 'libandroid-shmem.so'].each { name ->
