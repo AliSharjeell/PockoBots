@@ -3,12 +3,17 @@ android {
     namespace 'dev.pocket.agent'
     compileSdk 35
     defaultConfig { applicationId 'dev.pocket.agent'; minSdk 26; targetSdk 35; versionCode 2; versionName '0.2.0' }
+    defaultConfig { testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
     sourceSets.main.java.srcDir '../terminal/src/main/java'
     packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
 }
-dependencies { implementation 'androidx.annotation:annotation:1.9.0' }
+dependencies {
+    implementation 'androidx.annotation:annotation:1.9.0'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
 
 tasks.register('verifyPackagedRuntime') {
     doLast {
