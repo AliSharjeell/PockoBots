@@ -1,13 +1,332 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#111315"><title>Pocket Agent</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-<div id="pairing" class="overlay"><form id="pair-form" class="pair-card"><div class="brand-mark">p<span>•</span></div><p class="eyebrow">YOUR PHONE. YOUR WORKSPACE.</p><h1>Meet Pocket Agent.</h1><p>Connect to your local Termux backend to start building.</p><label>Pairing token<input id="token" type="password" autocomplete="off" placeholder="Paste the token from Termux" required></label><button class="primary">Connect locally →</button><p class="hint">Run <code>bash scripts/pair.sh</code> in your Pocket Agent checkout. Keys stay in Termux’s private storage.</p><p id="pair-error" role="alert"></p></form></div>
-<div class="app-shell">
-<aside><a class="brand" href="#">p<span>•</span><strong>Pocket Agent</strong></a><p class="eyebrow workspace-title">WORKSPACE</p><nav id="navigation"><button data-tab="chat" class="active"><span>◌</span>Chat</button><button data-tab="files"><span>▤</span>Files</button><button data-tab="terminal"><span>›_</span>Terminal</button><button data-tab="servers"><span>⇄</span>Servers</button><button data-tab="settings"><span>⚙</span>Settings</button></nav><div class="aside-foot"><span class="dot"></span><span id="connection">Connecting</span><small>Powered by pi-agent-core</small></div></aside>
-<main><header><div><p class="eyebrow">LOCAL CODING COMPANION</p><h2 id="page-title">Let’s build something.</h2></div><div class="status-pill"><span class="dot"></span>On device</div></header>
-<section id="chat" class="panel active"><div class="chat-toolbar"><select id="session-select" aria-label="Conversation"></select><button id="new-chat" class="subtle">＋ New chat</button><button id="delete-chat" class="icon" title="Delete current conversation">×</button></div><div id="messages" aria-live="polite"><div class="welcome"><div class="orbit">✳</div><h1>A little screen.<br>A whole workspace.</h1><p>Write code, explore files, and run your projects.<br>Everything happens right here on your phone.</p><div class="suggestions"><button data-prompt="List the files in my workspace and explain the project.">Explore my workspace <span>↗</span></button><button data-prompt="Create a simple Node.js HTTP server in a new hello-server directory, then test it locally.">Build a Node.js server <span>↗</span></button></div></div></div><div id="approvals"></div><form id="chat-form" class="composer"><textarea id="prompt" rows="2" placeholder="Ask Pocket to write, fix, or build…" required aria-label="Message"></textarea><div class="composer-foot"><span id="model-label">Configure a model in Settings</span><button id="stop-agent" type="button" class="subtle" hidden>■ Stop</button><button id="send" class="primary">Send ↑</button></div></form><p class="chat-note">Files & tools run locally · Model requests use your provider</p></section>
-<section id="files" class="panel"><div class="section-heading"><div><h3>Your workspace</h3><p id="workspace-path"></p></div><button id="new-file" class="primary">＋ New file</button></div><form id="path-form" class="inline-form"><input id="directory" value="." aria-label="Directory"><button>Open directory</button><button type="button" id="parent-dir">↑</button></form><div class="file-layout"><div id="file-list" class="card"></div><form id="editor-form" class="card editor"><div class="inline-form"><input id="file-path" placeholder="Select a file or enter a new path" required aria-label="File path"><button class="primary">Save file</button></div><textarea id="file-content" spellcheck="false" aria-label="File content" placeholder="Your code goes here…"></textarea></form></div></section>
-<section id="terminal" class="panel"><div class="section-heading"><div><h3>A shell in your pocket.</h3><p>Git, npm, and your tools. Commands run as your Termux user.</p></div></div><form id="command-form" class="card"><label>Working directory<input id="command-cwd" value="."></label><div class="inline-form"><input id="command" placeholder="git clone https://github.com/user/project.git" required autocomplete="off" aria-label="Shell command"><button class="primary">Run →</button></div><p class="hint">Use Servers for long-running development processes. This terminal does not support interactive stdin.</p></form><div class="job-layout"><div id="terminal-jobs"></div><pre id="terminal-output" class="console">Command output will appear here.</pre></div></section>
-<section id="servers" class="panel"><div class="section-heading"><div><h3>From localhost to anywhere.</h3><p>Keep development servers running, preview them, and share a port.</p></div></div><div class="two-column"><form id="server-form" class="card"><p class="eyebrow">DEVELOPMENT SERVER</p><h3>Start a process</h3><label>Command<input id="server-command" value="npm run dev -- --host 127.0.0.1 --port 3000" required></label><div class="two-column"><label>Directory<input id="server-cwd" value="."></label><label>Port<input id="server-port" type="number" min="1024" max="65535" value="3000" required></label></div><button class="primary">Start server →</button></form><form id="tunnel-form" class="card"><p class="eyebrow">MICROSOFT DEV TUNNELS</p><h3>Share a local port</h3><label>Local port<input id="tunnel-port" type="number" min="1024" max="65535" value="3000" required></label><label class="checkbox"><input id="anonymous" type="checkbox">Allow anonymous visitors</label><p class="hint">Install the Dev Tunnels CLI with our Termux script, then sign in. Private access is the default. Share your project port only.</p><div class="inline-form"><button type="button" id="tunnel-login">Sign in</button><button class="primary">Open tunnel ↗</button></div></form></div><div id="server-jobs"></div><pre id="server-output" class="console">Server and tunnel logs will appear here.</pre></section>
-<section id="settings" class="panel"><div class="section-heading"><div><h3>Your model. Your choice.</h3><p>Bring a key, or connect an API-compatible local model server.</p></div></div><form id="settings-form" class="card settings-card"><div class="two-column"><label>Provider<select id="provider"><option value="openai">OpenAI / compatible</option><option value="anthropic">Anthropic</option></select></label><label>API protocol<select id="api"><option value="openai-responses">OpenAI Responses</option><option value="openai-completions">OpenAI Chat Completions</option><option value="anthropic-messages">Anthropic Messages</option></select></label></div><label>Base URL<input id="base-url" type="url" placeholder="https://api.openai.com/v1" required></label><label>Model name<input id="model" placeholder="gpt-4.1" required></label><label>API key<input id="api-key" type="password" autocomplete="off" placeholder="Enter your API key"><span id="key-status" class="hint"></span></label><label class="checkbox"><input id="clear-key" type="checkbox">Remove saved key</label><div class="two-column"><label>Context window<input id="context-window" type="number" value="128000" min="128" max="2000000" required></label><label>Max output tokens<input id="max-tokens" type="number" value="8192" min="128" max="2000000" required></label></div><div class="inline-form"><button class="primary">Save connection</button><button id="test-api" type="button">Test API ↗</button></div><p id="test-result" class="hint" role="status"></p></form><div class="card settings-card"><h3>Agent command access</h3><label class="checkbox"><input id="trust-session" type="checkbox">Allow agent shell commands without asking in this conversation</label><p class="hint">Shell commands have the permissions of your Termux account, including shared storage if enabled. File tools use the configured workspace. Trust resets when the backend restarts.</p><button id="disconnect">Disconnect this UI</button></div></section>
-<div id="toast" role="status" hidden></div></main></div><script src="/app.js"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#111315" />
+    <title>Pocket Agent</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="pairing" class="overlay">
+      <form id="pair-form" class="pair-card">
+        <div class="brand-mark">p<span>•</span></div>
+        <p class="eyebrow">YOUR PHONE. YOUR WORKSPACE.</p>
+        <h1>Meet Pocket Agent.</h1>
+        <p>Connect to your local Termux backend to start building.</p>
+        <label
+          >Pairing token<input
+            id="token"
+            type="password"
+            autocomplete="off"
+            placeholder="Paste the token from Termux"
+            required /></label
+        ><button class="primary">Connect locally →</button>
+        <p class="hint">
+          Run <code>bash scripts/pair.sh</code> in your Pocket Agent checkout.
+          Keys stay in Termux’s private storage.
+        </p>
+        <p id="pair-error" role="alert"></p>
+      </form>
+    </div>
+    <div class="app-shell">
+      <aside>
+        <a class="brand" href="#"
+          >p<span>•</span><strong>Pocket Agent</strong></a
+        >
+        <p class="eyebrow workspace-title">WORKSPACE</p>
+        <nav id="navigation">
+          <button data-tab="chat" class="active"><span>◌</span>Chat</button
+          ><button data-tab="files"><span>▤</span>Files</button
+          ><button data-tab="terminal"><span>›_</span>Terminal</button
+          ><button data-tab="servers"><span>⇄</span>Servers</button
+          ><button data-tab="settings"><span>⚙</span>Settings</button>
+        </nav>
+        <div class="aside-foot">
+          <span class="dot"></span><span id="connection">Connecting</span
+          ><small>Powered by pi-agent-core</small>
+        </div>
+      </aside>
+      <main>
+        <header>
+          <div>
+            <p class="eyebrow">LOCAL CODING COMPANION</p>
+            <h2 id="page-title">Let’s build something.</h2>
+          </div>
+          <div class="status-pill"><span class="dot"></span>On device</div>
+        </header>
+        <section id="chat" class="panel active">
+          <div class="chat-toolbar">
+            <select id="session-select" aria-label="Conversation"></select
+            ><button id="new-chat" class="subtle">＋ New chat</button
+            ><button
+              id="delete-chat"
+              class="icon"
+              title="Delete current conversation"
+            >
+              ×
+            </button>
+          </div>
+          <div id="messages" aria-live="polite">
+            <div class="welcome">
+              <div class="orbit">✳</div>
+              <h1>A little screen.<br />A whole workspace.</h1>
+              <p>
+                Write code, explore files, and run your projects.<br />Everything
+                happens right here on your phone.
+              </p>
+              <div class="suggestions">
+                <button
+                  data-prompt="List the files in my workspace and explain the project."
+                >
+                  Explore my workspace <span>↗</span></button
+                ><button
+                  data-prompt="Create a simple Node.js HTTP server in a new hello-server directory, then test it locally."
+                >
+                  Build a Node.js server <span>↗</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="approvals"></div>
+          <form id="chat-form" class="composer">
+            <textarea
+              id="prompt"
+              rows="2"
+              placeholder="Ask Pocket to write, fix, or build…"
+              required
+              aria-label="Message"
+            ></textarea>
+            <div class="composer-foot">
+              <span id="model-label">Configure a model in Settings</span
+              ><button id="stop-agent" type="button" class="subtle" hidden>
+                ■ Stop</button
+              ><button id="send" class="primary">Send ↑</button>
+            </div>
+          </form>
+          <p class="chat-note">
+            Files & tools run locally · Model requests use your provider
+          </p>
+        </section>
+        <section id="files" class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Your workspace</h3>
+              <p id="workspace-path"></p>
+            </div>
+            <button id="new-file" class="primary">＋ New file</button>
+          </div>
+          <form id="path-form" class="inline-form">
+            <input id="directory" value="." aria-label="Directory" /><button>
+              Open directory</button
+            ><button type="button" id="parent-dir">↑</button>
+          </form>
+          <div class="file-layout">
+            <div id="file-list" class="card"></div>
+            <form id="editor-form" class="card editor">
+              <div class="inline-form">
+                <input
+                  id="file-path"
+                  placeholder="Select a file or enter a new path"
+                  required
+                  aria-label="File path"
+                /><button class="primary">Save file</button>
+              </div>
+              <textarea
+                id="file-content"
+                spellcheck="false"
+                aria-label="File content"
+                placeholder="Your code goes here…"
+              ></textarea>
+            </form>
+          </div>
+        </section>
+        <section id="terminal" class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>A shell in your pocket.</h3>
+              <p>Git, npm, and your tools. Commands run as your Termux user.</p>
+            </div>
+          </div>
+          <form id="command-form" class="card">
+            <label>Working directory<input id="command-cwd" value="." /></label>
+            <div class="inline-form">
+              <input
+                id="command"
+                placeholder="git clone https://github.com/user/project.git"
+                required
+                autocomplete="off"
+                aria-label="Shell command"
+              /><button class="primary">Run →</button>
+            </div>
+            <p class="hint">
+              Use Servers for long-running development processes. This terminal
+              does not support interactive stdin.
+            </p>
+          </form>
+          <div class="job-layout">
+            <div id="terminal-jobs"></div>
+            <pre id="terminal-output" class="console">
+Command output will appear here.</pre>
+          </div>
+        </section>
+        <section id="servers" class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>From localhost to anywhere.</h3>
+              <p>
+                Keep development servers running, preview them, and share a
+                port.
+              </p>
+            </div>
+          </div>
+          <div class="two-column">
+            <form id="server-form" class="card">
+              <p class="eyebrow">DEVELOPMENT SERVER</p>
+              <h3>Start a process</h3>
+              <label
+                >Command<input
+                  id="server-command"
+                  value="npm run dev -- --host 127.0.0.1 --port 3000"
+                  required
+              /></label>
+              <div class="two-column">
+                <label>Directory<input id="server-cwd" value="." /></label
+                ><label
+                  >Port<input
+                    id="server-port"
+                    type="number"
+                    min="1024"
+                    max="65535"
+                    value="3000"
+                    required
+                /></label>
+              </div>
+              <button class="primary">Start server →</button>
+            </form>
+            <form id="tunnel-form" class="card">
+              <p class="eyebrow">MICROSOFT DEV TUNNELS</p>
+              <h3>Share a local port</h3>
+              <label
+                >Local port<input
+                  id="tunnel-port"
+                  type="number"
+                  min="1024"
+                  max="65535"
+                  value="3000"
+                  required /></label
+              ><label class="checkbox"
+                ><input id="anonymous" type="checkbox" />Allow anonymous
+                visitors</label
+              >
+              <p class="hint">
+                Install the Dev Tunnels CLI with our Termux script, then sign
+                in. Private access is the default. Share your project port only.
+              </p>
+              <div class="inline-form">
+                <button type="button" id="tunnel-login">Sign in</button
+                ><button class="primary">Open tunnel ↗</button>
+              </div>
+            </form>
+          </div>
+          <div id="server-jobs"></div>
+          <pre id="server-output" class="console">
+Server and tunnel logs will appear here.</pre>
+        </section>
+        <section id="settings" class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Your model. Your choice.</h3>
+              <p>
+                Bring a key, or connect an API-compatible local model server.
+              </p>
+            </div>
+          </div>
+          <form id="settings-form" class="card settings-card">
+            <div class="two-column">
+              <label
+                >Provider<select id="provider">
+                  <option value="openai">OpenAI / compatible</option>
+                  <option value="anthropic">Anthropic</option>
+                </select></label
+              ><label
+                >API protocol<select id="api">
+                  <option value="openai-responses">OpenAI Responses</option>
+                  <option value="openai-completions">
+                    OpenAI Chat Completions
+                  </option>
+                  <option value="anthropic-messages">Anthropic Messages</option>
+                </select></label
+              >
+            </div>
+            <label
+              >Base URL<input
+                id="base-url"
+                type="url"
+                placeholder="https://api.openai.com/v1"
+                required /></label
+            ><label
+              >Model name<input
+                id="model"
+                placeholder="gpt-4.1"
+                required /></label
+            ><label
+              >API key<input
+                id="api-key"
+                type="password"
+                autocomplete="off"
+                placeholder="Enter your API key" /><span
+                id="key-status"
+                class="hint"
+              ></span></label
+            ><label class="checkbox"
+              ><input id="clear-key" type="checkbox" />Remove saved key</label
+            >
+            <div class="two-column">
+              <label
+                >Context window<input
+                  id="context-window"
+                  type="number"
+                  value="128000"
+                  min="128"
+                  max="2000000"
+                  required /></label
+              ><label
+                >Max output tokens<input
+                  id="max-tokens"
+                  type="number"
+                  value="8192"
+                  min="128"
+                  max="2000000"
+                  required
+              /></label>
+            </div>
+            <div class="inline-form">
+              <button class="primary">Save connection</button
+              ><button id="test-api" type="button">Test API ↗</button>
+            </div>
+            <p id="test-result" class="hint" role="status"></p>
+          </form>
+          <div class="card settings-card">
+            <h3>Agent command access</h3>
+            <label class="checkbox"
+              ><input id="trust-session" type="checkbox" />Allow agent shell
+              commands without asking in this conversation</label
+            >
+            <p class="hint">
+              Shell commands have the permissions of your Termux account,
+              including shared storage if enabled. File tools use the configured
+              workspace. Trust resets when the backend restarts.
+            </p>
+            <button id="disconnect">Disconnect this UI</button>
+          </div>
+        </section>
+        <div id="toast" role="status" hidden></div>
+      </main>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
