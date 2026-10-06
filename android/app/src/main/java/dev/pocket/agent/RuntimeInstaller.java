@@ -23,7 +23,7 @@ final class RuntimeInstaller {
         if (abi == null) throw new IOException("This APK has no runtime for this device. Install the matching arm64 or x86_64 APK.");
         JSONObject metadata;
         try (InputStream in = context.getAssets().open("runtime/" + abi + ".json")) {
-            metadata = new JSONObject(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            metadata = new JSONObject(new String(Io.bytes(in), java.nio.charset.StandardCharsets.UTF_8));
         }
         String digest = metadata.getString("sha256");
         File root = new File(context.getFilesDir(), "runtimes/" + digest);
@@ -62,12 +62,12 @@ final class RuntimeInstaller {
         StringBuilder actual = new StringBuilder();
         for (byte b : sha.digest()) actual.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
         if (!digest.equals(actual.toString())) throw new IOException("Included runtime failed its checksum check");
-        JSONObject modes = new JSONObject(Files.readString(new File(root, ".pocket-modes.json").toPath()));
+        JSONObject modes = new JSONObject(Io.text(new File(root, ".pocket-modes.json")));
         java.util.Iterator<String> names = modes.keys();
         while (names.hasNext()) {
             String name = names.next(); Os.chmod(within(root, name).getPath(), modes.getInt(name));
         }
-        JSONArray links = new JSONArray(Files.readString(new File(root, ".pocket-links.json").toPath()));
+        JSONArray links = new JSONArray(Io.text(new File(root, ".pocket-links.json")));
         for (int i = 0; i < links.length(); i++) {
             JSONObject link = links.getJSONObject(i);
             File path = within(root, link.getString("path"));
@@ -78,7 +78,7 @@ final class RuntimeInstaller {
                 throw new IOException("Runtime link escapes its filesystem");
             if (!Files.isSymbolicLink(path.toPath())) Os.symlink(link.getString("target"), path.getPath());
         }
-        Files.writeString(marker.toPath(), digest);
+        Io.write(marker, digest);
         return root;
     }
     private static File within(File root, String name) throws IOException {
