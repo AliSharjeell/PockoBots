@@ -42,7 +42,7 @@ try:
         with tarfile.open(archive) as source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as target:
             for entry in source:
                 name = entry.name.lstrip("./")
-                if not name or name.startswith(("dev/", "proc/", "sys/")):
+                if not name or name == "etc/resolv.conf" or name.startswith(("dev/", "proc/", "sys/")):
                     continue
                 if entry.issym():
                     # Relative host links also resolve correctly inside PRoot.
@@ -60,6 +60,7 @@ try:
                             modes[name] = entry.mode & 0o777
             target.writestr(".pocket-links.json", json.dumps(links))
             target.writestr(".pocket-modes.json", json.dumps(modes))
+            target.writestr("etc/resolv.conf", "nameserver 1.1.1.1\nnameserver 8.8.8.8\n")
 
         lock = json.loads((repo / "runtime/native-lock.json").read_text())[debarch]
         extracted = temp / "native"

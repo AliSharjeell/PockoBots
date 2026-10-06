@@ -14,8 +14,7 @@ COPY backend ./backend
 COPY web ./web
 RUN npx tsc && npm prune --omit=dev && \
     mkdir -p runtime /workspace /state && cp backend/runtime/pty.py runtime/pty.py && \
-    rm -rf backend/test && \
-    printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+    rm -rf backend/test
 COPY LICENSE /opt/pocket-agent/LICENSE
 ENV HOME=/root POCKET_WORKSPACE=/workspace POCKET_STATE=/state
 CMD ["node", "/opt/pocket-agent/dist/server.js"]
