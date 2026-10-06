@@ -1,3 +1,10 @@
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS backend
+WORKDIR /build
+COPY package.json package-lock.json tsconfig.json ./
+RUN npm ci
+COPY backend ./backend
+RUN npx tsc
+
 FROM node:22-bookworm-slim AS runtime
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -8,13 +15,12 @@ RUN tunnel_arch="$TARGETARCH"; if [ "$tunnel_arch" = amd64 ]; then tunnel_arch=x
     curl --fail --location --retry 3 "https://tunnelsassetsprod.blob.core.windows.net/cli/linux-${tunnel_arch}-devtunnel" \
     -o /usr/local/bin/devtunnel && chmod 755 /usr/local/bin/devtunnel
 WORKDIR /opt/pocket-agent
-COPY package.json package-lock.json tsconfig.json ./
-RUN npm ci
-COPY backend ./backend
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=backend /build/dist ./dist
+COPY backend/runtime/terminal_bridge.py ./runtime/terminal_bridge.py
 COPY web ./web
-RUN npx tsc && npm prune --omit=dev && \
-    mkdir -p runtime /workspace /state && cp backend/runtime/terminal_bridge.py runtime/terminal_bridge.py && \
-    rm -rf backend/test
+RUN mkdir -p /workspace /state
 COPY LICENSE /opt/pocket-agent/LICENSE
 ENV HOME=/root POCKET_WORKSPACE=/workspace POCKET_STATE=/state
 CMD ["node", "/opt/pocket-agent/dist/server.js"]
