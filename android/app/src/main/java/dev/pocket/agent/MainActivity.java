@@ -31,6 +31,14 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
+        }
+        android.view.View content = findViewById(android.R.id.content);
+        content.setOnApplyWindowInsetsListener((view, insets) -> {
+            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            return insets.consumeSystemWindowInsets();
+        });
         port = getSharedPreferences("connection", MODE_PRIVATE).getInt("port", 8787);
         try {
             String token = SecretStore.read(this);
@@ -39,7 +47,7 @@ public class MainActivity extends Activity {
         connectionScreen();
     }
     @Override public boolean onCreateOptionsMenu(Menu menu) {
-        menu.add("Backend").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        menu.add("Backend").setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         return true;
     }
     @Override public boolean onOptionsItemSelected(MenuItem item) { connectionScreen(); return true; }
@@ -85,11 +93,12 @@ public class MainActivity extends Activity {
     private void startTermux() {
         if (checkSelfPermission(TERMUX_PERMISSION) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{TERMUX_PERMISSION}, 42); return; }
         try {
+            String termuxFiles = getPackageManager().getApplicationInfo("com.termux", 0).dataDir + "/files";
             Intent intent = new Intent("com.termux.RUN_COMMAND");
             intent.setClassName("com.termux", "com.termux.app.RunCommandService");
-            intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"/data/data/com.termux/files/home/.local/bin/pocket-agent-start"});
-            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+            intent.putExtra("com.termux.RUN_COMMAND_PATH", termuxFiles + "/usr/bin/bash");
+            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{termuxFiles + "/home/.local/bin/pocket-agent-start"});
+            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", termuxFiles + "/home");
             intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
             startService(intent); Toast.makeText(this, "Start requested. Connect after the backend starts; check Termux if it fails.", Toast.LENGTH_LONG).show();
         } catch (Exception e) { Toast.makeText(this, "Cannot start backend: " + e.getMessage(), Toast.LENGTH_LONG).show(); }
@@ -105,6 +114,8 @@ public class MainActivity extends Activity {
         if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) return;
         try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (Exception e) { Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show(); }
     }
+    // Only the validated localhost UI is loaded; no JavaScript-to-native bridge is exposed.
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
     private void openAgent(String token) {
         web = new WebView(this); web.setBackgroundColor(Color.rgb(17, 19, 21));
         web.getSettings().setJavaScriptEnabled(true); web.getSettings().setDomStorageEnabled(true);
@@ -140,6 +151,7 @@ public class MainActivity extends Activity {
         });
         setContentView(web); web.loadUrl("http://127.0.0.1:" + port + "/#token=" + Uri.encode(token));
     }
-    @Override public void onBackPressed() { if (web != null && web.canGoBack()) web.goBack(); else if (web != null) connectionScreen(); else super.onBackPressed(); }
+    private void navigateBack() { if (web != null && web.canGoBack()) web.goBack(); else if (web != null) connectionScreen(); else finish(); }
+    @Override public void onBackPressed() { navigateBack(); }
     @Override public void onDestroy() { if(web != null)web.destroy(); super.onDestroy(); }
 }
