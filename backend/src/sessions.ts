@@ -5,11 +5,13 @@ import type { Processes } from "./processes.js";
 import type { Store, Settings } from "./storage.js";
 import { connection } from "./models.js";
 import { agentTools } from "./tools.js";
+import type { Projects } from "./projects.js";
 type Session = {
   id: string;
   title: string;
   messages: AgentMessage[];
   created: number;
+  projectId?: string;
 };
 type Approval = {
   id: string;
@@ -30,6 +32,7 @@ export class Sessions {
     private processes: Processes,
     private settings: () => Settings,
     private publish: (e: unknown) => void,
+    private projects?: Projects,
   ) {}
   async init() {
     const records = await this.store.read<Session[]>("sessions", []);
@@ -58,7 +61,8 @@ export class Sessions {
         .map(({ resolve, ...a }) => a),
     };
   }
-  async create() {
+  async create(projectId?: string) {
+    if (projectId) this.projects?.get(projectId);
     if (this.records.size >= 50)
       throw Error("Session limit reached; delete an old session");
     const s = {
@@ -66,6 +70,7 @@ export class Sessions {
       title: "New conversation",
       messages: [],
       created: Date.now(),
+      projectId,
     };
     this.records.set(s.id, s);
     await this.persist();
@@ -119,6 +124,7 @@ export class Sessions {
     if (typeof text !== "string" || !text.trim() || text.length > 32000)
       throw Error("Enter a prompt of at most 32000 characters");
     const settings = { ...this.settings() };
+    const workspace = this.projects ? await this.projects.workspace(record.projectId) : this.workspace;
     const { model, models } = connection(settings);
     if (record.title === "New conversation") record.title = text.slice(0, 50);
     const agent = new Agent({
@@ -126,9 +132,9 @@ export class Sessions {
       getApiKey: () => settings.apiKey || undefined,
       toolExecution: "sequential",
       initialState: {
-        systemPrompt: `You are Pocket Agent, a coding agent running locally in Termux on Android. Workspace: ${this.workspace.root}. Use file tools with relative paths. Use bash for Git, npm, tests and searches. Shell has full Termux access. Never read or disclose API keys or agent state files. Ask before destructive work. Use start_server for persistent npm servers, not bash. Report actual tool results and errors honestly. Do not claim a server or tunnel works until verified.`,
+        systemPrompt: `You are Pocket Agent, a coding agent running locally on Android. Project directory: ${workspace.root}. Use file tools with paths relative to this project. Use bash for Git, npm, tests and searches. Shell has full runtime account access. Never read or disclose API keys or agent state files. Ask before destructive work. Use start_server for persistent npm servers, not bash. Report actual tool results and errors honestly. Do not claim a server or tunnel works until verified.`,
         model,
-        tools: agentTools(this.workspace, this.processes),
+        tools: agentTools(workspace, this.processes),
       },
       beforeToolCall: async (context, signal) => {
         if (

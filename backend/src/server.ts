@@ -13,6 +13,7 @@ import {
 import { Workspace } from "./workspace.js";
 import { Processes, validPort, tunnelCommand } from "./processes.js";
 import { Sessions } from "./sessions.js";
+import { Projects } from "./projects.js";
 import { testConnection } from "./models.js";
 const here = dirname(fileURLToPath(import.meta.url));
 export async function createApp(options: {
@@ -31,6 +32,8 @@ export async function createApp(options: {
   );
   const workspace = new Workspace(options.workspace);
   await workspace.init();
+  const projects = new Projects(store, workspace);
+  await projects.init();
   const clients = new Set<Response>();
   const redact = (value: unknown) => {
     const json = JSON.stringify(value);
@@ -49,6 +52,7 @@ export async function createApp(options: {
     processes,
     () => settings,
     publish,
+    projects,
   );
   await sessions.init();
   const app = express();
@@ -93,6 +97,7 @@ export async function createApp(options: {
       settings: publicSettings(settings),
       sessions: sessions.list(),
       jobs: [...processes.jobs.values()],
+      projects: projects.list(),
     }),
   );
   app.get("/api/events", (req, res) => {
@@ -129,18 +134,22 @@ export async function createApp(options: {
   app.post("/api/settings/test", async (req, res) =>
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
+  app.get("/api/projects", (_req, res) => res.json(projects.list()));
+  app.post("/api/projects", async (req, res) =>
+    res.status(201).json(await projects.create(req.body.name)),
+  );
   app.get("/api/files", async (req, res) =>
-    res.json(await workspace.list(String(req.query.path || "."))),
+    res.json(await (await projects.workspace(req.query.projectId as string)).list(String(req.query.path || "."))),
   );
   app.get("/api/file", async (req, res) =>
-    res.json({ content: await workspace.read(String(req.query.path || "")) }),
+    res.json({ content: await (await projects.workspace(req.query.projectId as string)).read(String(req.query.path || "")) }),
   );
   app.put("/api/file", async (req, res) => {
-    await workspace.write(req.body.path, req.body.content);
+    await (await projects.workspace(req.body.projectId)).write(req.body.path, req.body.content);
     res.json({ ok: true });
   });
-  app.post("/api/sessions", async (_req, res) =>
-    res.status(201).json(await sessions.create()),
+  app.post("/api/sessions", async (req, res) =>
+    res.status(201).json(await sessions.create(req.body.projectId)),
   );
   app.get("/api/sessions/:id", (req, res) =>
     res.type("json").send(redact(sessions.state(req.params.id))),
@@ -171,7 +180,7 @@ export async function createApp(options: {
       .json(
         processes.start(
           String(req.body.command || ""),
-          await workspace.path(req.body.cwd),
+          await (await projects.workspace(req.body.projectId)).path(req.body.cwd),
         ),
       ),
   );
@@ -181,7 +190,7 @@ export async function createApp(options: {
       .json(
         processes.start(
           String(req.body.command || ""),
-          await workspace.path(req.body.cwd),
+          await (await projects.workspace(req.body.projectId)).path(req.body.cwd),
           "server",
           validPort(req.body.port),
         ),
