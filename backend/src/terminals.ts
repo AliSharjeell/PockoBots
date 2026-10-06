@@ -6,32 +6,34 @@ import { fileURLToPath } from "node:url";
 // Python's standard-library PTY runs inside the packaged Linux runtime.
 // No native npm addon or external Termux service is required.
 export class Terminals {
-  private terminals = new Map<string, { child: ChildProcessWithoutNullStreams; output: string; exited: boolean }>();
+  private terminals = new Map<string, { child: ChildProcessWithoutNullStreams; output: Buffer; total: number; exited: boolean }>();
   constructor(private publish: (event: unknown) => void) {}
   start(cwd: string, cols = 80, rows = 24) {
     if (this.terminals.size >= 8) throw Error("Close a terminal before opening another");
     const id = randomUUID();
     const helper = fileURLToPath(new URL("../runtime/pty.py", import.meta.url));
     const child = spawn("python3", [helper, cwd, String(cols), String(rows)], { stdio: "pipe" });
-    const terminal = { child, output: "", exited: false };
+    const terminal = { child, output: Buffer.alloc(0), total: 0, exited: false };
     this.terminals.set(id, terminal);
-    const append = (data: string) => {
-      terminal.output = (terminal.output + data).slice(-256000);
-      this.publish({ type: "terminal", id, data });
+    const append = (data: Buffer) => {
+      const offset = terminal.total;
+      terminal.total += data.length;
+      terminal.output = Buffer.concat([terminal.output, data]).subarray(-256000);
+      this.publish({ type: "terminal", id, offset, data: data.toString("base64") });
     };
     createInterface({ input: child.stdout }).on("line", (line) => {
-      try { append(Buffer.from(JSON.parse(line).data, "base64").toString("utf8")); }
-      catch { append("\r\nInvalid terminal response\r\n"); }
+      try { append(Buffer.from(JSON.parse(line).data, "base64")); }
+      catch { append(Buffer.from("\r\nInvalid terminal response\r\n")); }
     });
-    child.stderr.on("data", (data) => append(data.toString()));
-    child.on("error", (e) => append("\r\n" + e.message + "\r\n"));
+    child.stderr.on("data", (data) => append(data));
+    child.on("error", (e) => append(Buffer.from("\r\n" + e.message + "\r\n")));
     child.on("close", () => { terminal.exited = true; this.publish({ type: "terminal_exit", id }); });
     return { id };
   }
   state(id: string) {
     const t = this.terminals.get(id);
     if (!t) throw Error("Terminal not found");
-    return { id, output: t.output, exited: t.exited };
+    return { id, output: t.output.toString("base64"), offset: t.total - t.output.length, total: t.total, exited: t.exited };
   }
   input(id: string, data: unknown, cols?: number, rows?: number) {
     const t = this.terminals.get(id);
