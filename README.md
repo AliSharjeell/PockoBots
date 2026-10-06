@@ -39,7 +39,7 @@ Requires Android 8+ (API 26), a current Android System WebView, and [Termux from
 
    The installer installs Node.js LTS (22.19+ required), Git, and bash; installs npm dependencies; builds the backend; and adds launcher scripts. It enables Termux’s `allow-external-apps` setting for the Android launcher. Keep the pairing token private.
 
-3. Install `app-debug.apk` from a successful [GitHub Actions build](https://github.com/AliSharjeell/pocket-agent/actions): open the latest successful **Verify and build Android APK** run and download the **pocket-agent-debug-apk** artifact. Unzip it and install the APK. Android may ask you to allow installation from your browser or file manager. This is a development APK signed with a debug key, not a Play Store release.
+3. Open the [private preview release](https://github.com/AliSharjeell/pocket-agent/releases/tag/v0.1.0), download **pocket-agent-debug.apk** under Assets, and install it. Sign in to GitHub as an account with repository access. Android may ask you to allow installation from your browser or file manager. This is a development APK signed with a debug key, not a Play Store release. You can also download the ZIP artifact from a successful [GitHub Actions build](https://github.com/AliSharjeell/pocket-agent/actions): open the run, download **pocket-agent-debug-apk**, unzip it, and install the APK.
 
 4. Open Pocket Agent. Paste the pairing token and leave the port at **8787**. Tap **Connect**. Later, **Backend → Start backend in Termux** can start it. Grant Pocket Agent the Termux **Run commands** permission when asked. If the permission prompt is unavailable, use Android Settings → Apps → Pocket Agent → Permissions, or start the backend manually in Termux.
 
@@ -168,6 +168,8 @@ bash android/build.sh
 ```
 
 APK output: `android/app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs backend checks, browser flows, Android compilation, and Android lint. It uploads an APK artifact for successful Android builds. Different debug signing keys across machines may require uninstalling the previous APK before installing a new build; uninstalling clears the app’s pairing data, while Termux files remain.
+
+To publish another preview APK, open Actions → **Verify and build Android APK** → **Run workflow**, enable **Publish an APK preview release after verification**, and enter a new version tag. The release job runs only after both backend and Android checks pass. Existing published version tags are protected from replacement; choose a new tag for a new preview.
 
 Integration tests run actual pi provider adapters against local mock OpenAI Chat Completions, OpenAI Responses, and Anthropic endpoints. They verify tool dispatch, approvals, cancellation, private settings, local Git cloning, and a real npm HTTP server. Browser checks cover mobile and desktop layouts. No paid provider keys or physical Android device were available during development.
 
