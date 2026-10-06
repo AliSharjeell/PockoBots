@@ -1,0 +1,22 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+repo_dir="$(cat "$HOME/.config/pocket-agent/source")"
+state_dir="${POCKET_STATE:-$HOME/.local/share/pocket-agent}"
+mkdir -p "$state_dir"; chmod 700 "$state_dir"
+if [[ -f "$state_dir/backend.pid" ]]; then
+  backend_pid="$(cat "$state_dir/backend.pid")"
+  if [[ "$backend_pid" =~ ^[0-9]+$ ]] && kill -0 "$backend_pid" 2>/dev/null && [[ "$(tr '\0' ' ' < "/proc/$backend_pid/cmdline" 2>/dev/null)" == *"$repo_dir/dist/server.js"* ]]; then
+    echo 'Pocket Agent is already running.'; exit 0
+  fi
+fi
+[[ -f "$repo_dir/dist/server.js" ]] || { echo 'Build the backend with npm run build first.' >&2; exit 1; }
+command -v termux-wake-lock >/dev/null && termux-wake-lock || true
+umask 077
+nohup node "$repo_dir/dist/server.js" >> "$state_dir/backend.log" 2>&1 &
+backend_pid=$!
+printf '%s\n' "$backend_pid" > "$state_dir/backend.pid"
+sleep 1
+if ! kill -0 "$backend_pid" 2>/dev/null; then
+  echo "Backend failed to start. Check $state_dir/backend.log" >&2; exit 1
+fi
+echo "Pocket Agent started (PID $backend_pid). Port: ${POCKET_PORT:-8787}"

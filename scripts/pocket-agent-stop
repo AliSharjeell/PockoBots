@@ -1,0 +1,12 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+repo_dir="$(cat "$HOME/.config/pocket-agent/source")"
+state_dir="${POCKET_STATE:-$HOME/.local/share/pocket-agent}"
+if [[ -f "$state_dir/backend.pid" ]]; then
+  backend_pid="$(cat "$state_dir/backend.pid")"
+  if [[ "$backend_pid" =~ ^[0-9]+$ ]] && kill -0 "$backend_pid" 2>/dev/null && [[ "$(tr '\0' ' ' < "/proc/$backend_pid/cmdline" 2>/dev/null)" == *"$repo_dir/dist/server.js"* ]]; then
+    kill "$backend_pid"; echo 'Requested backend shutdown.'
+  fi
+  rm -f "$state_dir/backend.pid"
+fi
+command -v termux-wake-unlock >/dev/null && termux-wake-unlock || true
