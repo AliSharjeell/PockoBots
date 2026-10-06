@@ -60,6 +60,9 @@ results to the configured provider.
 
 ## Build the standalone APK
 
+For editing and debugging the app directly in Android Studio, see
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
 Requirements: Linux or WSL, Docker (with ARM64 emulation for cross builds), Python
 3, curl, dpkg-deb, patchelf, JDK 17, Gradle 8.11.1 and Android SDK 35.
 
