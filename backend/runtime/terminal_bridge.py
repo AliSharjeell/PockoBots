@@ -10,6 +10,7 @@ import signal
 import struct
 import sys
 import termios
+import time
 
 pid, fd = pty.fork()
 if pid == 0:
@@ -48,9 +49,24 @@ try:
                     written = os.write(fd, payload)
                     payload = payload[written:]
 finally:
+    try:
+        os.killpg(os.tcgetpgrp(fd), signal.SIGHUP)
+    except (ProcessLookupError, OSError):
+        pass
     os.close(fd)
     try:
         os.killpg(pid, signal.SIGHUP)
     except ProcessLookupError:
         pass
-    os.waitpid(pid, 0)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        waited, _ = os.waitpid(pid, os.WNOHANG)
+        if waited:
+            break
+        time.sleep(0.05)
+    else:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        os.waitpid(pid, 0)
