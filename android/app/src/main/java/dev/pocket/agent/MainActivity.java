@@ -1,157 +1,250 @@
 package dev.pocket.agent;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
+import android.app.*;
+import android.content.*;
+import android.graphics.*;
 import android.net.Uri;
-import android.os.Bundle;
-import android.os.Message;
+import android.os.*;
 import android.text.InputType;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.webkit.CookieManager;
-import android.webkit.JsResult;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+import java.io.File;
+import java.util.concurrent.*;
 
+/** Native UI backed by the app-owned Linux runtime; no WebView or Termux pairing. */
 public class MainActivity extends Activity {
-    private static final String TERMUX_PERMISSION = "com.termux.permission.RUN_COMMAND";
-    private WebView web;
-    private int port = 8787;
-
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService work = Executors.newFixedThreadPool(3);
+    private final ExecutorService inputs = Executors.newSingleThreadExecutor();
+    private AgentApi api;
+    private JSONObject state = new JSONObject();
+    private String project = "", projectName = "", session = "", tab = "Projects", directory = ".", terminalId = "", pendingClone = "";
+    private LinearLayout body, messages, jobs;
+    private ScrollView chatScroll;
+    private EditText prompt;
+    private TextView setupStatus;
+    private TerminalCanvas terminal;
+    private boolean visible, listening, loadingChat, chatDirty, followChat = true;
+    private int generation;
+    private final Runnable chatUpdate = this::refreshChat;
+    int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    android.content.SharedPreferences prefs() { return getSharedPreferences("native-ui", MODE_PRIVATE); }
+    @Override public void onCreate(Bundle saved) {
+        super.onCreate(saved); project = prefs().getString("project", ""); session = prefs().getString("session", "");
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::back);
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1);
         }
-        android.view.View content = findViewById(android.R.id.content);
-        content.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+        setup();
+    }
+    @Override protected void onResume() {
+        super.onResume(); visible = true; startForegroundService(new Intent(this, RuntimeService.class));
+        if (api == null) waitForRuntime(); else { listen(); loadState(() -> show(tab)); }
+    }
+    @Override protected void onPause() {
+        visible = false; generation++; listening = false; if (api != null) api.closeEvents();
+        handler.removeCallbacks(chatUpdate); super.onPause();
+    }
+    @Override protected void onDestroy() { handler.removeCallbacksAndMessages(null); work.shutdownNow(); inputs.shutdownNow(); super.onDestroy(); }
+    LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
+    LinearLayout row() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.HORIZONTAL); return view; }
+    TextView label(String text, int size) {
+        TextView view = new TextView(this); view.setText(text); view.setTextSize(size); view.setTextColor(Color.rgb(230,235,223));
+        view.setPadding(dp(8),dp(8),dp(8),dp(8)); return view;
+    }
+    Button button(LinearLayout parent, String text, Runnable action) {
+        Button view = new Button(this); view.setText(text); view.setAllCaps(false); parent.addView(view); view.setOnClickListener(v -> action.run()); return view;
+    }
+    EditText field(LinearLayout parent, String hint, String value, boolean secret) {
+        parent.addView(label(hint,13)); EditText view = new EditText(this); view.setSingleLine(true);
+        view.setInputType(InputType.TYPE_CLASS_TEXT | (secret ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS));
+        view.setText(value); parent.addView(view); return view;
+    }
+    private void shell() {
+        LinearLayout page = column(); page.setBackgroundColor(Color.rgb(17,19,21)); page.setPadding(dp(8),0,dp(8),0);
+        page.setOnApplyWindowInsetsListener((v,insets) -> {
+            v.setPadding(dp(8)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(8)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-        port = getSharedPreferences("connection", MODE_PRIVATE).getInt("port", 8787);
-        try {
-            String token = SecretStore.read(this);
-            if (!token.isEmpty()) { openAgent(token); return; }
-        } catch (Exception ignored) { SecretStore.clear(this); }
-        connectionScreen();
+        page.addView(label("Pocket Agent"+(projectName.isEmpty()?"":" · "+projectName),21));
+        HorizontalScrollView nav = new HorizontalScrollView(this); LinearLayout tabs = row(); nav.addView(tabs); page.addView(nav);
+        for (String name : new String[]{"Projects","Chat","Terminal","Files","Servers","Settings"}) button(tabs,name,() -> show(name));
+        body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1)); setContentView(page);
     }
-    @Override public boolean onCreateOptionsMenu(Menu menu) {
-        menu.add("Backend").setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
-        return true;
+    LinearLayout scrolling() {
+        ScrollView scroll=new ScrollView(this); LinearLayout content=column(); content.setPadding(dp(6),dp(6),dp(6),dp(16));
+        scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return content;
     }
-    @Override public boolean onOptionsItemSelected(MenuItem item) { connectionScreen(); return true; }
-
-    private TextView text(String value, int size) {
-        TextView label = new TextView(this);
-        label.setText(value); label.setTextColor(Color.rgb(230, 235, 223)); label.setTextSize(size);
-        label.setPadding(0, 16, 0, 16); return label;
+    private void setup() {
+        LinearLayout page=column();page.setPadding(dp(24),dp(40),dp(24),dp(24));page.setBackgroundColor(Color.rgb(17,19,21));
+        page.addView(label("Pocket Agent",28));page.addView(label("Your projects and coding tools, on your phone.",17));
+        setupStatus=label(RuntimeService.status,15);page.addView(setupStatus);page.addView(new ProgressBar(this));
+        button(page,"Retry setup",() -> { startForegroundService(new Intent(this,RuntimeService.class));waitForRuntime(); });
+        button(page,"View setup log",() -> {try {new AlertDialog.Builder(this).setTitle("Environment log").setMessage(Io.text(new File(getFilesDir(),"runtime.log"))).setPositiveButton("Close",null).show();}catch(Exception e){error(e);}});
+        setContentView(page);
     }
-    private Button button(String value, LinearLayout layout, View.OnClickListener listener) {
-        Button button = new Button(this); button.setText(value); layout.addView(button); button.setOnClickListener(listener); return button;
-    }
-    private void connectionScreen() {
-        if (web != null) { web.destroy(); web = null; }
-        LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); layout.setPadding(32, 24, 32, 24);
-        layout.setBackgroundColor(Color.rgb(17, 19, 21));
-        layout.addView(text("Your coding agent, on your phone.", 24));
-        layout.addView(text("Install the backend in Termux first. Run bash scripts/pair.sh and paste its token below. Backend must be running to connect.", 14));
-        layout.addView(text("Local backend port", 12));
-        EditText portField = new EditText(this); portField.setInputType(InputType.TYPE_CLASS_NUMBER); portField.setText(String.valueOf(port)); layout.addView(portField);
-        layout.addView(text("Pairing token", 12));
-        EditText tokenField = new EditText(this); tokenField.setSingleLine(true); tokenField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        tokenField.setHint("Paste your Termux pairing token"); layout.addView(tokenField);
-        try { tokenField.setText(SecretStore.read(this)); } catch (Exception ignored) {}
-        button("Connect", layout, v -> {
+    private void waitForRuntime() {
+        if(!visible||isFinishing()||api!=null)return;setupStatus.setText(RuntimeService.status);
+        if(RuntimeService.ready) {
             try {
-                int chosen = Integer.parseInt(portField.getText().toString());
-                String token = tokenField.getText().toString().trim();
-                if (chosen < 1024 || chosen > 65535 || !token.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("Enter a port and the 64-character token from Termux");
-                port = chosen; SecretStore.save(this, token);
-                getSharedPreferences("connection", MODE_PRIVATE).edit().putInt("port", port).apply(); openAgent(token);
-            } catch (Exception e) { Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show(); }
-        });
-        button("Start backend in Termux", layout, v -> startTermux());
-        button("Open Termux", layout, v -> {
-            Intent intent = getPackageManager().getLaunchIntentForPackage("com.termux");
-            if (intent != null) startActivity(intent); else Toast.makeText(this, "Install Termux from F-Droid or its official GitHub releases", Toast.LENGTH_LONG).show();
-        });
-        button("Forget connection", layout, v -> { SecretStore.clear(this); tokenField.setText(""); CookieManager.getInstance().removeAllCookies(null); android.webkit.WebStorage.getInstance().deleteAllData(); });
-        layout.addView(text("The backend runs inside Termux, even when this app is closed. To stop it, use pocket-agent-stop in Termux. Android may stop background processes; allow unrestricted battery use for Termux.", 12));
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this); scroll.addView(layout); setContentView(scroll);
+                api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());listen();
+                loadState(() -> {JSONObject selected=findProject(project);if(selected==null){project="";session="";}else projectName=selected.optString("name");show(project.isEmpty()?"Projects":"Chat");});
+            }catch(Exception e){api=null;error(e);handler.postDelayed(this::waitForRuntime,1000);}
+        }else handler.postDelayed(this::waitForRuntime,500);
     }
-    private void startTermux() {
-        if (checkSelfPermission(TERMUX_PERMISSION) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{TERMUX_PERMISSION}, 42); return; }
-        try {
-            String termuxFiles = getPackageManager().getApplicationInfo("com.termux", 0).dataDir + "/files";
-            Intent intent = new Intent("com.termux.RUN_COMMAND");
-            intent.setClassName("com.termux", "com.termux.app.RunCommandService");
-            intent.putExtra("com.termux.RUN_COMMAND_PATH", termuxFiles + "/usr/bin/bash");
-            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{termuxFiles + "/home/.local/bin/pocket-agent-start"});
-            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", termuxFiles + "/home");
-            intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-            startService(intent); Toast.makeText(this, "Start requested. Connect after the backend starts; check Termux if it fails.", Toast.LENGTH_LONG).show();
-        } catch (Exception e) { Toast.makeText(this, "Cannot start backend: " + e.getMessage(), Toast.LENGTH_LONG).show(); }
+    interface Result { void done(Object value) throws Exception; }
+    void request(String method,String path,JSONObject data,Result result) {
+        if(api==null)return;AgentApi connection=api;
+        work.execute(() -> {try {Object value=connection.request(method,path,data);handler.post(() -> {if(!isDestroyed())try {result.done(value);}catch(Exception e){error(e);}});}
+            catch(Exception e){handler.post(() -> {if(!isDestroyed())error(e);});}});
     }
-    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
-        super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == 42 && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) startTermux();
+    JSONObject json(Object... values) {
+        JSONObject data=new JSONObject();try {for(int i=0;i<values.length;i+=2)data.put((String)values[i],values[i+1]);}catch(JSONException e){throw new IllegalArgumentException(e);}return data;
     }
-    private boolean sameOrigin(Uri uri) {
-        return "http".equals(uri.getScheme()) && "127.0.0.1".equals(uri.getHost()) && uri.getPort() == port;
+    void error(Exception e) {if(!isDestroyed())new AlertDialog.Builder(this).setTitle("Couldn't complete that").setMessage(e.getMessage()).setPositiveButton("OK",null).show();}
+    void loadState(Runnable done){request("GET","/state",null,value -> {state=(JSONObject)value;done.run();});}
+    private JSONObject findProject(String id) {
+        JSONArray projects=state.optJSONArray("projects");if(projects!=null)for(int i=0;i<projects.length();i++)if(id.equals(projects.optJSONObject(i).optString("id")))return projects.optJSONObject(i);return null;
     }
-    private void external(Uri uri) {
-        if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) return;
-        try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (Exception e) { Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show(); }
+    private void selectProject(JSONObject selected) {
+        project=selected.optString("id");projectName=selected.optString("name");session="";terminalId="";directory=".";
+        prefs().edit().putString("project",project).putString("session","").apply();show("Chat");
     }
-    // Only the validated localhost UI is loaded; no JavaScript-to-native bridge is exposed.
-    @android.annotation.SuppressLint("SetJavaScriptEnabled")
-    private void openAgent(String token) {
-        web = new WebView(this); web.setBackgroundColor(Color.rgb(17, 19, 21));
-        web.getSettings().setJavaScriptEnabled(true); web.getSettings().setDomStorageEnabled(true);
-        web.getSettings().setAllowFileAccess(false); web.getSettings().setAllowContentAccess(false);
-        web.getSettings().setSupportMultipleWindows(true); web.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-        web.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
-        web.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (!request.isForMainFrame()) return true;
-                if (sameOrigin(request.getUrl())) return false;
-                external(request.getUrl()); return true;
-            }
-            @Override public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (request.isForMainFrame()) new AlertDialog.Builder(MainActivity.this).setTitle("Backend unavailable")
-                    .setMessage("Start Pocket Agent in Termux, then reconnect. " + error.getDescription())
-                    .setPositiveButton("Connection settings", (dialog, which) -> connectionScreen()).setNegativeButton("Retry", (dialog, which) -> view.reload()).show();
-            }
-        });
-        web.setWebChromeClient(new WebChromeClient() {
-            @Override public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(MainActivity.this).setMessage(message).setPositiveButton("Confirm", (d, w) -> result.confirm())
-                    .setNegativeButton("Cancel", (d, w) -> result.cancel()).setOnCancelListener(d -> result.cancel()).show(); return true;
-            }
-            @Override public boolean onCreateWindow(WebView view, boolean isDialog, boolean userGesture, Message resultMsg) {
-                if (!userGesture) return false;
-                WebView popup = new WebView(MainActivity.this);
-                popup.setWebViewClient(new WebViewClient() {
-                    @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) { external(request.getUrl()); v.destroy(); return true; }
-                });
-                ((WebView.WebViewTransport) resultMsg.obj).setWebView(popup); resultMsg.sendToTarget(); return true;
-            }
-        });
-        setContentView(web); web.loadUrl("http://127.0.0.1:" + port + "/#token=" + Uri.encode(token));
+    private void show(String name) {
+        if(api==null)return;tab=name;terminal=null;handler.removeCallbacks(chatUpdate);shell();
+        if(project.isEmpty()&&!name.equals("Projects")&&!name.equals("Settings")){body.addView(label("Create or select a project to get started.",18));button(body,"Projects",() -> show("Projects"));return;}
+        switch(name){case "Projects":projects();break;case "Chat":chat();break;case "Terminal":terminal();break;case "Files":files();break;case "Servers":servers();break;case "Settings":settings();break;}
     }
-    private void navigateBack() { if (web != null && web.canGoBack()) web.goBack(); else if (web != null) connectionScreen(); else finish(); }
-    @Override public void onBackPressed() { navigateBack(); }
-    @Override public void onDestroy() { if(web != null)web.destroy(); super.onDestroy(); }
+    private void projects() {
+        LinearLayout content=scrolling();content.addView(label("Your projects",23));button(content,"Create project / clone repository",this::createProject);
+        request("GET","/projects",null,value -> {if(!tab.equals("Projects"))return;JSONArray projects=(JSONArray)value;
+            if(projects.length()==0)content.addView(label("Start with an empty project, or clone a Git repository.",16));
+            for(int i=0;i<projects.length();i++){JSONObject selected=projects.getJSONObject(i);button(content,selected.getString("name"),() -> selectProject(selected));}});
+    }
+    private void createProject() {
+        LinearLayout form=column();form.setPadding(dp(20),0,dp(20),0);EditText name=field(form,"Project name","",false);EditText repo=field(form,"Git URL (optional)","",false);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("New project").setView(form).setPositiveButton("Create",null).setNegativeButton("Cancel",null).create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String url=repo.getText().toString().trim();if(!url.isEmpty()){Uri uri=Uri.parse(url);if(!("https".equals(uri.getScheme())||"ssh".equals(uri.getScheme()))||uri.getHost()==null){repo.setError("Enter an HTTPS or SSH Git URL");return;}}
+            request("POST","/projects",json("name",name.getText().toString().trim()),value -> {dialog.dismiss();selectProject((JSONObject)value);if(!url.isEmpty()){pendingClone="git clone -- "+quote(url)+" .\r";show("Terminal");}});
+        }));dialog.show();
+    }
+    static String quote(String value){return "'"+value.replace("'","'\\''")+"'";}
+    private void chat() {
+        LinearLayout actions=row();body.addView(actions);button(actions,"Conversations",this::conversations);button(actions,"New chat",this::newChat);
+        button(actions,"Stop",() -> {if(!session.isEmpty())request("POST","/sessions/"+session+"/stop",json(),v -> refreshChat());});
+        chatScroll=new ScrollView(this);messages=column();chatScroll.addView(messages);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
+        chatScroll.setOnScrollChangeListener((v,x,y,oldx,oldy) -> followChat=y+chatScroll.getHeight()>=messages.getHeight()-dp(50));
+        prompt=new EditText(this);prompt.setHint("Ask the agent to build or change something…");prompt.setMinLines(2);prompt.setMaxLines(5);body.addView(prompt);
+        button(body,"Send",() -> {String text=prompt.getText().toString().trim();if(text.isEmpty())return;
+            if(session.isEmpty())request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);sendPrompt(text);});else sendPrompt(text);});
+        if(session.isEmpty()){messages.addView(label("Describe what you want to build. The agent can edit files, run Git and npm, and start a preview in this project.",17));
+            JSONObject settings=state.optJSONObject("settings");if(settings!=null&&!settings.optBoolean("hasKey"))button(messages,"Set up your model / BYOK key",() -> show("Settings"));}else refreshChat();
+    }
+    private void setSession(JSONObject selected){session=selected.optString("id");prefs().edit().putString("session",session).apply();}
+    private void newChat(){request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);show("Chat");});}
+    private void sendPrompt(String text){request("POST","/sessions/"+session+"/chat",json("text",text),v -> {prompt.setText("");refreshChat();});}
+    private void conversations() {
+        loadState(() -> {JSONArray all=state.optJSONArray("sessions");java.util.ArrayList<JSONObject> sessions=new java.util.ArrayList<>();
+            for(int i=0;i<all.length();i++)if(project.equals(all.optJSONObject(i).optString("projectId")))sessions.add(all.optJSONObject(i));
+            String[] names=new String[sessions.size()];for(int i=0;i<names.length;i++)names[i]=sessions.get(i).optString("title");
+            new AlertDialog.Builder(this).setTitle("Project conversations").setItems(names,(d,index) -> {setSession(sessions.get(index));show("Chat");}).setNegativeButton("Close",null).show();});
+    }
+    private void refreshChat() {
+        if(!visible||!tab.equals("Chat")||session.isEmpty())return;if(loadingChat){chatDirty=true;return;}loadingChat=true;String id=session;
+        work.execute(() -> {try {JSONObject value=api.get("/sessions/"+id);handler.post(() -> {loadingChat=false;if(tab.equals("Chat")&&session.equals(id))renderChat(value);
+            if(chatDirty){chatDirty=false;handler.postDelayed(chatUpdate,150);}});}catch(Exception e){handler.post(() -> {loadingChat=false;error(e);});}});
+    }
+    private String messageText(JSONObject message) {
+        Object content=message.opt("content");if(content instanceof String)return (String)content;StringBuilder text=new StringBuilder();
+        if(content instanceof JSONArray)for(int i=0;i<((JSONArray)content).length();i++){JSONObject part=((JSONArray)content).optJSONObject(i);if(part==null)continue;
+            if(part.has("text"))text.append(part.optString("text")).append("\n");if(part.optString("type").equals("toolCall"))text.append("→ ").append(part.optString("name")).append(" ").append(part.opt("arguments")).append("\n");}
+        if(message.has("errorMessage"))text.append(message.optString("errorMessage"));return text.toString().trim();
+    }
+    private void renderChat(JSONObject value) {
+        int old=chatScroll.getScrollY();boolean follow=followChat;messages.removeAllViews();JSONArray all=value.optJSONArray("messages");
+        for(int i=0;i<all.length();i++){JSONObject message=all.optJSONObject(i);String role=message.optString("role");if(role.equals("system"))continue;String text=messageText(message);if(text.isEmpty())continue;
+            TextView view=label((role.equals("toolResult")?"Tool · "+message.optString("toolName"):role.equals("user")?"You":"Agent")+"\n"+text,15);view.setTextIsSelectable(true);
+            view.setBackgroundColor(role.equals("user")?Color.rgb(36,48,35):Color.rgb(25,29,31));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(5),0,dp(5));messages.addView(view,params);}
+        JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null)messages.addView(label("Agent\n"+messageText(streaming),15));
+        JSONArray approvals=value.optJSONArray("approvals");for(int i=0;i<approvals.length();i++){JSONObject approval=approvals.optJSONObject(i);messages.addView(label("Allow "+approval.optString("tool")+"?\n"+approval.opt("args"),15));LinearLayout buttons=row();messages.addView(buttons);
+            button(buttons,"Allow",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",true),v -> refreshChat()));button(buttons,"Deny",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",false),v -> refreshChat()));}
+        if(value.optBoolean("busy"))messages.addView(label("Agent is working…",13));chatScroll.post(() -> {if(follow)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
+    }
+    private void terminal() {
+        String selected=project;terminalId=prefs().getString("terminal-"+selected,"");LinearLayout keys=row();HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.addView(keys);body.addView(scroll);
+        String[] names={"Esc","Tab","Ctrl-C","Ctrl-D","↑","↓","←","→"};String[] values={"\u001b","\t","\u0003","\u0004","\u001b[A","\u001b[B","\u001b[D","\u001b[C"};
+        for(int i=0;i<values.length;i++){String value=values[i];button(keys,names[i],() -> terminalSend(value));}
+        button(keys,"Paste",() -> {if(terminal!=null)terminal.paste();});button(keys,"New shell",() -> {if(!terminalId.isEmpty())request("DELETE","/terminals/"+terminalId,null,v -> {});prefs().edit().remove("terminal-"+selected).apply();terminalId="";show("Terminal");});
+        terminal=new TerminalCanvas(this,new TerminalCanvas.Input(){public void send(String value){terminalSend(value);}public void resize(int cols,int rows){if(!terminalId.isEmpty())terminalRequest(json("data","","cols",cols,"rows",rows));}});
+        body.addView(terminal,new LinearLayout.LayoutParams(-1,0,1));
+        if(terminalId.isEmpty())openTerminal(selected);else{String id=terminalId;work.execute(() -> {try{JSONObject value=api.get("/terminals/"+id);handler.post(() -> {if(!tab.equals("Terminal")||!selected.equals(project))return;
+            if(value.optBoolean("exited")){terminalId="";openTerminal(selected);}else terminal.append(value.optString("output"),value.optLong("offset"));});}catch(Exception e){handler.post(() -> {if(tab.equals("Terminal")&&selected.equals(project)){terminalId="";openTerminal(selected);}});}});}
+    }
+    private void openTerminal(String selected) {
+        request("POST","/terminals",json("projectId",selected,"cwd","."),value -> {String id=((JSONObject)value).getString("id");prefs().edit().putString("terminal-"+selected,id).apply();if(!selected.equals(project)||!tab.equals("Terminal"))return;terminalId=id;
+            request("GET","/terminals/"+id,null,output -> {if(terminal!=null&&terminalId.equals(id))terminal.append(((JSONObject)output).optString("output"),((JSONObject)output).optLong("offset"));});
+            if(!pendingClone.isEmpty()){String command=pendingClone;pendingClone="";terminalSend(command);}});
+    }
+    private void terminalSend(String value){if(!terminalId.isEmpty())terminalRequest(json("data",value));}
+    private void terminalRequest(JSONObject data){String id=terminalId;AgentApi connection=api;inputs.execute(() -> {try{connection.request("POST","/terminals/"+id+"/input",data);}catch(Exception e){handler.post(() -> error(e));}});}
+    private void files() {
+        LinearLayout content=scrolling();content.addView(label(directory,18));button(content,"Up",() -> {int slash=directory.lastIndexOf('/');directory=slash<0?".":directory.substring(0,slash);show("Files");});
+        button(content,"New file",() -> {EditText name=new EditText(this);name.setHint("path/to/file.txt");new AlertDialog.Builder(this).setTitle("Create file").setView(name).setPositiveButton("Create",(d,w) -> editFile((directory.equals(".")?"":directory+"/")+name.getText(),"")).setNegativeButton("Cancel",null).show();});
+        String selected=project,pathDirectory=directory;
+        request("GET","/files?projectId="+AgentApi.encode(selected)+"&path="+AgentApi.encode(directory),null,value -> {if(!tab.equals("Files")||!project.equals(selected)||!directory.equals(pathDirectory))return;JSONArray list=(JSONArray)value;
+            for(int i=0;i<list.length();i++){JSONObject entry=list.getJSONObject(i);String path=(directory.equals(".")?"":directory+"/")+entry.getString("name");button(content,(entry.optBoolean("directory")?"▸ ":"  ")+entry.getString("name"),() -> {
+                if(entry.optBoolean("directory")){directory=path;show("Files");}else request("GET","/file?projectId="+AgentApi.encode(selected)+"&path="+AgentApi.encode(path),null,file -> editFile(path,((JSONObject)file).getString("content")));});}});
+    }
+    private void editFile(String path,String text) {
+        String selected=project;EditText editor=new EditText(this);editor.setGravity(Gravity.TOP);editor.setTypeface(Typeface.MONOSPACE);editor.setTextSize(13);
+        editor.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);editor.setText(text);editor.setMinLines(12);ScrollView scroll=new ScrollView(this);scroll.addView(editor);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(path).setView(scroll).setPositiveButton("Save",null).setNegativeButton("Close",null).create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> request("PUT","/file",json("projectId",selected,"path",path,"content",editor.getText().toString()),result -> {dialog.dismiss();show("Files");})));dialog.show();
+    }
+    private void servers() {
+        LinearLayout content=scrolling();content.addView(label("Development servers",22));EditText command=field(content,"Command","npm run dev -- --host 0.0.0.0 --port 3000",false);EditText port=field(content,"Port","3000",false);port.setInputType(InputType.TYPE_CLASS_NUMBER);
+        button(content,"Start server",() -> {try{request("POST","/servers",json("projectId",project,"cwd",".","port",Integer.parseInt(port.getText().toString()),"command",command.getText().toString()),v -> loadState(() -> show("Servers")));}catch(Exception e){error(e);}});
+        content.addView(label("Microsoft Dev Tunnels",22));button(content,"Sign in",() -> request("POST","/tunnels/login",json(),v -> loadState(() -> show("Servers"))));CheckBox anonymous=new CheckBox(this);anonymous.setText("Allow anonymous visitors");content.addView(anonymous);
+        button(content,"Share this port",() -> {try{request("POST","/tunnels",json("port",Integer.parseInt(port.getText().toString()),"anonymous",anonymous.isChecked()),v -> loadState(() -> show("Servers")));}catch(Exception e){error(e);}});
+        jobs=column();content.addView(jobs);renderJobs();
+    }
+    private void renderJobs() {
+        if(jobs==null||!tab.equals("Servers"))return;jobs.removeAllViews();JSONArray list=state.optJSONArray("jobs");if(list==null)return;
+        for(int i=list.length()-1;i>=0;i--){JSONObject job=list.optJSONObject(i);jobs.addView(label(job.optString("label")+" · "+job.optString("status"),16));if(job.optString("status").equals("running"))button(jobs,"Stop",() -> request("POST","/processes/"+job.optString("id")+"/stop",json(),v -> {}));
+            int port=job.optInt("port");if(port>0)button(jobs,"Preview localhost:"+port,() -> openUrl("http://127.0.0.1:"+port));String output=job.optString("output");TextView log=label(output.length()>16000?output.substring(output.length()-16000):output,12);log.setTypeface(Typeface.MONOSPACE);log.setTextIsSelectable(true);jobs.addView(log);
+            java.util.regex.Matcher matches=java.util.regex.Pattern.compile("https://[^\\s<>\"']+").matcher(output);java.util.HashSet<String> urls=new java.util.HashSet<>();while(matches.find()){String url=matches.group();String host=Uri.parse(url).getHost();if(host!=null&&(host.endsWith(".devtunnels.ms")||host.equals("github.com")||host.equals("microsoft.com")||host.endsWith(".microsoft.com"))&&urls.add(url))button(jobs,"Open "+host,() -> openUrl(url));}}
+    }
+    private void settings() {
+        LinearLayout content=scrolling();JSONObject saved=state.optJSONObject("settings");content.addView(label("Your model connection",22));Spinner protocol=new Spinner(this);protocol.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"OpenAI Responses","OpenAI-compatible Chat Completions","Anthropic Messages"}));content.addView(protocol);
+        String savedApi=saved.optString("api");protocol.setSelection(savedApi.equals("anthropic-messages")?2:savedApi.equals("openai-completions")?1:0);
+        EditText base=field(content,"API base URL",saved.optString("baseUrl"),false),model=field(content,"Model",saved.optString("model"),false),key=field(content,saved.optBoolean("hasKey")?"API key (saved; leave blank to keep)":"Your API key","",true);
+        EditText context=field(content,"Context tokens",String.valueOf(saved.optInt("contextWindow")),false),max=field(content,"Maximum output tokens",String.valueOf(saved.optInt("maxTokens")),false);context.setInputType(InputType.TYPE_CLASS_NUMBER);max.setInputType(InputType.TYPE_CLASS_NUMBER);
+        protocol.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){boolean first=true;public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int pos,long id){if(first){first=false;return;}base.setText(pos==2?"https://api.anthropic.com":"https://api.openai.com/v1");if(pos==2)model.setText("claude-sonnet-4-6");key.setText("");}});
+        java.util.function.Supplier<JSONObject> connection=() -> json("provider",protocol.getSelectedItemPosition()==2?"anthropic":"openai","api",protocol.getSelectedItemPosition()==2?"anthropic-messages":protocol.getSelectedItemPosition()==1?"openai-completions":"openai-responses","baseUrl",base.getText().toString().trim(),"model",model.getText().toString().trim(),"apiKey",key.getText().toString(),"contextWindow",Integer.parseInt(context.getText().toString()),"maxTokens",Integer.parseInt(max.getText().toString()));
+        button(content,"Test connection (uses a small model request)",() -> {try{request("POST","/settings/test",connection.get(),v -> Toast.makeText(this,"Connected · "+((JSONObject)v).optLong("latencyMs")+" ms",Toast.LENGTH_LONG).show());}catch(Exception e){error(e);}});
+        button(content,"Save connection",() -> {try{request("PUT","/settings",connection.get(),v -> {state.put("settings",v);key.setText("");Toast.makeText(this,"Connection saved",Toast.LENGTH_SHORT).show();});}catch(Exception e){error(e);}});
+        button(content,"Remove saved key",() -> request("PUT","/settings",json("clearKey",true),v -> {state.put("settings",v);show("Settings");}));
+        CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");content.addView(trust);trust.setOnCheckedChangeListener((v,checked) -> {if(!session.isEmpty())request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {});});
+        content.addView(label("Files and tools run on this device. Model requests go to your provider. Closing this screen keeps servers running; use the notification to stop the environment.",14));
+        button(content,"Stop coding environment",() -> {startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});
+    }
+    private void listen() {
+        if(listening||!visible||api==null)return;listening=true;int epoch=++generation;AgentApi connection=api;
+        new Thread(() -> {try{connection.listen(value -> handler.post(() -> {if(visible&&epoch==generation)event(value);}));}catch(Exception ignored){}
+            finally{handler.post(() -> {if(epoch==generation){listening=false;if(visible&&api!=null)handler.postDelayed(this::listen,1000);}});}},"pocket-events").start();
+    }
+    private void event(JSONObject value) {
+        String type=value.optString("type");if(type.equals("terminal")&&terminal!=null&&terminalId.equals(value.optString("id")))terminal.append(value.optString("data"),value.optLong("offset"));
+        if(type.equals("terminal_exit")&&terminalId.equals(value.optString("id")))Toast.makeText(this,"Shell exited",Toast.LENGTH_SHORT).show();
+        if(type.equals("process")){JSONObject job=value.optJSONObject("job");JSONArray list=state.optJSONArray("jobs");if(list!=null&&job!=null){boolean found=false;for(int i=0;i<list.length();i++)if(list.optJSONObject(i).optString("id").equals(job.optString("id"))){try{list.put(i,job);}catch(JSONException ignored){}found=true;break;}if(!found)list.put(job);renderJobs();}}
+        if(type.equals("error"))new AlertDialog.Builder(this).setTitle("Agent error").setMessage(value.optString("error")).setPositiveButton("OK",null).show();
+        if(value.optString("sessionId").equals(session)&&tab.equals("Chat")){handler.removeCallbacks(chatUpdate);handler.postDelayed(chatUpdate,100);}
+        if(type.equals("connected")&&tab.equals("Chat"))refreshChat();
+    }
+    private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){error(e);}}
+    private void back(){if(!tab.equals("Projects"))show("Projects");else finish();}
+    @Override public void onBackPressed(){back();}
 }
