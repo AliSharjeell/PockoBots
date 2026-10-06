@@ -160,7 +160,10 @@ test("real pi OpenAI streaming dispatches tools and waits for cancellable shell 
     assert.equal(saved.apiKey, undefined);
     const result = await request("/settings/test", "POST", {});
     assert.equal(result.text, "OK");
-    const session = await request("/sessions", "POST", {});
+    const project = await request("/projects", "POST", { name: "agent-project" });
+    const other = await request("/projects", "POST", { name: "other-project" });
+    const session = await request("/sessions", "POST", { projectId: project.id });
+    assert.equal(session.projectId, project.id);
     const events = await fetch(base + "/api/events", {
       headers: { Authorization: "Bearer " + runtime.token },
       signal: AbortSignal.timeout(15000),
@@ -177,9 +180,11 @@ test("real pi OpenAI streaming dispatches tools and waits for cancellable shell 
       (s) => !s.busy,
     );
     assert.equal(
-      await readFile(join(temp, "workspace/agent-created.txt"), "utf8"),
+      await readFile(join(temp, "workspace/agent-project/agent-created.txt"), "utf8"),
       "Created by real pi tool dispatch",
     );
+    const files = await request("/files?projectId=" + other.id);
+    assert.equal(files.length, 0);
     assert.ok(
       finished.messages.some(
         (m: any) => m.role === "toolResult" && m.toolName === "write_file",

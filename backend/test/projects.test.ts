@@ -49,7 +49,6 @@ test("interactive terminal has a real TTY, accepts input, resizes and interrupts
     assert.fail("PTY did not produce: " + needle + "\n" + output());
   };
   try {
-    await until("$");
     terminals.input(id, "test -t 0 && test -t 1 && printf '\\n%s\\n' TTY_WORKS\n", 93, 31);
     await until("\r\nTTY_WORKS\r\n");
     terminals.input(id, "stty size\n"); await until("31 93");
