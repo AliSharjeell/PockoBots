@@ -1,4 +1,22 @@
-# Verification — 2026-10-06
+# Verification - 2026-10-06
+
+## Standalone native Android v0.2
+
+The v0.2 implementation replaces the Android WebView/Termux pairing flow with native Java screens and an app-owned PRoot runtime. Both ARM64 and x86_64 runtime archives were built locally from `runtime/Dockerfile`, with checksum-verified Android libraries and upstream native source archives.
+
+Completed backend checks: TypeScript compilation, ordinary Node build, Android backend bundle, and all nine integration tests against both backend builds. Tests dispatch real pi adapters against local OpenAI Chat Completions, OpenAI Responses, and Anthropic fixtures, exercise project isolation, and verify a real Linux PTY with resizing and Ctrl-C. These fixtures do not use paid provider accounts.
+
+Android SDK 35 compilation and lint pass with JDK 17 and Gradle 8.11.1. Lint reports zero errors and nine warnings, including vendored terminal reflection, localization, and the foreground service wake lock. APK v2 signing verification passes.
+
+On an Android 14 x86_64 emulator, a fresh APK installation automatically extracted the included runtime and launched its own backend without Termux. The packaged agent edited a project file using a local provider fixture. The native runtime executed Node 22.23.3, npm 10.9.9, Git 2.39.5, an interactive Bash PTY, a local Git clone, Ctrl-C, and an npm HTTP preview. Microsoft Dev Tunnels CLI 1.0.2094 launched and reported service metadata; authenticated tunnel hosting was not exercised.
+
+Final restart and architecture-specific artifact checks are recorded below after completion.
+
+Remaining coverage: physical ARM64 phone installation; Android vendor battery/background behavior; real provider credentials; authenticated Dev Tunnels login/hosting; compatibility of individual third-party npm packages and native addons on Android. The ARM64 runtime is built, but execution coverage in this workspace is x86_64 Android emulation. Model inference is remote BYOK; project files, agent tools, terminals, and development servers execute on the device.
+
+## Historical external-Termux v0.1 verification
+
+The following record concerns the previous v0.1 release. Its APK and setup instructions are not the standalone v0.2 implementation.
 
 Validated in the Linux build workspace:
 
