@@ -31,7 +31,9 @@ optional internet sharing for project ports.
 **Terminal** opens an interactive Bash PTY in the selected project directory.
 Use Git, npm, SSH, nano and other included tools. It supports input, resizing,
 colors, cursor control, scrollback, paste, arrow keys, Tab, Escape, Ctrl-C and
-Ctrl-D. Long-running commands can run here; **Servers** also offers managed
+Ctrl-D. Use the **Ctrl** toggle for other shortcuts, such as nano's Ctrl-O and
+Ctrl-X. Long-press the terminal to copy its transcript. Long-running commands
+can run here; **Servers** also offers managed
 development processes with logs, previews and stop controls.
 
 **Files** browses and edits project files. **Conversations** reopens saved chats
@@ -73,6 +75,11 @@ contains the runtime archive and executable libraries; no phone-side installer
 commands are needed. A build fails if the runtime is missing. `-PcompileOnly` is
 available for source compilation/lint during development, and must not be used
 to distribute an APK.
+
+If both runtime architectures are generated, the default APK contains both.
+Use `gradle :app:assembleDebug -PruntimeAbi=arm64-v8a` (or `x86_64`) for a smaller
+APK containing only the selected architecture. Rename or copy the resulting APK
+before building another architecture, since both builds use the same output path.
 
 GitHub Actions builds separate ARM64 and x86_64 APK artifacts and runs the
 packaged runtime smoke test in an Android emulator. To test locally with a
