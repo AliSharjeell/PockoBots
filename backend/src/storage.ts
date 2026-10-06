@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, rename, chmod } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 export class Store {
+  private writes = new Map<string, Promise<void>>();
   constructor(readonly dir: string) {}
   async init() { await mkdir(this.dir, { recursive: true, mode: 0o700 }); await chmod(this.dir, 0o700); }
   async read<T>(name: string, fallback: T): Promise<T> {
@@ -9,10 +10,16 @@ export class Store {
     catch (e: any) { if (e.code === 'ENOENT') return fallback; throw e; }
   }
   async write(name: string, value: unknown) {
-    const path = join(this.dir, name + '.json');
-    const temp = path + '.' + randomBytes(6).toString('hex') + '.tmp';
-    await writeFile(temp, JSON.stringify(value), { mode: 0o600 });
-    await rename(temp, path); await chmod(path, 0o600);
+    const data = JSON.stringify(value);
+    const prior = this.writes.get(name) || Promise.resolve();
+    const operation = prior.catch(() => {}).then(async () => {
+      const path = join(this.dir, name + '.json');
+      const temp = path + '.' + randomBytes(6).toString('hex') + '.tmp';
+      await writeFile(temp, data, { mode: 0o600 });
+      await rename(temp, path); await chmod(path, 0o600);
+    });
+    this.writes.set(name, operation);
+    try { await operation; } finally { if (this.writes.get(name) === operation) this.writes.delete(name); }
   }
   async token() {
     let token = await this.read<string>('token', '');
