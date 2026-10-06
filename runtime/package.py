@@ -119,6 +119,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-sources-") as source_dir:
                 archive.writestr(f"recipes/{package}/build.sh", response.read())
         for name in ("Dockerfile", "package.py", "android-compat.c", "native-lock.json", "source-lock.json", "NOTICE.md"):
             archive.write(repo / "runtime" / name, f"pocket-agent/{name}")
+        archive.write(repo / "scripts/bundle-backend.mjs", "pocket-agent/bundle-backend.mjs")
     import shutil
     shutil.copyfile(repo / "runtime/NOTICE.md", licenses / "NOTICE.md")
     shutil.copyfile(repo / "android/terminal/LICENSE", licenses / "terminal-LICENSE")
