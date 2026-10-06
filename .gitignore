@@ -8,3 +8,5 @@ android/local.properties
 android/**/build/
 *.apk
 *.keystore
+playwright-report/
+test-results/
