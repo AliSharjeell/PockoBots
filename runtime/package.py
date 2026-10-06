@@ -93,3 +93,28 @@ try:
         print(json.dumps(metadata))
 finally:
     run("docker", "rm", container)
+
+# Ship the exact upstream native source and build recipes with each APK.
+# Debian package and npm license files remain within the runtime filesystem.
+source_lock = json.loads((repo / "runtime/source-lock.json").read_text())
+with tempfile.TemporaryDirectory(prefix="pocket-sources-") as source_dir:
+    source_dir = Path(source_dir)
+    licenses = repo / "android/app/src/main/assets/licenses"
+    licenses.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(licenses / "native-sources.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, (url, digest) in source_lock.items():
+            path = source_dir / name
+            run("curl", "--fail", "--location", "--retry", "3", url, "-o", str(path))
+            if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                raise RuntimeError(f"Source checksum mismatch: {name}")
+            archive.write(path, name)
+        recipes_commit = "decc2980bd7f3f2d1f1b51a5bb519c2f57bcfa70"
+        for package in ("proot", "libtalloc", "libandroid-shmem"):
+            url = f"https://raw.githubusercontent.com/termux/termux-packages/{recipes_commit}/packages/{package}/build.sh"
+            with urllib.request.urlopen(url) as response:
+                archive.writestr(f"recipes/{package}/build.sh", response.read())
+        for name in ("Dockerfile", "package.py", "native-lock.json", "source-lock.json", "NOTICE.md"):
+            archive.write(repo / "runtime" / name, f"pocket-agent/{name}")
+    import shutil
+    shutil.copyfile(repo / "runtime/NOTICE.md", licenses / "NOTICE.md")
+    shutil.copyfile(repo / "android/terminal/LICENSE", licenses / "terminal-LICENSE")

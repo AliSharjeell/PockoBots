@@ -13,3 +13,4 @@ test-results/
 android/app/src/main/assets/runtime/
 android/app/src/main/jniLibs/
 __pycache__/
+android/app/src/main/assets/licenses/
