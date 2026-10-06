@@ -85,7 +85,7 @@ public class RuntimeSmokeTest {
         context.startForegroundService(new Intent(context,RuntimeService.class));
         long restarted=System.currentTimeMillis()+60000;
         while(!RuntimeService.ready&&System.currentTimeMillis()<restarted)Thread.sleep(100);
-        assertTrue("Runtime did not restart: "+RuntimeService.status,RuntimeService.ready);
+        assertTrue("Runtime did not restart: "+RuntimeService.status+"\n"+Io.text(new File(context.getFilesDir(),"runtime.log")),RuntimeService.ready);
         AgentApi reconnected=new AgentApi(token);assertTrue(reconnected.get("/state").getJSONArray("projects").toString().contains(projectId));
         assertEquals(projectId,reconnected.get("/sessions/"+conversation.getString("id")).getString("projectId"));
     }
