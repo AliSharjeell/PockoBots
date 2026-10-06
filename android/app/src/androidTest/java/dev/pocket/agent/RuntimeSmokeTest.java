@@ -56,7 +56,7 @@ public class RuntimeSmokeTest {
         try {
             api.request("POST","/terminals/"+id+"/input",object("data","test -t 0 && test -t 1 && printf '\\n%s\\n' TTY_OK\r","cols",93,"rows",31));
             untilTerminal(id,"\r\nTTY_OK\r\n");
-            api.request("POST","/terminals/"+id+"/input",object("data","stty size; pwd; node --version; npm --version; git --version; devtunnel --version && printf '\\n%s\\n' TUNNEL_CLI_OK\r"));
+            api.request("POST","/terminals/"+id+"/input",object("data","stty size; pwd; node --version; npm --version; git --version; devtunnel --help >/dev/null && printf '\\n%s\\n' TUNNEL_CLI_OK\r"));
             untilTerminal(id,"31 93");untilTerminal(id,"/workspace/"+name);untilTerminal(id,"git version");
             untilTerminal(id,"\r\nTUNNEL_CLI_OK\r\n");
             api.request("POST","/terminals/"+id+"/input",object("data","git init source && git -C source -c user.name=Test -c user.email=test@example.com commit --allow-empty -m initial && git clone ./source cloned && test -d cloned/.git && printf '\\n%s\\n' CLONE_OK\r"));
