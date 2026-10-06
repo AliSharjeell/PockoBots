@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, symlink, readFile, stat, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, symlink, readFile, writeFile, stat, rm, mkdir } from 'node:fs/promises';
+import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Workspace } from '../src/workspace.js';
@@ -51,5 +52,23 @@ test('shell commands, local git clones, and process cancellation work',async()=>
     assert.equal(tunnelCommand(3000,false),'devtunnel host -p 3000');
     assert.equal(tunnelCommand(3000,true),'devtunnel host -p 3000 --allow-anonymous');
     assert.throws(()=>validPort('3000; echo bad'),/Port/);assert.throws(()=>validPort(8787),/control port/);
+  }finally{processes.stopAll();await rm(temp,{recursive:true,force:true});}
+});
+
+test('a managed npm development server answers localhost HTTP and stops with its children',async()=>{
+  const temp=await mkdtemp(join(tmpdir(),'pocket-npm-'));
+  const processes=new Processes(()=>{});
+  const reserve=http.createServer();await new Promise<void>(r=>reserve.listen(0,'127.0.0.1',r));const port=(reserve.address() as any).port;
+  await new Promise<void>(r=>reserve.close(()=>r()));
+  try {
+    await writeFile(join(temp,'package.json'),JSON.stringify({scripts:{dev:'node server.cjs'}}));
+    await writeFile(join(temp,'server.cjs'),`require('http').createServer((req,res)=>res.end('local npm server')).listen(${port},'127.0.0.1',()=>console.log('ready'));`);
+    const job=processes.start('npm run dev',temp,'server',port);
+    const deadline=Date.now()+10000;let response='';
+    while(Date.now()<deadline) {try {response=await (await fetch('http://127.0.0.1:'+port)).text();break;}catch{}await new Promise(r=>setTimeout(r,30));}
+    assert.equal(response,'local npm server');assert.match(job.output,/ready/);
+    processes.stop(job.id);
+    while(job.status==='running' && Date.now()<deadline)await new Promise(r=>setTimeout(r,25));
+    assert.equal(job.status,'exited');await assert.rejects(fetch('http://127.0.0.1:'+port));
   }finally{processes.stopAll();await rm(temp,{recursive:true,force:true});}
 });

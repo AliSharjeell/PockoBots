@@ -87,3 +87,22 @@ test('Anthropic API test uses the configured URL and key through the real pi ada
   try{const result=await testConnection({...defaults,provider:'anthropic',api:'anthropic-messages',baseUrl:'http://127.0.0.1:'+port,model:'custom-claude',apiKey:'anthropic-test-key'});assert.equal(result.text,'OK');}
   finally{await close(server);}
 });
+
+test('OpenAI Responses adapter streams from a custom base URL',async()=>{
+  const server=http.createServer(async(req,res)=>{
+    assert.equal(req.url,'/v1/responses');assert.equal(req.headers.authorization,'Bearer responses-test-key');
+    let body='';for await(const chunk of req)body+=chunk;assert.equal(JSON.parse(body).model,'custom-responses');
+    res.setHeader('Content-Type','text/event-stream');
+    const send=(type:string,data:any)=>res.write('event: '+type+'\ndata: '+JSON.stringify({type,...data})+'\n\n');
+    const item={id:'msg_1',type:'message',role:'assistant',status:'completed',content:[{type:'output_text',text:'OK',annotations:[]}]};
+    send('response.created',{response:{id:'resp_1'}});
+    send('response.output_item.added',{output_index:0,item:{...item,status:'in_progress',content:[]}});
+    send('response.output_text.delta',{output_index:0,content_index:0,item_id:'msg_1',delta:'OK'});
+    send('response.output_item.done',{output_index:0,item});
+    send('response.completed',{response:{id:'resp_1',model:'custom-responses',status:'completed',output:[item],usage:{input_tokens:3,output_tokens:1,total_tokens:4,input_tokens_details:{cached_tokens:0},output_tokens_details:{reasoning_tokens:0}}}});
+    res.end();
+  });
+  const port=await listen(server);
+  try{const result=await testConnection({...defaults,baseUrl:'http://127.0.0.1:'+port+'/v1',model:'custom-responses',apiKey:'responses-test-key'});assert.equal(result.text,'OK');}
+  finally{await close(server);}
+});
