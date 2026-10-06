@@ -11,8 +11,10 @@ public class RuntimeService extends Service {
     static volatile boolean ready = false;
     private static final Object runtimeLock = new Object();
     private static volatile java.lang.Process lastRuntime;
+    private static volatile int lastRuntimePid;
     private static volatile RuntimeService active;
     private volatile java.lang.Process backend;
+    private volatile int runtimePid;
     private volatile boolean starting;
     private PowerManager.WakeLock wakeLock;
     private volatile boolean stopping;
@@ -61,7 +63,11 @@ public class RuntimeService extends Service {
             File logFile = new File(files, "runtime.log");
             // A pipe reader can block Process.destroy() on Android. Write directly
             // to a file so lifecycle shutdown never waits on a stdout reader lock.
-            ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(logFile);
+            File pidFile = new File(files, "runtime.pid");
+            List<String> launcher = new ArrayList<>(Arrays.asList("/system/bin/sh", "-c",
+                "printf '%s\\n' \"$$\" > \"$1\"; shift; exec \"$@\"", "pocket-runtime", pidFile.getPath()));
+            launcher.addAll(command);
+            ProcessBuilder builder = new ProcessBuilder(launcher).redirectErrorStream(true).redirectOutput(logFile);
             builder.environment().put("PROOT_LOADER", nativeDir + "/libproot-loader.so");
             builder.environment().put("PROOT_LOADER_32", nativeDir + "/libproot-loader32.so");
             builder.environment().put("PROOT_TMP_DIR", files + "/tmp");
@@ -70,15 +76,18 @@ public class RuntimeService extends Service {
             synchronized (runtimeLock) {
                 if (lastRuntime != null && lastRuntime.isAlive()) {
                     status = "Waiting for the previous environment to stop…";
-                    lastRuntime.destroy();
-                    if (!lastRuntime.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                        lastRuntime.destroyForcibly();
-                        if (!lastRuntime.waitFor(5, java.util.concurrent.TimeUnit.SECONDS))
-                            throw new IOException("The previous environment has not stopped yet. Retry setup.");
-                    }
+                    stopProcess(lastRuntime, lastRuntimePid);
                 }
                 if (stopping) return;
-                backend = builder.start(); lastRuntime = backend;
+                Io.write(pidFile, ""); backend = builder.start(); lastRuntime = backend;
+                long pidDeadline = System.currentTimeMillis() + 3000;
+                while (runtimePid == 0 && backend.isAlive() && System.currentTimeMillis() < pidDeadline) {
+                    String value = Io.text(pidFile).trim();
+                    if (!value.isEmpty()) runtimePid = Integer.parseInt(value);
+                    else Thread.sleep(25);
+                }
+                lastRuntimePid = runtimePid;
+                if (runtimePid == 0) throw new IOException("Could not identify the coding environment process");
             }
             long logSize = -1;
             while (!stopping && backend.isAlive()) {
@@ -93,14 +102,27 @@ public class RuntimeService extends Service {
         } catch (Exception e) { if (!stopping && active == this) { ready = false; status = "Setup failed: " + e.getMessage(); } }
         finally { starting = false; if (!stopping && active == this) stopSelf(); }
     }
+    private static void stopProcess(java.lang.Process process, int pid) throws InterruptedException, IOException {
+        if (!process.isAlive()) return;
+        // PRoot deliberately ignores SIGTERM. SIGQUIT invokes its handler that
+        // kills every traced child before exiting, including terminals/servers.
+        try { android.system.Os.kill(pid, android.system.OsConstants.SIGQUIT); }
+        catch (android.system.ErrnoException e) { if (e.errno != android.system.OsConstants.ESRCH) throw new IOException(e); }
+        if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+            try { android.system.Os.kill(pid, android.system.OsConstants.SIGKILL); }
+            catch (android.system.ErrnoException e) { if (e.errno != android.system.OsConstants.ESRCH) throw new IOException(e); }
+            if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) throw new IOException("The previous environment has not stopped yet. Retry setup.");
+        }
+    }
     @Override public void onDestroy() {
         stopping = true; if (active == this) ready = false;
         java.lang.Process process = backend;
         if (process != null) {
             new Thread(() -> { try {
-                process.destroy();
-                if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly();
-            } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }, "pocket-stop").start();
+                synchronized (runtimeLock) { stopProcess(process, runtimePid); }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+              catch (IOException e) { android.util.Log.e("PocketRuntime", "Could not stop environment", e); }
+            }, "pocket-stop").start();
         }
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         super.onDestroy();
