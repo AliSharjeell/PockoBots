@@ -10,7 +10,9 @@ Android SDK 35 compilation and lint pass with JDK 17 and Gradle 8.11.1. Lint rep
 
 On an Android 14 x86_64 emulator, a fresh APK installation automatically extracted the included runtime and launched its own backend without Termux. The packaged agent edited a project file using a local provider fixture. The native runtime executed Node 22.23.3, npm 10.9.9, Git 2.39.5, an interactive Bash PTY, a local Git clone, Ctrl-C, and an npm HTTP preview. Microsoft Dev Tunnels CLI 1.0.2094 launched and reported service metadata; authenticated tunnel hosting was not exercised.
 
-Final restart and architecture-specific artifact checks are recorded below after completion.
+The full packaged-app smoke test passed on the Android 14 emulator in 76 seconds from a fresh installation, including automatic runtime extraction, agent tool dispatch, terminal resizing and interactive input, Git cloning, npm HTTP serving, shutdown, restart, and persisted project/conversation state. PRoot shutdown uses SIGQUIT because its normal handler ignores SIGTERM; runtime launches record their own PID and wait for the previous process to exit.
+
+Architecture-specific Gradle packaging was checked to include only the selected runtime archive and native-library ABI. The x86_64 debug APK is 271,249,519 bytes. Generated APKs and runtime payloads are build artifacts ignored by Git; all implementation changes are committed separately.
 
 Remaining coverage: physical ARM64 phone installation; Android vendor battery/background behavior; real provider credentials; authenticated Dev Tunnels login/hosting; compatibility of individual third-party npm packages and native addons on Android. The ARM64 runtime is built, but execution coverage in this workspace is x86_64 Android emulation. Model inference is remote BYOK; project files, agent tools, terminals, and development servers execute on the device.
 
