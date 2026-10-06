@@ -80,7 +80,8 @@ final class TerminalCanvas extends View {
                 touchY = event.getY(); dragged = true; invalidate();
             }
         }
-        if (event.getAction() == MotionEvent.ACTION_UP && !dragged) performClick();
+        // Let View dispatch taps and long presses, including transcript copying.
+        super.onTouchEvent(event);
         return true;
     }
     @Override public boolean performClick() {
