@@ -27,6 +27,8 @@ public class RuntimeSmokeTest {
     }
     @Test public void firstLaunchProjectsGitNpmInteractiveShellAndRestart() throws Exception {
         Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        if(android.os.Build.VERSION.SDK_INT>=33)InstrumentationRegistry.getInstrumentation().getUiAutomation()
+            .grantRuntimePermission(context.getPackageName(),android.Manifest.permission.POST_NOTIFICATIONS);
         Intent open=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         InstrumentationRegistry.getInstrumentation().startActivitySync(open);
         long deadline=System.currentTimeMillis()+240000;
