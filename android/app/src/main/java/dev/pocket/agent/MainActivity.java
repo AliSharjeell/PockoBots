@@ -151,7 +151,12 @@ public class MainActivity extends Activity {
         loadState(() -> {JSONArray all=state.optJSONArray("sessions");java.util.ArrayList<JSONObject> sessions=new java.util.ArrayList<>();
             for(int i=0;i<all.length();i++)if(project.equals(all.optJSONObject(i).optString("projectId")))sessions.add(all.optJSONObject(i));
             String[] names=new String[sessions.size()];for(int i=0;i<names.length;i++)names[i]=sessions.get(i).optString("title");
-            new AlertDialog.Builder(this).setTitle("Project conversations").setItems(names,(d,index) -> {setSession(sessions.get(index));show("Chat");}).setNegativeButton("Close",null).show();});
+            new AlertDialog.Builder(this).setTitle("Project conversations").setItems(names,(d,index) -> {
+                JSONObject selected=sessions.get(index);
+                new AlertDialog.Builder(this).setTitle(selected.optString("title")).setPositiveButton("Open",(dialog,which) -> {setSession(selected);show("Chat");})
+                    .setNeutralButton("Delete",(dialog,which) -> request("DELETE","/sessions/"+selected.optString("id"),null,result -> {if(session.equals(selected.optString("id"))){session="";prefs().edit().putString("session","").apply();}show("Chat");}))
+                    .setNegativeButton("Cancel",null).show();
+            }).setNegativeButton("Close",null).show();});
     }
     private void refreshChat() {
         if(!visible||!tab.equals("Chat")||session.isEmpty())return;if(loadingChat){chatDirty=true;return;}loadingChat=true;String id=session;
