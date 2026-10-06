@@ -50,6 +50,8 @@ try:
                     if link.startswith("/"):
                         link = os.path.relpath(link.lstrip("/"), os.path.dirname(name) or ".")
                     links.append({"path": name, "target": link})
+                elif entry.isdir():
+                    target.writestr(name.rstrip("/") + "/", b"")
                 elif entry.isfile() or entry.islnk():
                     stream = source.extractfile(entry)
                     if stream is not None:
