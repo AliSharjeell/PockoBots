@@ -25,9 +25,9 @@ public class MainActivity extends Activity {
     private EditText prompt;
     private TextView setupStatus;
     private TerminalCanvas terminal;
-    private boolean visible, listening, loadingChat, chatDirty, followChat = true;
+    private boolean visible, listening, loadingChat, chatDirty, chatScheduled, followChat = true;
     private int generation;
-    private final Runnable chatUpdate = this::refreshChat;
+    private final Runnable chatUpdate = () -> { chatScheduled=false;refreshChat(); };
     int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     android.content.SharedPreferences prefs() { return getSharedPreferences("native-ui", MODE_PRIVATE); }
     @Override public void onCreate(Bundle saved) {
@@ -41,11 +41,12 @@ public class MainActivity extends Activity {
     }
     @Override protected void onResume() {
         super.onResume(); visible = true; startForegroundService(new Intent(this, RuntimeService.class));
-        if (api == null) waitForRuntime(); else { listen(); loadState(() -> show(tab)); }
+        if (!RuntimeService.ready) { api=null;setup();waitForRuntime(); }
+        else if (api == null) waitForRuntime(); else { listen(); loadState(() -> show(tab)); }
     }
     @Override protected void onPause() {
         visible = false; generation++; listening = false; if (api != null) api.closeEvents();
-        handler.removeCallbacks(chatUpdate); super.onPause();
+        handler.removeCallbacks(chatUpdate);chatScheduled=false; super.onPause();
     }
     @Override protected void onDestroy() { handler.removeCallbacksAndMessages(null); work.shutdownNow(); inputs.shutdownNow(); super.onDestroy(); }
     LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
@@ -113,7 +114,7 @@ public class MainActivity extends Activity {
         prefs().edit().putString("project",project).putString("session","").apply();show("Chat");
     }
     private void show(String name) {
-        if(api==null)return;tab=name;terminal=null;handler.removeCallbacks(chatUpdate);shell();
+        if(api==null)return;tab=name;terminal=null;handler.removeCallbacks(chatUpdate);chatScheduled=false;shell();
         if(project.isEmpty()&&!name.equals("Projects")&&!name.equals("Settings")){body.addView(label("Create or select a project to get started.",18));button(body,"Projects",() -> show("Projects"));return;}
         switch(name){case "Projects":projects();break;case "Chat":chat();break;case "Terminal":terminal();break;case "Files":files();break;case "Servers":servers();break;case "Settings":settings();break;}
     }
@@ -155,7 +156,7 @@ public class MainActivity extends Activity {
     private void refreshChat() {
         if(!visible||!tab.equals("Chat")||session.isEmpty())return;if(loadingChat){chatDirty=true;return;}loadingChat=true;String id=session;
         work.execute(() -> {try {JSONObject value=api.get("/sessions/"+id);handler.post(() -> {loadingChat=false;if(tab.equals("Chat")&&session.equals(id))renderChat(value);
-            if(chatDirty){chatDirty=false;handler.postDelayed(chatUpdate,150);}});}catch(Exception e){handler.post(() -> {loadingChat=false;error(e);});}});
+            if(chatDirty){chatDirty=false;scheduleChat();}});}catch(Exception e){handler.post(() -> {loadingChat=false;error(e);});}});
     }
     private String messageText(JSONObject message) {
         Object content=message.opt("content");if(content instanceof String)return (String)content;StringBuilder text=new StringBuilder();
@@ -231,7 +232,8 @@ public class MainActivity extends Activity {
         EditText gitName=field(content,"Your name","",false),gitEmail=field(content,"Your email","",false);
         request("GET","/git/identity",null,v -> {if(tab.equals("Settings")){gitName.setText(((JSONObject)v).optString("name"));gitEmail.setText(((JSONObject)v).optString("email"));}});
         button(content,"Save Git identity",() -> request("PUT","/git/identity",json("name",gitName.getText().toString(),"email",gitEmail.getText().toString()),v -> Toast.makeText(this,"Git identity saved",Toast.LENGTH_SHORT).show()));
-        CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");content.addView(trust);trust.setOnCheckedChangeListener((v,checked) -> {if(!session.isEmpty())request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {});});
+        CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");trust.setEnabled(!session.isEmpty());content.addView(trust);
+        if(!session.isEmpty())request("GET","/sessions/"+session,null,v -> {trust.setChecked(((JSONObject)v).optBoolean("trusted"));trust.setOnCheckedChangeListener((view,checked) -> request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {}));});
         content.addView(label("Files and tools run on this device. Model requests go to your provider. Closing this screen keeps servers running; use the notification to stop the environment.",14));
         button(content,"Stop coding environment",() -> {startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});
     }
@@ -245,9 +247,10 @@ public class MainActivity extends Activity {
         if(type.equals("terminal_exit")&&terminalId.equals(value.optString("id")))Toast.makeText(this,"Shell exited",Toast.LENGTH_SHORT).show();
         if(type.equals("process")){JSONObject job=value.optJSONObject("job");JSONArray list=state.optJSONArray("jobs");if(list!=null&&job!=null){boolean found=false;for(int i=0;i<list.length();i++)if(list.optJSONObject(i).optString("id").equals(job.optString("id"))){try{list.put(i,job);}catch(JSONException ignored){}found=true;break;}if(!found)list.put(job);renderJobs();}}
         if(type.equals("error"))new AlertDialog.Builder(this).setTitle("Agent error").setMessage(value.optString("error")).setPositiveButton("OK",null).show();
-        if(value.optString("sessionId").equals(session)&&tab.equals("Chat")){handler.removeCallbacks(chatUpdate);handler.postDelayed(chatUpdate,100);}
+        if(value.optString("sessionId").equals(session)&&tab.equals("Chat"))scheduleChat();
         if(type.equals("connected")&&tab.equals("Chat"))refreshChat();
     }
+    private void scheduleChat(){if(!chatScheduled){chatScheduled=true;handler.postDelayed(chatUpdate,100);}}
     private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){error(e);}}
     private void back(){if(!tab.equals("Projects"))show("Projects");else finish();}
     @Override public void onBackPressed(){back();}
