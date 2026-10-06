@@ -2,9 +2,25 @@ plugins { id 'com.android.application' }
 android {
     namespace 'dev.pocket.agent'
     compileSdk 35
-    defaultConfig { applicationId 'dev.pocket.agent'; minSdk 26; targetSdk 35; versionCode 1; versionName '0.1.0' }
+    defaultConfig { applicationId 'dev.pocket.agent'; minSdk 26; targetSdk 35; versionCode 2; versionName '0.2.0' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
     sourceSets.main.java.srcDir '../terminal/src/main/java'
+    packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
 }
 dependencies { implementation 'androidx.annotation:annotation:1.9.0' }
+
+tasks.register('verifyPackagedRuntime') {
+    doLast {
+        if (!project.hasProperty('compileOnly')) {
+            def abis = ['arm64-v8a', 'x86_64'].findAll { file("src/main/assets/runtime/${it}.zip").exists() }
+            if (abis.empty) throw new GradleException('Run python3 runtime/package.py arm64 (or amd64) before building the standalone APK.')
+            abis.each { abi ->
+                ['libproot.so', 'libproot-loader.so', 'libtalloc.so', 'libandroid-shmem.so'].each { name ->
+                    if (!file("src/main/jniLibs/${abi}/${name}").exists()) throw new GradleException("Missing packaged runtime library: ${abi}/${name}")
+                }
+            }
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyPackagedRuntime' }
