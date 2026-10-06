@@ -9,12 +9,16 @@ import java.util.*;
 public class RuntimeService extends Service {
     static volatile String status = "Starting coding environment…";
     static volatile boolean ready = false;
+    private static final Object runtimeLock = new Object();
+    private static volatile java.lang.Process lastRuntime;
+    private static volatile RuntimeService active;
     private volatile java.lang.Process backend;
     private volatile boolean starting;
     private PowerManager.WakeLock wakeLock;
     private volatile boolean stopping;
     @Override public void onCreate() {
         super.onCreate();
+        active = this; ready = false; status = "Starting coding environment…";
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("runtime", "Coding environment", NotificationManager.IMPORTANCE_LOW));
         Intent open = new Intent(this, MainActivity.class);
@@ -60,24 +64,43 @@ public class RuntimeService extends Service {
             builder.environment().put("PROOT_TMP_DIR", files + "/tmp");
             builder.environment().put("PROOT_NO_SECCOMP", "1");
             builder.environment().put("LD_LIBRARY_PATH", nativeDir);
-            backend = builder.start();
+            synchronized (runtimeLock) {
+                if (lastRuntime != null && lastRuntime.isAlive()) {
+                    status = "Waiting for the previous environment to stop…";
+                    lastRuntime.destroy();
+                    if (!lastRuntime.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        lastRuntime.destroyForcibly();
+                        if (!lastRuntime.waitFor(5, java.util.concurrent.TimeUnit.SECONDS))
+                            throw new IOException("The previous environment has not stopped yet. Retry setup.");
+                    }
+                }
+                if (stopping) return;
+                backend = builder.start(); lastRuntime = backend;
+            }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(backend.getInputStream()));
                  FileWriter log = new FileWriter(new File(files, "runtime.log"), false)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     log.write(line + "\n"); log.flush();
-                    if (line.contains("Pocket Agent listening")) { ready = true; status = "Ready"; }
-                    else if (!ready) status = line;
+                    if (!stopping && active == this) {
+                        if (line.contains("Pocket Agent listening")) { ready = true; status = "Ready"; }
+                        else if (!ready) status = line;
+                    }
                 }
             }
-            ready = false;
-            if (!stopping) status = "Environment stopped (" + backend.waitFor() + "). Reopen the app to restart. See runtime logs for details.";
-        } catch (Exception e) { ready = false; status = "Setup failed: " + e.getMessage(); }
-        finally { starting = false; if (!stopping) stopSelf(); }
+            if (!stopping && active == this) { ready = false; status = "Environment stopped (" + backend.waitFor() + "). Reopen the app to restart. See runtime logs for details."; }
+        } catch (Exception e) { if (!stopping && active == this) { ready = false; status = "Setup failed: " + e.getMessage(); } }
+        finally { starting = false; if (!stopping && active == this) stopSelf(); }
     }
     @Override public void onDestroy() {
-        stopping = true; ready = false;
-        if (backend != null) backend.destroy();
+        stopping = true; if (active == this) ready = false;
+        java.lang.Process process = backend;
+        if (process != null) {
+            process.destroy();
+            new Thread(() -> { try {
+                if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly();
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }, "pocket-stop").start();
+        }
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         super.onDestroy();
     }
