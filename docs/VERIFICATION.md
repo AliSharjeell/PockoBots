@@ -15,4 +15,4 @@ The process tests perform a local Git clone and start a real npm HTTP server, fe
 
 Not verified here: installation on a physical phone; Android background survival; Termux RUN_COMMAND permission behavior on each Android vendor; paid provider accounts; ARM64 Debian/proot Dev Tunnels execution; authenticated tunnel creation. Microsoft’s CLI download short link returned HTTP 403 in this workspace. The README explains the required phone setup and the tunnel integration uses Microsoft’s documented CLI commands.
 
-At this verification point, the connected GitHub app can access repositories under `raahimirfan100` but cannot access `AliSharjeell/pocket-agent`. All source changes are committed locally; pushing those commits requires installing the connector for the target owner/repository.
+GitHub access is now verified: the ChatGPT Codex Connector is installed for all repositories under `AliSharjeell`, with contents and workflows write permissions. `AliSharjeell/pocket-agent` is private and grants push access. The project history preserves the repository’s initial README commit through a merge.
