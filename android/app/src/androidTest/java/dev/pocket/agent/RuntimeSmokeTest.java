@@ -42,8 +42,9 @@ public class RuntimeSmokeTest {
         try {
             api.request("POST","/terminals/"+id+"/input",object("data","test -t 0 && test -t 1 && printf '\\n%s\\n' TTY_OK\r","cols",93,"rows",31));
             untilTerminal(id,"\r\nTTY_OK\r\n");
-            api.request("POST","/terminals/"+id+"/input",object("data","stty size; pwd; node --version; npm --version; git --version; devtunnel --version\r"));
+            api.request("POST","/terminals/"+id+"/input",object("data","stty size; pwd; node --version; npm --version; git --version; devtunnel --version && printf '\\n%s\\n' TUNNEL_CLI_OK\r"));
             untilTerminal(id,"31 93");untilTerminal(id,"/workspace/"+name);untilTerminal(id,"git version");
+            untilTerminal(id,"\r\nTUNNEL_CLI_OK\r\n");
             api.request("POST","/terminals/"+id+"/input",object("data","git init source && git -C source -c user.name=Test -c user.email=test@example.com commit --allow-empty -m initial && git clone ./source cloned && test -d cloned/.git && printf '\\n%s\\n' CLONE_OK\r"));
             untilTerminal(id,"\r\nCLONE_OK\r\n");
             api.request("POST","/terminals/"+id+"/input",object("data","read -r answer; printf '\\nANSWER:%s\\n' \"$answer\"\r"));
@@ -60,7 +61,17 @@ public class RuntimeSmokeTest {
             while(System.currentTimeMillis()<end){try(java.io.InputStream in=new java.net.URL("http://127.0.0.1:3199").openStream()){response=new String(Io.bytes(in));break;}catch(Exception ignored){Thread.sleep(100);}}
             assertEquals("PHONE_NPM_OK",response);
         }finally{api.request("POST","/processes/"+server.getString("id")+"/stop",object());}
-        // A new client and activity recreation reuse the runtime and its persisted projects.
+        context.stopService(new Intent(context,RuntimeService.class));
+        long stopped=System.currentTimeMillis()+15000;
+        while(RuntimeService.ready&&System.currentTimeMillis()<stopped)Thread.sleep(100);
+        assertFalse("Runtime did not stop",RuntimeService.ready);
+        // Wait for the old PRoot process and its listening socket to exit before relaunch.
+        while(System.currentTimeMillis()<stopped){try{api.get("/state");Thread.sleep(100);}catch(Exception e){break;}}
+        context.startForegroundService(new Intent(context,RuntimeService.class));
+        long restarted=System.currentTimeMillis()+60000;
+        while(!RuntimeService.ready&&System.currentTimeMillis()<restarted)Thread.sleep(100);
+        assertTrue("Runtime did not restart: "+RuntimeService.status,RuntimeService.ready);
         AgentApi reconnected=new AgentApi(token);assertTrue(reconnected.get("/state").getJSONArray("projects").toString().contains(projectId));
+        assertEquals(projectId,reconnected.get("/sessions/"+conversation.getString("id")).getString("projectId"));
     }
 }
