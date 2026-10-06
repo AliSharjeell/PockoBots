@@ -50,6 +50,8 @@ final class TerminalCanvas extends View {
         }
         offset = Math.max(offset, start + bytes.length); topRow = 0; invalidate();
     }
+    int columns() { return emulator.mColumns; }
+    int rows() { return emulator.mRows; }
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         int cols = Math.max(10, Math.min(500, (int)(w / cellWidth)));
         int rows = Math.max(2, Math.min(200, h / cellHeight - 1));

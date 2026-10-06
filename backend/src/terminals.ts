@@ -9,6 +9,8 @@ export class Terminals {
   private terminals = new Map<string, { child: ChildProcessWithoutNullStreams; output: Buffer; total: number; exited: boolean }>();
   constructor(private publish: (event: unknown) => void) {}
   start(cwd: string, cols = 80, rows = 24) {
+    if (!Number.isInteger(cols) || cols < 10 || cols > 500 || !Number.isInteger(rows) || rows < 2 || rows > 200)
+      throw Error("Invalid terminal size");
     if (this.terminals.size >= 8) throw Error("Close a terminal before opening another");
     const id = randomUUID();
     const helper = fileURLToPath(new URL("../runtime/terminal_bridge.py", import.meta.url));
@@ -26,6 +28,7 @@ export class Terminals {
       catch { append(Buffer.from("\r\nInvalid terminal response\r\n")); }
     });
     child.stderr.on("data", (data) => append(data));
+    child.stdin.on("error", () => {}); // An input request can race shell exit.
     child.on("error", (e) => append(Buffer.from("\r\n" + e.message + "\r\n")));
     child.on("close", () => { terminal.exited = true; this.publish({ type: "terminal_exit", id }); });
     return { id };

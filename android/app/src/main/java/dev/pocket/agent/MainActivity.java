@@ -186,6 +186,7 @@ public class MainActivity extends Activity {
     }
     private void openTerminal(String selected) {
         request("POST","/terminals",json("projectId",selected,"cwd","."),value -> {String id=((JSONObject)value).getString("id");prefs().edit().putString("terminal-"+selected,id).apply();if(!selected.equals(project)||!tab.equals("Terminal"))return;terminalId=id;
+            terminalRequest(json("data","","cols",terminal.columns(),"rows",terminal.rows()));
             request("GET","/terminals/"+id,null,output -> {if(terminal!=null&&terminalId.equals(id))terminal.append(((JSONObject)output).optString("output"),((JSONObject)output).optLong("offset"));});
             if(!pendingClone.isEmpty()){String command=pendingClone;pendingClone="";terminalSend(command);}});
     }
