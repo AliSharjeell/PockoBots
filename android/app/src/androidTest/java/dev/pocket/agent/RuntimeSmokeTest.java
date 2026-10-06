@@ -23,7 +23,7 @@ public class RuntimeSmokeTest {
     private void untilTerminal(String id,String expected) throws Exception {
         long end=System.currentTimeMillis()+20000;String last="";
         while(System.currentTimeMillis()<end){last=text(api.get("/terminals/"+id));if(last.contains(expected))return;Thread.sleep(100);}
-        fail("Missing terminal output: "+expected+"\n"+last);
+        fail("Missing terminal output: "+expected+"\n"+last.replaceAll("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]",""));
     }
     @Test public void firstLaunchProjectsGitNpmInteractiveShellAndRestart() throws Exception {
         Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
@@ -61,7 +61,8 @@ public class RuntimeSmokeTest {
             untilTerminal(id,"\r\nTUNNEL_CLI_OK\r\n");
             api.request("POST","/terminals/"+id+"/input",object("data","git init source && git -C source -c user.name=Test -c user.email=test@example.com commit --allow-empty -m initial && git clone ./source cloned && test -d cloned/.git && printf '\\n%s\\n' CLONE_OK\r"));
             untilTerminal(id,"\r\nCLONE_OK\r\n");
-            api.request("POST","/terminals/"+id+"/input",object("data","read -r answer; printf '\\nANSWER:%s\\n' \"$answer\"\r"));
+            api.request("POST","/terminals/"+id+"/input",object("data","printf '\\n'; read -r -p 'PHONE_INPUT_READY: ' answer; printf '\\nANSWER:%s\\n' \"$answer\"\r"));
+            untilTerminal(id,"\r\nPHONE_INPUT_READY: ");
             api.request("POST","/terminals/"+id+"/input",object("data","phone-input\r"));untilTerminal(id,"ANSWER:phone-input");
             api.request("POST","/terminals/"+id+"/input",object("data","sleep 60\r"));Thread.sleep(200);
             api.request("POST","/terminals/"+id+"/input",object("data","\u0003"));
