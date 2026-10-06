@@ -105,7 +105,8 @@ with tempfile.TemporaryDirectory(prefix="pocket-sources-") as source_dir:
     source_dir = Path(source_dir)
     licenses = repo / "android/app/src/main/assets/licenses"
     licenses.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(licenses / "native-sources.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    source_archive = source_dir / "native-sources.zip"
+    with zipfile.ZipFile(source_archive, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, (url, digest) in source_lock.items():
             path = source_dir / name
             run("curl", "--fail", "--location", "--retry", "3", url, "-o", str(path))
@@ -121,6 +122,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-sources-") as source_dir:
             archive.write(repo / "runtime" / name, f"pocket-agent/{name}")
         archive.write(repo / "scripts/bundle-backend.mjs", "pocket-agent/bundle-backend.mjs")
         archive.write(repo / "scripts/copy-runtime.mjs", "pocket-agent/copy-runtime.mjs")
+    os.replace(source_archive, licenses / "native-sources.zip")
     import shutil
     shutil.copyfile(repo / "runtime/NOTICE.md", licenses / "NOTICE.md")
     shutil.copyfile(repo / "android/terminal/LICENSE", licenses / "terminal-LICENSE")
