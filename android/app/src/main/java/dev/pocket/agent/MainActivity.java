@@ -332,6 +332,6 @@ public class MainActivity extends Activity {
     }
     private void scheduleChat(){if(!chatScheduled){chatScheduled=true;handler.postDelayed(chatUpdate,100);}}
     private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){error(e);}}
-    private void back(){if(!tab.equals("Projects"))show("Projects");else finish();}
+    private void back(){if(mode.equals("Mobile Use")){if(!tab.equals("Tasks"))show("Tasks");else finish();}else if(!tab.equals("Projects"))show("Projects");else finish();}
     @Override public void onBackPressed(){back();}
 }

@@ -75,7 +75,7 @@ public class MobileOverlayService extends Service {
             catch(Exception e){main.post(() -> {MobileAccess.authorize(false);try{task.put("error",e.getMessage());}catch(Exception ignored){}expanded=true;render();});}});
     }
     private void control(String action){MobileAccess.authorize(false);if(!id.isEmpty()&&api!=null)call(action,new JSONObject(),this::pollSoon);}
-    private void pollSoon(){polling.execute(this::poll);}
+    private void pollSoon(){if(!closing&&!polling.isShutdown())polling.execute(this::poll);}
     private Button button(LinearLayout parent,String title,Runnable click,boolean primary){Button view=new Button(this);view.setText(title);AgentStyle.button(view,primary);parent.addView(view);view.setOnClickListener(v -> click.run());return view;}
     private TextView text(String value,int size){TextView view=AgentStyle.text(this,value,size);view.setPadding(0,dp(5),0,dp(5));view.setTextIsSelectable(true);return view;}
     private void render(){
@@ -108,7 +108,7 @@ public class MobileOverlayService extends Service {
                 surface.addView(text(question.optString("text"),13));answer=new EditText(this);AgentStyle.input(answer);answer.setHint("Reply or say ready after handling it in the app");answer.setText(draft);answer.setMaxLines(3);surface.addView(answer);
                 button(surface,"Reply & continue",() -> {String reply=answer.getText().toString().trim();if(reply.isEmpty())return;
                     MobileAccess.authorize(true);JSONObject body=new JSONObject();try{body.put("questionId",question.optString("id")).put("text",reply);}catch(Exception ignored){}
-                    call("answer",body,() -> {draft="";expanded=false;pollSoon();render();});},true);
+                    call("answer",body,() -> {draft="";if(answer!=null)answer.setText("");expanded=false;pollSoon();render();});},true);
             }
             LinearLayout controls=new LinearLayout(this);surface.addView(controls);
             if(status.equals("paused")||status.equals("queued"))button(controls,"Resume",() -> {MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);},true);
