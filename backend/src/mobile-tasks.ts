@@ -56,7 +56,7 @@ export class MobileTasks {
     let turns = 0; let currentTool = ""; let lastPreview = 0;
     const safe = (text: string) => settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text;
     const ask = async (question: string, signal?: AbortSignal) => {
-      task.status = "waiting"; task.question = { id: randomUUID(), text: question };
+      task.status = "waiting"; task.question = { id: randomUUID(), text: safe(question) };
       await this.changed(task);
       return new Promise<string>((resolve, reject) => {
         const abort = () => { this.questions.delete(id); reject(Error("Task interrupted")); };
@@ -138,6 +138,7 @@ export class MobileTasks {
     if (!waiter) { await this.start(id, task.question.text + "\nUser reply: " + text); return; }
     const health = await this.health();
     if (!health.task_allowed) throw Error("Resume the floating controller before replying");
+    if (task.status !== "waiting" || task.question?.id !== questionId || this.questions.get(id) !== waiter) throw Error("Question expired while the task was interrupted");
     task.history.push({ role: "user", text: text.trim() }); task.question = undefined; task.status = "running";
     await this.changed(task); waiter.resolve(text.trim()); this.questions.delete(id);
   }
@@ -145,6 +146,7 @@ export class MobileTasks {
     const task = this.state(id);
     if (["completed", "failed", "stopped"].includes(task.status)) return;
     task.status = stop ? "stopped" : "paused";
+    if (stop) task.question = undefined;
     task.error = stop ? undefined : "Paused by you";
     this.agents.get(id)?.abort(); this.questions.get(id)?.reject(Error("Task interrupted")); this.questions.delete(id);
     await this.changed(task);
