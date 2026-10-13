@@ -15,7 +15,7 @@ final class ThinkingOrbView extends View {
     private final double[] amount=new double[14];
     private final double[][] dots;
     private String state="idle";
-    private final long started=SystemClock.uptimeMillis();
+    private static final long started=SystemClock.uptimeMillis();
     ThinkingOrbView(Context context){
         super(context);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         for(int i=0;i<14;i++){moves[i][0]=Math.min(2,Math.floor(hash(i,2.3)*3));moves[i][1]=-1+.5*Math.min(3,Math.floor(hash(i,5.9)*4));moves[i][2]=(hash(i,7.7)<.5?1:-1)*Math.PI/2;}

@@ -265,7 +265,7 @@ public class MainActivity extends Activity {
         LinearLayout group=column();TextView heading=label(title+"  ›",12);heading.setTextColor(AgentStyle.MUTED);group.addView(heading);TextView log=label(detail,12);log.setTypeface(Typeface.MONOSPACE);log.setTextIsSelectable(true);log.setVisibility(View.GONE);AgentStyle.card(log);group.addView(log);heading.setOnClickListener(v -> {boolean open=log.getVisibility()!=View.VISIBLE;log.setVisibility(open?View.VISIBLE:View.GONE);heading.setText(title+(open?"  ⌄":"  ›"));});parent.addView(group);
     }
     private void working(LinearLayout parent,String status){
-        LinearLayout wrap=row();wrap.setGravity(Gravity.CENTER);LinearLayout pill=AgentStyle.segment(this);pill.setPadding(dp(10),dp(6),dp(14),dp(6));ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");pill.addView(orb,new LinearLayout.LayoutParams(dp(24),dp(24)));TextView caption=label(status,12);pill.addView(caption);wrap.addView(pill);parent.addView(wrap);
+        LinearLayout wrap=row();wrap.setGravity(Gravity.CENTER);LinearLayout pill=AgentStyle.segment(this);pill.setPadding(dp(10),dp(6),dp(14),dp(6));ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");pill.addView(orb,new LinearLayout.LayoutParams(dp(24),dp(24)));ShimmerTextView caption=new ShimmerTextView(this,status);caption.active(true);caption.setPadding(dp(8),0,0,0);pill.addView(caption);wrap.addView(pill);parent.addView(wrap);
     }
     private void setSession(JSONObject selected){session=selected.optString("id");prefs().edit().putString("session",session).apply();}
     private void newChat(){request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);show("Chat");});}
