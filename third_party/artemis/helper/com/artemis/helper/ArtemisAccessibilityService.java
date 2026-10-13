@@ -83,6 +83,7 @@ public class ArtemisAccessibilityService extends AccessibilityService {
     public void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        dev.pocket.agent.MobileAccess.syncToken(this);
         Log.i(TAG, "ArtemisAccessibilityService connected");
 
         // 1. Start foreground service to resist low-memory killer on aggressive custom ROMs
@@ -156,15 +157,12 @@ public class ArtemisAccessibilityService extends AccessibilityService {
                 builder = new Notification.Builder(this);
             }
 
-            builder.setContentTitle("Artemis test helper is running")
-                    .setContentText("Lets Artemis read this screen during automated tests. "
-                            + "Remove with: artemis helper uninstall")
+            builder.setContentTitle("Pocket Agent · Mobile Use enabled")
+                    .setContentText("Device actions require a mobile task you start")
                     .setStyle(new Notification.BigTextStyle().bigText(
-                            "Installed by Artemis to read the screen layout during automated "
-                            + "tests. It answers only on this device (127.0.0.1:" + DEFAULT_PORT
-                            + "), only to the computer that is connected over USB debugging and "
-                            + "holds the session token, and it sends nothing anywhere. Remove it "
-                            + "any time with `artemis helper uninstall` or from Settings > Apps."))
+                            "The local Artemis bridge responds only to Pocket Agent's private token. "
+                            + "Mobile tasks may send screen observations to your configured provider. "
+                            + "Disable this service in Android Accessibility settings at any time."))
                     .setSmallIcon(android.R.drawable.stat_notify_sync)
                     .setOngoing(true);
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {

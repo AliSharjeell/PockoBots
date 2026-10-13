@@ -216,6 +216,7 @@ public class CommandServer extends Thread {
             }
 
             String token = headerToken != null ? headerToken : query.get("token");
+            dev.pocket.agent.MobileAccess.syncToken(service);
             boolean authed = TokenStore.matches(token);
 
             if (path.equals("/ping") || path.equals("/")) {
@@ -224,6 +225,10 @@ public class CommandServer extends Thread {
             }
             if (!authed) {
                 sendJson(output, 401, unauthorizedJson().toString());
+                return;
+            }
+            if (!dev.pocket.agent.MobileAccess.allowed()) {
+                sendJson(output, 409, errorJson("Start or resume a Mobile Use task controller first").toString());
                 return;
             }
 
@@ -269,6 +274,8 @@ public class CommandServer extends Thread {
                 resp = buildPing(authed);
             } else if (!authed) {
                 resp = unauthorizedJson();
+            } else if (!dev.pocket.agent.MobileAccess.allowed()) {
+                resp = errorJson("Mobile task controller is paused or inactive");
             } else {
                 resp = executeCommand(cmd, json);
             }
@@ -392,6 +399,7 @@ public class CommandServer extends Thread {
         r.put("auth_required", true);
         r.put("token_set", TokenStore.isSet());
         r.put("authenticated", authed);
+        r.put("task_allowed", authed && dev.pocket.agent.MobileAccess.allowed());
         if (authed) {
             r.put("package", service.getCurrentPackageName());
             r.put("activity", service.getCurrentActivityName());

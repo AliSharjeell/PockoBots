@@ -20,6 +20,7 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
     sourceSets.main.java.srcDir '../terminal/src/main/java'
+    sourceSets.main.java.srcDir '../../third_party/artemis/helper'
     if (runtimeAbi != null) {
         defaultConfig.ndk.abiFilters.add(runtimeAbi)
         sourceSets.main.assets.setSrcDirs([layout.buildDirectory.dir("generated/runtimeAssets/${runtimeAbi}")])

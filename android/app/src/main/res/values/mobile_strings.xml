@@ -1,0 +1,3 @@
+<resources>
+    <string name="mobile_accessibility_description">Pocket Agent uses Artemis to read the screen, take screenshots and tap/type for Mobile Use tasks you start. Screen observations go to your configured BYOK provider. Device actions are disabled when no mobile task controller is active. Pause or stop at any time from the floating panel or notification.</string>
+</resources>
