@@ -33,7 +33,7 @@ public class MobileOverlayService extends Service {
         layout.gravity=Gravity.TOP|Gravity.LEFT;layout.x=AgentStyle.dp(this,16);layout.y=AgentStyle.dp(this,100);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
         surface.setElevation(dp(12));surface.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
-        surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());}
         catch(Exception e){MobileAccess.authorize(false);stopSelf();return;}
         polling.scheduleWithFixedDelay(this::poll,0,700,TimeUnit.MILLISECONDS);
@@ -84,17 +84,19 @@ public class MobileOverlayService extends Service {
         String status=task.optString("status","queued");
         String shortTitle=status.equals("waiting")?"●  Needs you":status.equals("running")?"●  Working · "+task.optInt("steps"):"○  "+status;
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView pill=text(shortTitle,12);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);header.addView(pill,new LinearLayout.LayoutParams(0,-2,1));
-        TextView chevron=text(expanded?"−":"↗",16);chevron.setPadding(dp(12),0,0,0);header.addView(chevron);surface.addView(header);
-        surface.setOnTouchListener(!expanded?(v,event) -> {
+        TextView pill=text(shortTitle,12);pill.setTextIsSelectable(false);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);header.addView(pill,new LinearLayout.LayoutParams(0,-2,1));
+        TextView chevron=text(expanded?"−":"↗",16);chevron.setTextIsSelectable(false);chevron.setPadding(dp(12),0,0,0);header.addView(chevron);surface.addView(header);
+        View.OnTouchListener drag=!expanded?(v,event) -> {
             switch(event.getAction()){
                 case MotionEvent.ACTION_DOWN:startX=event.getRawX();startY=event.getRawY();windowX=layout.x;windowY=layout.y;return true;
                 case MotionEvent.ACTION_MOVE:layout.x=Math.max(0,Math.min(getResources().getDisplayMetrics().widthPixels-surface.getWidth(),windowX+(int)(event.getRawX()-startX)));
                     layout.y=Math.max(0,Math.min(getResources().getDisplayMetrics().heightPixels-dp(64),windowY+(int)(event.getRawY()-startY)));windows.updateViewLayout(surface,layout);return true;
-                case MotionEvent.ACTION_UP:if(Math.abs(event.getRawX()-startX)<dp(8)&&Math.abs(event.getRawY()-startY)<dp(8)){expanded=true;render();}return true;
+                case MotionEvent.ACTION_UP:if(Math.abs(event.getRawX()-startX)<dp(8)&&Math.abs(event.getRawY()-startY)<dp(8))v.performClick();return true;
                 default:return true;
             }
-        }:null);
+        }:null;
+        surface.setOnTouchListener(drag);header.setOnTouchListener(drag);
+        surface.setOnClickListener(!expanded?v -> {expanded=true;render();}:null);
         header.setOnClickListener(v -> {expanded=!expanded;render();});
         if(expanded){
             TextView title=text("MOBILE USE",10);title.setTextColor(AgentStyle.MUTED);surface.addView(title);
