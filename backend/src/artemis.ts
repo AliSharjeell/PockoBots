@@ -5,7 +5,7 @@ export type Screen = { id: string; captured: number; package: string; width: num
 /** Artemis helper protocol v2, transported locally without ADB or a remote host. */
 export class ArtemisBridge {
   last?: Screen;
-  constructor(private token: string, private base = "http://127.0.0.1:18888") {}
+  constructor(private token: string, private base = "http://127.0.0.1:18889") {}
   private async request(path: string, body?: unknown, signal?: AbortSignal) {
     const response = await fetch(this.base + path, {
       method: body ? "POST" : "GET",

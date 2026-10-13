@@ -26,7 +26,8 @@ import android.view.accessibility.AccessibilityEvent;
 public class ArtemisAccessibilityService extends AccessibilityService {
 
     private static final String TAG = "ArtemisA11yService";
-    public static final int DEFAULT_PORT = 18888;
+    // Dedicated to Pocket Agent; does not collide with the stock Artemis helper.
+    public static final int DEFAULT_PORT = 18889;
     /**
      * Bumped whenever the HTTP contract changes in a way an older host cannot use.
      * 2: token authentication, byte-accurate bodies, visible-only dumps, fields=.

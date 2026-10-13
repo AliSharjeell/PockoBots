@@ -121,7 +121,7 @@ export function validPort(port: unknown): number {
   const n = Number(port);
   if (!Number.isInteger(n) || n < 1024 || n > 65535)
     throw Error("Port must be between 1024 and 65535");
-  if (n === 8787) throw Error("Do not tunnel the agent control port");
+  if (n === 8787 || n === 18889) throw Error("Do not tunnel an agent control port");
   return n;
 }
 export function tunnelCommand(port: number, anonymous: boolean) {
