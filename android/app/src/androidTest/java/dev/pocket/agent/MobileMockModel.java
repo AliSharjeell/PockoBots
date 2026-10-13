@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 /** Exercises the real vision adapter and Artemis helper, without paid credentials. */
 final class MobileMockModel implements AutoCloseable {
     private final ServerSocket socket=new ServerSocket(0,4,InetAddress.getByName("127.0.0.1"));
-    volatile Exception failure;volatile int stage;volatile boolean sawImage;private volatile boolean running=true;
+    volatile Exception failure;volatile int stage;volatile boolean sawImage;volatile String observedLabels="";private volatile boolean running=true;
     MobileMockModel() throws IOException {
         Thread worker=new Thread(() -> {while(running)try(Socket connection=socket.accept()){
             connection.setSoTimeout(15000);InputStream input=connection.getInputStream();line(input);
@@ -22,6 +22,7 @@ final class MobileMockModel implements AutoCloseable {
                 try{JSONObject candidate=new JSONObject(value);if(candidate.has("screen_id"))screen=candidate;}catch(JSONException ignored){}
             }
             int turn=stage++;String name;JSONObject args=new JSONObject();
+            if(screen!=null){StringBuilder labels=new StringBuilder(screen.optString("package")+" | ");JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(!elements.getJSONObject(i).optString("text").isEmpty())labels.append(elements.getJSONObject(i).optString("text")).append(" | ");observedLabels=labels.toString();}
             if(turn==0||turn==2||turn==4||turn==6)name="observe_screen";
             else if(turn==1){name="manage_app";args.put("screen_id",screen.getString("screen_id")).put("app_name","com.android.settings");}
             else if(turn==3){name="click";int target=-1;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery")){target=elements.getJSONObject(i).getInt("index");break;}

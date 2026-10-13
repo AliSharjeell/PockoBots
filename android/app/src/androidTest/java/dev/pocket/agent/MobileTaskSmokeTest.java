@@ -43,7 +43,7 @@ public class MobileTaskSmokeTest {
                 long armed=System.currentTimeMillis()+5000;while(!MobileAccess.allowed()&&System.currentTimeMillis()<armed)Thread.sleep(100);assertTrue(MobileAccess.allowed());
                 shell(automation,"input keyevent KEYCODE_HOME"); // Activity no longer hosts the task loop.
                 Thread.sleep(350);api.request("POST","/mobile/tasks/"+id+"/resume",object());
-                JSONObject waiting;try{waiting=until(api,id,"waiting");}catch(AssertionError e){if(mock.failure!=null)throw mock.failure;throw e;}if(mock.failure!=null)throw mock.failure;
+                JSONObject waiting;try{waiting=until(api,id,"waiting");}catch(AssertionError e){if(mock.failure!=null)throw mock.failure;throw new AssertionError(e.getMessage()+"\nObserved labels: "+mock.observedLabels,e);}if(mock.failure!=null)throw mock.failure;
                 assertEquals(id,MobileOverlayService.activeTask);assertTrue(mock.sawImage);assertTrue(mock.stage>=6);
                 long gated=System.currentTimeMillis()+6000;while(MobileAccess.allowed()&&System.currentTimeMillis()<gated)Thread.sleep(100);assertFalse("Device access must pause for user input",MobileAccess.allowed());
                 MobileAccess.authorize(true); // Same local consent transition as Reply & continue.
