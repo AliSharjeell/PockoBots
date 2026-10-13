@@ -90,3 +90,13 @@ Use a dedicated test emulator for that integration test. It expects no saved
 real provider key and changes its test project's settings while exercising a
 local provider fixture. For ordinary development, use Run/Debug and your own
 project instead.
+
+`NativeUiSmokeTest` also exercises the history drawer, provider switch, API key
+visibility, and both composers. UI fixtures save PNG previews in the test app's
+private `files` directory. Gradle's connected-test runner removes its installation
+afterward; to retain previews, install the debug and androidTest APKs with `adb
+install -r`, then run `adb shell am instrument -w
+dev.pocket.agent.test/androidx.test.runner.AndroidJUnitRunner` directly. Retrieve
+the PNG bytes with `adb exec-out run-as dev.pocket.agent cat files/ui-chat.png`
+using a binary-safe subprocess stream. Reviewed captures are also checked into
+[the UI gallery](UI.md).
