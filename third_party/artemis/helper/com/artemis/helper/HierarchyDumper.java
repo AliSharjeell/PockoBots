@@ -168,6 +168,14 @@ public final class HierarchyDumper {
                 result.put("package", s.getCurrentPackageName());
                 result.put("activity", s.getCurrentActivityName());
             }
+            // The floating controller can emit window events. Use the actual
+            // visible application root, not a remembered overlay package.
+            for (A11yNode root : rootSnapshots) {
+                if ("application".equals(root.windowType) && !root.packageName.isEmpty()) {
+                    result.put("package", root.packageName);
+                    if (root.windowActive || root.windowFocused) break;
+                }
+            }
 
         } catch (Throwable t) {
             Log.e(TAG, "Dump failed with exception", t);
@@ -413,6 +421,10 @@ public final class HierarchyDumper {
 
         for (int i = 0; i < rawRoots.size(); i++) {
             RawRootEntry entry = rawRoots.get(i);
+            if (!"application".equals(entry.windowType) && service.getPackageName().contentEquals(
+                    entry.root.getPackageName() == null ? "" : entry.root.getPackageName())) {
+                safeRecycle(entry.root); continue;
+            }
             try {
                 Rect clip = new Rect(displayRect);
                 if (entry.windowBounds != null && !clip.intersect(entry.windowBounds)) {
