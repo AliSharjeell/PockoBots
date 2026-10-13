@@ -15,6 +15,7 @@ import { Processes, validPort, tunnelCommand } from "./processes.js";
 import { Sessions } from "./sessions.js";
 import { Projects } from "./projects.js";
 import { Terminals } from "./terminals.js";
+import { MobileTasks } from "./mobile-tasks.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -24,6 +25,7 @@ export async function createApp(options: {
   workspace: string;
   port?: number;
   webDir?: string;
+  mobileBridgeBase?: string;
 }) {
   const port = options.port || 8787;
   const store = new Store(options.stateDir);
@@ -59,6 +61,8 @@ export async function createApp(options: {
     projects,
   );
   await sessions.init();
+  const mobile = new MobileTasks(store, () => settings, token, publish, options.mobileBridgeBase);
+  await mobile.init();
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -102,6 +106,7 @@ export async function createApp(options: {
       sessions: sessions.list(),
       jobs: [...processes.jobs.values()],
       projects: projects.list(),
+      mobileTasks: mobile.list(),
     }),
   );
   app.get("/api/events", (req, res) => {
@@ -124,7 +129,7 @@ export async function createApp(options: {
     });
   });
   app.put("/api/settings", async (req, res) => {
-    if (sessions.anyBusy()) {
+    if (sessions.anyBusy() || mobile.anyBusy()) {
       res
         .status(409)
         .json({ error: "Stop the agent before changing provider" });
@@ -139,6 +144,15 @@ export async function createApp(options: {
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
+  app.get("/api/mobile/health", async (_req, res) => res.json(await mobile.health()));
+  app.get("/api/mobile/tasks", (_req, res) => res.type("json").send(redact(mobile.list())));
+  app.post("/api/mobile/tasks", async (req, res) => res.status(201).json(await mobile.create(req.body.prompt)));
+  app.get("/api/mobile/tasks/:id", (req, res) => res.type("json").send(redact(mobile.state(req.params.id))));
+  app.post("/api/mobile/tasks/:id/resume", async (req, res) => res.status(202).json(await mobile.start(req.params.id)));
+  app.post("/api/mobile/tasks/:id/pause", async (req, res) => { await mobile.interrupt(req.params.id); res.json({ ok: true }); });
+  app.post("/api/mobile/tasks/:id/stop", async (req, res) => { await mobile.interrupt(req.params.id, true); res.json({ ok: true }); });
+  app.post("/api/mobile/tasks/:id/answer", async (req, res) => { await mobile.answer(req.params.id, req.body.questionId, req.body.text); res.json({ ok: true }); });
+  app.delete("/api/mobile/tasks/:id", async (req, res) => { await mobile.remove(req.params.id); res.json({ ok: true }); });
   app.post("/api/projects", async (req, res) =>
     res.status(201).json(await projects.create(req.body.name)),
   );
@@ -288,10 +302,12 @@ export async function createApp(options: {
     token,
     sessions,
     processes,
+    mobile,
     close: () => {
       sessions.stopAll();
       processes.stopAll();
       terminals.stopAll();
+      mobile.stopAll();
       for (const c of clients) c.end();
     },
   };
