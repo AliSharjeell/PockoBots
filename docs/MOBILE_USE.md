@@ -37,6 +37,23 @@ task controller running. Android force-stop, process death and device restart
 interrupt execution; saved active tasks reopen as paused, with explicit Resume.
 Android vendor battery restrictions may still terminate foreground processes.
 
+## Native sidebar and floating island
+
+Version 0.3.1 follows the sidebar layout in `form-filling-ai`: a history drawer,
+rounded white selected segments, blue user bubbles and primary actions, dark
+assistant cards, collapsible tool output, and a rounded composer. Open the menu
+beside the Mobile Use / Coding switch for recent tasks or conversations and
+workspace tools. The settings button opens the BYOK form; advanced protocol,
+token limits, Git identity, and environment controls can be expanded there.
+
+The black floating island starts near the top center of the phone. Tap its header
+to expand or collapse it, and drag the header to move it. It grows into the question
+and output panel when your input is needed. Its dotted solving orb is a native
+Canvas port of `thinking-orbs` 0.3.2 used by the reference extension; the MIT notice
+ships in the APK. The working caption uses the reference's white text shimmer.
+Animation stops when the view is hidden and respects Android's disabled-animation
+setting. Amber dots identify a waiting task, and green dots identify completion.
+
 ## What runs on the phone
 
 The APK includes the actual Artemis native accessibility helper, pinned to
