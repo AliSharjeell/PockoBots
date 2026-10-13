@@ -26,6 +26,11 @@ question. Device actions pause while it waits. Handle credentials in the target
 app, then enter a reply such as "ready" and tap **Reply & continue**. Do not
 enter passwords, PINs, API keys or payment secrets into the floating chat.
 
+Some system or secure apps hide application overlays. The notification still
+signals that a reply is needed; go Home or open Pocket Agent to access the panel.
+The app respects these Android window restrictions. Switching to **Coding**
+pauses device automation so it does not compete with your coding UI.
+
 Results remain in the panel and the task history. Closing the controller pauses
 an unfinished task. Closing/backgrounding the activity leaves the foreground
 task controller running. Android force-stop, process death and device restart
