@@ -454,7 +454,7 @@ public final class HierarchyDumper {
     private static AccessibilityNodeInfo windowRoot(AccessibilityWindowInfo window) {
         if (Build.VERSION.SDK_INT >= 33) {
             try {
-                return window.getRoot(PREFETCH_DESCENDANTS_HYBRID);
+                return window.getRoot(AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_HYBRID);
             } catch (Throwable ignored) {}
         }
         return window.getRoot();
@@ -463,7 +463,7 @@ public final class HierarchyDumper {
     private static AccessibilityNodeInfo childOf(AccessibilityNodeInfo node, int index) {
         if (Build.VERSION.SDK_INT >= 33) {
             try {
-                return node.getChild(index, PREFETCH_DESCENDANTS_HYBRID);
+                return node.getChild(index, AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_HYBRID);
             } catch (Throwable ignored) {}
         }
         return node.getChild(index);
