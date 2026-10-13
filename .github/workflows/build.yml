@@ -12,9 +12,12 @@ on:
       release_tag:
         description: New preview release tag
         type: string
-        default: v0.2.0
+        default: v0.3.0
 permissions:
   contents: read
+concurrency:
+  group: pocket-agent-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   backend:
     runs-on: ubuntu-latest
