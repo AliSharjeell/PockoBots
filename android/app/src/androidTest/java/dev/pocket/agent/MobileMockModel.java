@@ -25,7 +25,8 @@ final class MobileMockModel implements AutoCloseable {
             if(turn==0||turn==2||turn==4||turn==6)name="observe_screen";
             else if(turn==1){name="manage_app";args.put("screen_id",screen.getString("screen_id")).put("app_name","com.android.settings");}
             else if(turn==3){name="click";int target=-1;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery")){target=elements.getJSONObject(i).getInt("index");break;}
-                if(target<0)throw new IOException("Battery was not visible in the live Settings hierarchy");args.put("screen_id",screen.getString("screen_id")).put("target",target);}
+                if(target<0){stage=2;name="wait_for_delay";args.put("milliseconds",750);}
+                else args.put("screen_id",screen.getString("screen_id")).put("target",target);}
             else if(turn==5){name="ask_user";args.put("question","Battery is open. Say ready to finish.");}
             else{name="report_task_status";args.put("status","completed").put("summary","Battery screen verified through Artemis on this device.");}
             JSONObject function=new JSONObject().put("name",name).put("arguments",args.toString());
