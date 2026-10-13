@@ -2,6 +2,9 @@ package com.artemis.helper;
 
 import android.util.Log;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import android.content.Intent;
+import android.content.pm.ResolveInfo;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -301,6 +304,43 @@ public class CommandServer extends Thread {
         JSONObject resp = new JSONObject();
         try {
             switch (cmd.toLowerCase(Locale.ROOT)) {
+                case "apps":
+                    JSONArray apps = new JSONArray();
+                    Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+                    for (ResolveInfo app : service.getPackageManager().queryIntentActivities(launcher, 0)) {
+                        apps.put(new JSONObject().put("label", app.loadLabel(service.getPackageManager()).toString())
+                                .put("package", app.activityInfo.packageName));
+                    }
+                    resp.put("success", true); resp.put("apps", apps); break;
+                case "launch":
+                    String requested = params.optString("app_name", "").trim();
+                    String pkg = requested;
+                    Intent intent = service.getPackageManager().getLaunchIntentForPackage(pkg);
+                    if (intent == null) {
+                        String match = null;
+                        for (ResolveInfo app : service.getPackageManager().queryIntentActivities(
+                                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)) {
+                            if (app.loadLabel(service.getPackageManager()).toString().equalsIgnoreCase(requested)) {
+                                if (match != null && !match.equals(app.activityInfo.packageName)) throw new IllegalArgumentException("App label is ambiguous; use its package ID");
+                                match = app.activityInfo.packageName;
+                            }
+                        }
+                        if (match != null) { pkg = match; intent = service.getPackageManager().getLaunchIntentForPackage(pkg); }
+                    }
+                    if (intent == null) throw new IllegalArgumentException("No launcher app found: " + requested);
+                    service.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    resp.put("success", true); resp.put("package", pkg); break;
+                case "tap_sequence":
+                    JSONArray points = params.getJSONArray("points");
+                    if (points.length() < 2 || points.length() > 5) throw new IllegalArgumentException("Use 2–5 tap points");
+                    boolean sequenceOk = true;
+                    for (int i = 0; i < points.length(); i++) {
+                        JSONArray point = points.getJSONArray(i);
+                        if (point.length() != 2 || point.getDouble(0) < 0 || point.getDouble(1) < 0) throw new IllegalArgumentException("Invalid tap coordinates");
+                        if (!GestureController.tap(service, (float)point.getDouble(0), (float)point.getDouble(1), 1500)) { sequenceOk = false; break; }
+                        if (i + 1 < points.length()) Thread.sleep(50);
+                    }
+                    resp.put("success", sequenceOk); break;
                 case "ping":
                     return buildPing(true);
                 case "dump":
