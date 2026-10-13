@@ -24,6 +24,9 @@ public class MainActivity extends Activity {
     private ScrollView chatScroll;
     private EditText prompt;
     private TextView setupStatus;
+    private String mode="Coding",mobileTask="",mobileDraft="";
+    private EditText mobilePrompt;
+    private LinearLayout mobileDetails;
     private TerminalCanvas terminal;
     private boolean visible, listening, loadingChat, chatDirty, chatScheduled, followChat = true;
     private int generation;
@@ -32,6 +35,8 @@ public class MainActivity extends Activity {
     android.content.SharedPreferences prefs() { return getSharedPreferences("native-ui", MODE_PRIVATE); }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved); project = prefs().getString("project", ""); session = prefs().getString("session", "");
+        mode=prefs().getString("mode","Coding");mobileTask=prefs().getString("mobile-task","");
+        acceptMobileIntent(getIntent());
         if (Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::back);
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
@@ -39,6 +44,8 @@ public class MainActivity extends Activity {
         }
         setup();
     }
+    private void acceptMobileIntent(Intent intent){if(intent!=null&&intent.hasExtra("mobileTask")){mode="Mobile Use";mobileTask=intent.getStringExtra("mobileTask");tab="Tasks";}}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);acceptMobileIntent(intent);if(api!=null)show(mode.equals("Mobile Use")?"Tasks":tab);}
     @Override protected void onResume() {
         super.onResume(); visible = true; startForegroundService(new Intent(this, RuntimeService.class));
         if (!RuntimeService.ready) { api=null;setup();waitForRuntime(); }
@@ -52,11 +59,11 @@ public class MainActivity extends Activity {
     LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
     LinearLayout row() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.HORIZONTAL); return view; }
     TextView label(String text, int size) {
-        TextView view = new TextView(this); view.setText(text); view.setTextSize(size); view.setTextColor(Color.rgb(230,235,223));
+        TextView view = AgentStyle.text(this,text,size>=20?18:size);
         view.setPadding(dp(8),dp(8),dp(8),dp(8)); return view;
     }
     Button button(LinearLayout parent, String text, Runnable action) {
-        Button view = new Button(this); view.setText(text); view.setAllCaps(false); parent.addView(view); view.setOnClickListener(v -> action.run()); return view;
+        Button view = new Button(this); view.setText(text); AgentStyle.button(view,text.equals("Send")||text.equals("Start task")||text.startsWith("Save ")); parent.addView(view); view.setOnClickListener(v -> action.run()); return view;
     }
     EditText field(LinearLayout parent, String hint, String value, boolean secret) {
         parent.addView(label(hint,13)); EditText view = new EditText(this); view.setSingleLine(true);
@@ -64,14 +71,20 @@ public class MainActivity extends Activity {
         view.setText(value); parent.addView(view); return view;
     }
     private void shell() {
-        LinearLayout page = column(); page.setBackgroundColor(Color.rgb(17,19,21)); page.setPadding(dp(8),0,dp(8),0);
+        LinearLayout page = column(); page.setBackgroundColor(AgentStyle.BACK); page.setPadding(dp(8),0,dp(8),0);
         page.setOnApplyWindowInsetsListener((v,insets) -> {
             v.setPadding(dp(8)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(8)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-        page.addView(label("Pocket Agent"+(projectName.isEmpty()?"":" · "+projectName),21));
+        page.addView(label("Pocket Agent"+(!mode.equals("Coding")||projectName.isEmpty()?"":" · "+projectName),21));
+        LinearLayout modes=row();modes.setPadding(0,0,0,dp(5));page.addView(modes);
+        for(String option:new String[]{"Mobile Use","Coding"}){
+            Button choice=button(modes,option,() -> {mode=option;prefs().edit().putString("mode",mode).apply();show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");});
+            choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
+            if(mode.equals(option)){choice.setBackground(AgentStyle.surface(this,AgentStyle.WHITE,10,false));choice.setTextColor(AgentStyle.BACK);}
+        }
         HorizontalScrollView nav = new HorizontalScrollView(this); LinearLayout tabs = row(); nav.addView(tabs); page.addView(nav);
-        for (String name : new String[]{"Projects","Chat","Terminal","Files","Servers","Settings"}) button(tabs,name,() -> show(name));
+        for (String name : mode.equals("Mobile Use")?new String[]{"Tasks","Settings"}:new String[]{"Projects","Chat","Terminal","Files","Servers","Settings"}) button(tabs,name,() -> show(name));
         body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1)); setContentView(page);
     }
     LinearLayout scrolling() {
@@ -79,7 +92,7 @@ public class MainActivity extends Activity {
         scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return content;
     }
     private void setup() {
-        LinearLayout page=column();page.setPadding(dp(24),dp(40),dp(24),dp(24));page.setBackgroundColor(Color.rgb(17,19,21));
+        LinearLayout page=column();page.setPadding(dp(24),dp(40),dp(24),dp(24));page.setBackgroundColor(AgentStyle.BACK);
         page.addView(label("Pocket Agent",28));page.addView(label("Your projects and coding tools, on your phone.",17));
         setupStatus=label(RuntimeService.status,15);page.addView(setupStatus);page.addView(new ProgressBar(this));
         button(page,"Retry setup",() -> { startForegroundService(new Intent(this,RuntimeService.class));waitForRuntime(); });
@@ -91,7 +104,8 @@ public class MainActivity extends Activity {
         if(RuntimeService.ready) {
             try {
                 api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());listen();
-                loadState(() -> {JSONObject selected=findProject(project);if(selected==null){project="";session="";}else projectName=selected.optString("name");show(project.isEmpty()?"Projects":"Chat");});
+                MobileAccess.syncToken(this);
+                loadState(() -> {JSONObject selected=findProject(project);if(selected==null){project="";session="";}else projectName=selected.optString("name");show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");});
             }catch(Exception e){api=null;error(e);handler.postDelayed(this::waitForRuntime,1000);}
         }else handler.postDelayed(this::waitForRuntime,500);
     }
@@ -114,7 +128,9 @@ public class MainActivity extends Activity {
         prefs().edit().putString("project",project).putString("session","").apply();show("Chat");
     }
     private void show(String name) {
-        if(api==null)return;tab=name;terminal=null;handler.removeCallbacks(chatUpdate);chatScheduled=false;shell();
+        if(api==null)return;if(mobilePrompt!=null){mobileDraft=mobilePrompt.getText().toString();mobilePrompt=null;}mobileDetails=null;
+        tab=name;terminal=null;handler.removeCallbacks(chatUpdate);chatScheduled=false;shell();
+        if(mode.equals("Mobile Use")){if(name.equals("Settings"))settings();else mobileTasks();return;}
         if(project.isEmpty()&&!name.equals("Projects")&&!name.equals("Settings")){body.addView(label("Create or select a project to get started.",18));button(body,"Projects",() -> show("Projects"));return;}
         switch(name){case "Projects":projects();break;case "Chat":chat();break;case "Terminal":terminal();break;case "Files":files();break;case "Servers":servers();break;case "Settings":settings();break;}
     }
@@ -173,7 +189,7 @@ public class MainActivity extends Activity {
         int old=chatScroll.getScrollY();boolean follow=followChat;messages.removeAllViews();JSONArray all=value.optJSONArray("messages");
         for(int i=0;i<all.length();i++){JSONObject message=all.optJSONObject(i);String role=message.optString("role");if(role.equals("system"))continue;String text=messageText(message);if(text.isEmpty())continue;
             TextView view=label((role.equals("toolResult")?"Tool · "+message.optString("toolName"):role.equals("user")?"You":"Agent")+"\n"+text,15);view.setTextIsSelectable(true);
-            view.setBackgroundColor(role.equals("user")?Color.rgb(36,48,35):Color.rgb(25,29,31));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(5),0,dp(5));messages.addView(view,params);}
+            AgentStyle.card(view);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(5),0,dp(5));messages.addView(view,params);}
         JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null)messages.addView(label("Agent\n"+messageText(streaming),15));
         JSONArray approvals=value.optJSONArray("approvals");for(int i=0;i<approvals.length();i++){JSONObject approval=approvals.optJSONObject(i);messages.addView(label("Allow "+approval.optString("tool")+"?\n"+approval.opt("args"),15));LinearLayout buttons=row();messages.addView(buttons);
             button(buttons,"Allow",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",true),v -> refreshChat()));button(buttons,"Deny",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",false),v -> refreshChat()));}
@@ -250,6 +266,9 @@ public class MainActivity extends Activity {
             finally{handler.post(() -> {if(epoch==generation){listening=false;if(visible&&api!=null)handler.postDelayed(this::listen,1000);}});}},"pocket-events").start();
     }
     private void event(JSONObject value) {
+        if(value.optString("type").equals("mobile")&&mode.equals("Mobile Use")&&tab.equals("Tasks")){
+            JSONObject task=value.optJSONObject("task");if(task!=null&&task.optString("id").equals(mobileTask))renderMobileTask(task);
+        }
         String type=value.optString("type");if(type.equals("terminal")&&terminal!=null&&terminalId.equals(value.optString("id")))terminal.append(value.optString("data"),value.optLong("offset"));
         if(type.equals("terminal_exit")&&terminalId.equals(value.optString("id")))Toast.makeText(this,"Shell exited",Toast.LENGTH_SHORT).show();
         if(type.equals("process")){JSONObject job=value.optJSONObject("job");JSONArray list=state.optJSONArray("jobs");if(list!=null&&job!=null){boolean found=false;for(int i=0;i<list.length();i++)if(list.optJSONObject(i).optString("id").equals(job.optString("id"))){try{list.put(i,job);}catch(JSONException ignored){}found=true;break;}if(!found)list.put(job);renderJobs();}}
