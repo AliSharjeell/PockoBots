@@ -79,7 +79,12 @@ public class MainActivity extends Activity {
         page.addView(label("Pocket Agent"+(!mode.equals("Coding")||projectName.isEmpty()?"":" · "+projectName),21));
         LinearLayout modes=row();modes.setPadding(0,0,0,dp(5));page.addView(modes);
         for(String option:new String[]{"Mobile Use","Coding"}){
-            Button choice=button(modes,option,() -> {mode=option;prefs().edit().putString("mode",mode).apply();show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");});
+            Button choice=button(modes,option,() -> {
+                if(option.equals("Coding")&&!MobileOverlayService.activeTask.isEmpty()){
+                    MobileAccess.authorize(false);request("POST","/mobile/tasks/"+MobileOverlayService.activeTask+"/pause",json(),v -> {});
+                }
+                mode=option;prefs().edit().putString("mode",mode).apply();show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");
+            });
             choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
             if(mode.equals(option)){choice.setBackground(AgentStyle.surface(this,AgentStyle.WHITE,10,false));choice.setTextColor(AgentStyle.BACK);}
         }
@@ -315,7 +320,7 @@ public class MainActivity extends Activity {
         CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");trust.setEnabled(!session.isEmpty());content.addView(trust);
         if(!session.isEmpty())request("GET","/sessions/"+session,null,v -> {trust.setChecked(((JSONObject)v).optBoolean("trusted"));trust.setOnCheckedChangeListener((view,checked) -> request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {}));});
         content.addView(label("Files and tools run on this device. Model requests go to your provider. Closing this screen keeps servers running; use the notification to stop the environment.",14));
-        button(content,"Stop coding environment",() -> {startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});
+        button(content,"Stop coding environment",() -> {MobileAccess.authorize(false);stopService(new Intent(this,MobileOverlayService.class));startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});
     }
     private void listen() {
         if(listening||!visible||api==null)return;listening=true;int epoch=++generation;AgentApi connection=api;
