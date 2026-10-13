@@ -53,7 +53,8 @@ export class MobileTasks {
     const { model, models } = connection(settings, true);
     task.status = "running"; task.error = undefined; task.question = undefined;
     if (reply) task.history.push({ role: "user", text: reply });
-    let turns = 0; let currentTool = "";
+    let turns = 0; let currentTool = ""; let lastPreview = 0;
+    const safe = (text: string) => settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text;
     const ask = async (question: string, signal?: AbortSignal) => {
       task.status = "waiting"; task.question = { id: randomUUID(), text: question };
       await this.changed(task);
@@ -65,7 +66,7 @@ export class MobileTasks {
     };
     const report = async (status: "completed" | "failed", summary: string) => {
       if (status === "completed" && (!bridge.last || Date.now() - bridge.last.captured > 30000)) throw Error("Observe the current screen and verify the outcome before reporting completion");
-      task.status = status; task.output = summary; task.question = undefined;
+      task.status = status; task.output = safe(summary); task.question = undefined;
       await this.changed(task);
     };
     const agent = new Agent({ streamFn: models.streamSimple.bind(models), getApiKey: () => settings.apiKey || undefined,
@@ -92,12 +93,17 @@ export class MobileTasks {
       },
     });
     agent.subscribe((event: any) => {
+      if (event.type === "message_update" && task.status === "running" && Date.now() - lastPreview > 400) {
+        const streaming: any = agent.state.streamingMessage;
+        const preview = (streaming?.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+        if (preview) { lastPreview = Date.now(); task.output = safe(preview).slice(0, 6000); void this.changed(task).catch(() => {}); }
+      }
       if (event.type === "message_end") {
         const message = event.message;
         if (message.role === "assistant" && message.stopReason === "error" && task.status === "running") {
-          task.status = "paused"; task.error = message.errorMessage || "The model request failed. Review your connection and resume.";
+          task.status = "paused"; task.error = safe(message.errorMessage || "The model request failed. Review your connection and resume.");
         }
-        const value = typeof message.content === "string" ? message.content : (message.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+        const value = safe(typeof message.content === "string" ? message.content : (message.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n"));
         if (value) task.history.push({ role: message.role, text: value.slice(0, 10000) });
         task.history = task.history.slice(-50);
         if (message.role === "assistant" && value && task.status === "running") task.output = value.slice(0, 6000);
@@ -116,9 +122,10 @@ export class MobileTasks {
           await agent.prompt("Continue the original task. Observe and act, ask_user if blocked, or explicitly report_task_status after verification.");
         if (task.status === "running") { task.status = "paused"; task.error = "The model ended without a verified result. Review and resume."; }
       } catch (e: any) {
-        if (task.status === "running" || task.status === "waiting") { task.status = "paused"; task.error = String(e.message || e); }
+        if (task.status === "running" || task.status === "waiting") { task.status = "paused"; task.error = safe(String(e.message || e)); }
       } finally {
-        this.agents.delete(id); this.questions.delete(id); await this.changed(task);
+        this.agents.delete(id); this.questions.delete(id);
+        try { await this.changed(task); } catch { task.status = "paused"; task.error = "Task progress could not be saved. Check free storage."; this.publish({ type: "mobile", task }); }
       }
     })();
     return task;
