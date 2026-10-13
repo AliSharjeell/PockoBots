@@ -173,30 +173,29 @@ public class MainActivity extends Activity {
             for(int i=0;i<projects.length();i++){JSONObject selected=projects.getJSONObject(i);button(content,selected.getString("name"),() -> selectProject(selected));}});
     }
     private void mobileTasks(){
-        LinearLayout content=scrolling();content.addView(label("Your phone, working for you",20));
-        TextView explanation=label("Describe a task across your apps. Follow progress, pause, or reply from the floating pill while Pocket Agent works in the background.",13);explanation.setTextColor(AgentStyle.MUTED);content.addView(explanation);
-        LinearLayout permissions=row();content.addView(permissions);
+        ScrollView scroll=new ScrollView(this);LinearLayout content=column();content.setPadding(dp(10),dp(8),dp(10),dp(20));scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        if(mobileTask.isEmpty())welcome(content,"What should your phone do?","Describe a task. Follow along and reply from the floating island while your agent works.");
+        LinearLayout permissionCard=column();permissionCard.setPadding(dp(8),dp(8),dp(8),dp(8));AgentStyle.card(permissionCard);content.addView(permissionCard);
+        LinearLayout permissions=row();permissionCard.addView(permissions);
         button(permissions,"Accessibility",() -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         button(permissions,"Floating pill",() -> startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()))));
         String ready=com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null?"Accessibility connected":"Enable Pocket Agent · Mobile Use in Accessibility";
-        content.addView(label(ready+(android.provider.Settings.canDrawOverlays(this)?" · Floating permission ready":" · Allow display over other apps"),11));
-        mobilePrompt=new EditText(this);AgentStyle.input(mobilePrompt);mobilePrompt.setMinLines(3);mobilePrompt.setMaxLines(6);mobilePrompt.setGravity(Gravity.TOP);
-        mobilePrompt.setHint("e.g. Open Settings and tell me my battery level");mobilePrompt.setText(mobileDraft);content.addView(mobilePrompt);
-        button(content,"Start task",() -> {
+        TextView permissionHint=label(ready+(android.provider.Settings.canDrawOverlays(this)?" · Floating permission ready":" · Allow display over other apps"),11);permissionHint.setTextColor(AgentStyle.MUTED);permissionCard.addView(permissionHint);
+        if(com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null&&android.provider.Settings.canDrawOverlays(this))permissionCard.setVisibility(View.GONE);
+        mobileDetails=column();content.addView(mobileDetails);
+        if(!mobileTask.isEmpty())request("GET","/mobile/tasks/"+mobileTask,null,value -> renderMobileTask((JSONObject)value));
+        LinearLayout composer=row();composer.setGravity(Gravity.CENTER_VERTICAL);composer.setPadding(dp(4),dp(4),dp(4),dp(4));composer.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,28,true));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(dp(4),dp(8),dp(4),dp(12));body.addView(composer,params);
+        composer.addView(new AgentIcon(this,"plus","New mobile task",() -> {mobileTask="";prefs().edit().remove("mobile-task").apply();show("Tasks");}),new LinearLayout.LayoutParams(dp(44),dp(44)));
+        mobilePrompt=new EditText(this);AgentStyle.input(mobilePrompt);mobilePrompt.setBackgroundColor(Color.TRANSPARENT);mobilePrompt.setMinLines(1);mobilePrompt.setMaxLines(5);mobilePrompt.setHint("Ask Pocket Agent to use your phone…");mobilePrompt.setText(mobileDraft);composer.addView(mobilePrompt,new LinearLayout.LayoutParams(0,-2,1));
+        AgentIcon start=new AgentIcon(this,"send","Start task",this::beginMobileTask);start.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,28,false));composer.addView(start,new LinearLayout.LayoutParams(dp(44),dp(44)));
+    }
+    private void beginMobileTask(){
             String goal=mobilePrompt.getText().toString().trim();if(goal.isEmpty()){mobilePrompt.setError("Describe a task first");return;}
             if(!mobileReady())return;
             new AlertDialog.Builder(this).setTitle("Start Mobile Use?").setMessage("Pocket Agent will read the visible screen, send observations to your configured model, and tap or type for this task. It continues outside this app. Pause or stop from the floating pill or notification. Enter passwords and payment details only in the target app.")
                 .setPositiveButton("Start",(dialog,which) -> request("POST","/mobile/tasks",json("prompt",goal),value -> {
                     mobileTask=((JSONObject)value).optString("id");prefs().edit().putString("mobile-task",mobileTask).apply();mobileDraft="";mobilePrompt.setText("");startMobile(mobileTask,true);
                 })).setNegativeButton("Cancel",null).show();
-        });
-        mobileDetails=column();content.addView(mobileDetails);
-        if(!mobileTask.isEmpty())request("GET","/mobile/tasks/"+mobileTask,null,value -> renderMobileTask((JSONObject)value));
-        content.addView(label("Recent tasks",16));
-        request("GET","/mobile/tasks",null,value -> {if(!mode.equals("Mobile Use")||!tab.equals("Tasks"))return;JSONArray tasks=(JSONArray)value;
-            for(int i=tasks.length()-1;i>=0;i--){JSONObject task=tasks.getJSONObject(i);String title=task.optString("prompt");
-                button(content,task.optString("status")+" · "+(title.length()>55?title.substring(0,55)+"…":title),() -> {mobileTask=task.optString("id");prefs().edit().putString("mobile-task",mobileTask).apply();renderMobileTask(task);});}
-        });
     }
     private boolean mobileReady(){
         if(com.artemis.helper.ArtemisAccessibilityService.getInstance()==null){new AlertDialog.Builder(this).setTitle("Enable Mobile Use accessibility").setMessage("In Android Accessibility settings, enable Pocket Agent · Mobile Use. Android requires you to grant this permission yourself.").setPositiveButton("Open settings",(d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))).setNegativeButton("Cancel",null).show();return false;}
@@ -218,9 +217,11 @@ public class MainActivity extends Activity {
     }
     private void renderMobileTask(JSONObject task){
         if(mobileDetails==null||!mode.equals("Mobile Use")||!task.optString("id").equals(mobileTask))return;
-        mobileDetails.removeAllViews();mobileDetails.setPadding(dp(10),dp(10),dp(10),dp(10));AgentStyle.card(mobileDetails);
-        String status=task.optString("status");mobileDetails.addView(label(status.toUpperCase(java.util.Locale.ROOT)+" · "+task.optInt("steps")+" steps",11));
-        mobileDetails.addView(label(task.optString("prompt"),14));String output=task.optString("output");if(!output.isEmpty()){TextView text=label(output,13);text.setTextIsSelectable(true);mobileDetails.addView(text);}
+        mobileDetails.removeAllViews();mobileDetails.setPadding(0,dp(12),0,0);
+        String status=task.optString("status");bubble(mobileDetails,task.optString("prompt"),true,task.optLong("createdAt"));TextView stateLabel=label(status.toUpperCase(java.util.Locale.ROOT)+" · "+task.optInt("steps")+" steps",11);stateLabel.setTextColor(AgentStyle.MUTED);mobileDetails.addView(stateLabel);
+        String output=task.optString("output");if(!output.isEmpty())bubble(mobileDetails,output,false,0);
+        JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0){StringBuilder details=new StringBuilder();for(int i=0;i<trace.length();i++)details.append(trace.optJSONObject(i).optString("text")).append("\n");disclosure(mobileDetails,"Activity · "+trace.length()+" events",details.toString());}
+        if(status.equals("running"))working(mobileDetails,"Agent is working");
         if(!task.optString("error").isEmpty())mobileDetails.addView(label(task.optString("error"),12));
         JSONObject question=task.optJSONObject("question");if(question!=null){mobileDetails.addView(label(question.optString("text"),14));button(mobileDetails,"Reply in floating panel",() -> startMobile(mobileTask,false));}
         LinearLayout actions=row();mobileDetails.addView(actions);
