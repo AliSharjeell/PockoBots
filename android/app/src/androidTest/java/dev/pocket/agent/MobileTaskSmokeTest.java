@@ -41,6 +41,9 @@ public class MobileTaskSmokeTest {
                 JSONObject task=(JSONObject)api.request("POST","/mobile/tasks",object("prompt","Open the Battery page in Settings, ask me if ready, and verify completion"));id=task.getString("id");
                 context.startForegroundService(new Intent(context,MobileOverlayService.class).putExtra("taskId",id));
                 long armed=System.currentTimeMillis()+5000;while(!MobileAccess.allowed()&&System.currentTimeMillis()<armed)Thread.sleep(100);assertTrue(MobileAccess.allowed());
+                // Settings remembers its previous page across our APK reinstalls.
+                // Normalize only this disposable emulator's navigation stack.
+                shell(automation,"am start -a android.settings.SETTINGS -f 0x10008000");Thread.sleep(600);
                 shell(automation,"input keyevent KEYCODE_HOME"); // Activity no longer hosts the task loop.
                 Thread.sleep(350);api.request("POST","/mobile/tasks/"+id+"/resume",object());
                 JSONObject waiting;try{waiting=until(api,id,"waiting");}catch(AssertionError e){if(mock.failure!=null)throw mock.failure;throw new AssertionError(e.getMessage()+"\nObserved labels: "+mock.observedLabels,e);}if(mock.failure!=null)throw mock.failure;
