@@ -1,5 +1,32 @@
 # Verification
 
+## Native sidebar and floating island v0.3.1 — 2026-10-13
+
+All three Android instrumentation tests passed on the Android 14 x86_64 emulator
+(140.44 seconds including first-launch runtime extraction). Coverage includes
+the packaged coding runtime, real Artemis screenshots and gestures, background
+task execution, island collapse/expand, and the actual floating Reply button.
+The native UI journey also checks history navigation, provider switching while
+advanced options are collapsed, API-key visibility, and both mode composers.
+After the final timestamp-alignment adjustment, NativeUiSmokeTest passed again
+in 13.852 seconds. Model requests use local fixtures, without paid credentials.
+
+The [reviewed screenshots](UI.md) show the actual chat, drawer, BYOK screen,
+Mobile Use composer, collapsed orb island, and expanded question panel.
+The solving-orb engine and text shimmer are native Canvas implementations;
+the thinking-orbs MIT attribution is included in both APKs.
+
+Both architecture-specific builds pass. Final Android lint reports zero errors
+and 33 warnings. Both APK signatures verify, and packaging includes the selected
+runtime/native ABI, current backend, fonts, and attribution. Generated binaries
+remain ignored build artifacts. Physical ARM64 devices and real provider accounts
+remain outside the completed coverage.
+
+| Debug APK | Bytes | SHA-256 |
+| --- | ---: | --- |
+| ARM64 v0.3.1 | 252354360 | `26fd31ee22b06b40333bb609c04278cc10d96ba11a9aadd691084399cf555e9b` |
+| x86_64 v0.3.1 | 272675439 | `e5be26120b4f6799aa7dcc7f81a1c553b52f4cfab7a7b942d8b2302be486cf23` |
+
 ## Native Mobile Use v0.3 — 2026-10-13
 
 The pinned Artemis native helper and adapted Flash-style task loop run inside
