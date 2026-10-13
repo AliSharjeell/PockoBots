@@ -239,15 +239,32 @@ public class MainActivity extends Activity {
     }
     static String quote(String value){return "'"+value.replace("'","'\\''")+"'";}
     private void chat() {
-        LinearLayout actions=row();body.addView(actions);button(actions,"Conversations",this::conversations);button(actions,"New chat",this::newChat);
-        button(actions,"Stop",() -> {if(!session.isEmpty())request("POST","/sessions/"+session+"/stop",json(),v -> refreshChat());});
         chatScroll=new ScrollView(this);messages=column();chatScroll.addView(messages);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
+        messages.setPadding(dp(8),dp(12),dp(8),dp(16));
         chatScroll.setOnScrollChangeListener((v,x,y,oldx,oldy) -> followChat=y+chatScroll.getHeight()>=messages.getHeight()-dp(50));
-        prompt=new EditText(this);AgentStyle.input(prompt);prompt.setHint("Ask the agent to build or change something…");prompt.setMinLines(2);prompt.setMaxLines(5);body.addView(prompt);
-        button(body,"Send",() -> {String text=prompt.getText().toString().trim();if(text.isEmpty())return;
-            if(session.isEmpty())request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);sendPrompt(text);});else sendPrompt(text);});
-        if(session.isEmpty()){messages.addView(label("Describe what you want to build. The agent can edit files, run Git and npm, and start a preview in this project.",17));
+        LinearLayout composer=row();composer.setGravity(Gravity.CENTER_VERTICAL);composer.setPadding(dp(4),dp(4),dp(4),dp(4));composer.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,28,true));LinearLayout.LayoutParams composerParams=new LinearLayout.LayoutParams(-1,-2);composerParams.setMargins(dp(4),dp(8),dp(4),dp(12));body.addView(composer,composerParams);
+        composer.addView(new AgentIcon(this,"plus","New chat",this::newChat),new LinearLayout.LayoutParams(dp(44),dp(44)));
+        prompt=new EditText(this);AgentStyle.input(prompt);prompt.setBackgroundColor(Color.TRANSPARENT);prompt.setHint("Ask Pocket Agent…");prompt.setMinLines(1);prompt.setMaxLines(5);composer.addView(prompt,new LinearLayout.LayoutParams(0,-2,1));
+        composer.addView(new AgentIcon(this,"stop","Stop agent",() -> {if(!session.isEmpty())request("POST","/sessions/"+session+"/stop",json(),v -> refreshChat());}),new LinearLayout.LayoutParams(dp(40),dp(44)));
+        AgentIcon send=new AgentIcon(this,"send","Send",() -> {String text=prompt.getText().toString().trim();if(text.isEmpty())return;
+            if(session.isEmpty())request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);sendPrompt(text);});else sendPrompt(text);});send.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,28,false));composer.addView(send,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        if(session.isEmpty()){welcome(messages,"What do you want to build?","Edit files, run commands, and bring an idea to life in "+projectName+".");
             JSONObject settings=state.optJSONObject("settings");if(settings!=null&&!settings.optBoolean("hasKey"))button(messages,"Set up your model / BYOK key",() -> show("Settings"));}else refreshChat();
+    }
+    private void welcome(LinearLayout parent,String title,String subtitle){
+        LinearLayout empty=column();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(20),dp(64),dp(20),dp(48));ThinkingOrbView orb=new ThinkingOrbView(this);empty.addView(orb,new LinearLayout.LayoutParams(dp(64),dp(64)));TextView heading=label(title,20);heading.setGravity(Gravity.CENTER);heading.setTypeface(AgentStyle.font(this),Typeface.BOLD);empty.addView(heading);TextView hint=label(subtitle,13);hint.setTextColor(AgentStyle.MUTED);hint.setGravity(Gravity.CENTER);empty.addView(hint);parent.addView(empty);
+    }
+    private void bubble(LinearLayout parent,String text,boolean user,long timestamp){
+        LinearLayout line=column();line.setGravity(user?Gravity.RIGHT:Gravity.LEFT);LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-2);outer.setMargins(0,dp(8),0,dp(8));parent.addView(line,outer);
+        TextView view=AgentStyle.text(this,text,14);view.setLineSpacing(dp(3),1);view.setTextIsSelectable(true);view.setPadding(dp(14),dp(12),dp(14),dp(12));view.setMaxWidth(getResources().getDisplayMetrics().widthPixels-dp(user?64:40));
+        android.graphics.drawable.GradientDrawable shape=AgentStyle.surface(this,user?AgentStyle.BLUE:AgentStyle.PANEL,20,!user);float r=dp(20),tip=dp(3);shape.setCornerRadii(user?new float[]{r,r,r,r,tip,tip,r,r}:new float[]{r,r,r,r,r,r,tip,tip});view.setBackground(shape);line.addView(view,new LinearLayout.LayoutParams(-2,-2));
+        if(timestamp>0){TextView time=label(new java.text.SimpleDateFormat("HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(timestamp)),10);time.setTextColor(AgentStyle.MUTED);line.addView(time);}
+    }
+    private void disclosure(LinearLayout parent,String title,String detail){
+        LinearLayout group=column();TextView heading=label(title+"  ›",12);heading.setTextColor(AgentStyle.MUTED);group.addView(heading);TextView log=label(detail,12);log.setTypeface(Typeface.MONOSPACE);log.setTextIsSelectable(true);log.setVisibility(View.GONE);AgentStyle.card(log);group.addView(log);heading.setOnClickListener(v -> {boolean open=log.getVisibility()!=View.VISIBLE;log.setVisibility(open?View.VISIBLE:View.GONE);heading.setText(title+(open?"  ⌄":"  ›"));});parent.addView(group);
+    }
+    private void working(LinearLayout parent,String status){
+        LinearLayout wrap=row();wrap.setGravity(Gravity.CENTER);LinearLayout pill=AgentStyle.segment(this);pill.setPadding(dp(10),dp(6),dp(14),dp(6));ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");pill.addView(orb,new LinearLayout.LayoutParams(dp(24),dp(24)));TextView caption=label(status,12);pill.addView(caption);wrap.addView(pill);parent.addView(wrap);
     }
     private void setSession(JSONObject selected){session=selected.optString("id");prefs().edit().putString("session",session).apply();}
     private void newChat(){request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);show("Chat");});}
@@ -277,12 +294,13 @@ public class MainActivity extends Activity {
     private void renderChat(JSONObject value) {
         int old=chatScroll.getScrollY();boolean follow=followChat;messages.removeAllViews();JSONArray all=value.optJSONArray("messages");
         for(int i=0;i<all.length();i++){JSONObject message=all.optJSONObject(i);String role=message.optString("role");if(role.equals("system"))continue;String text=messageText(message);if(text.isEmpty())continue;
-            TextView view=label((role.equals("toolResult")?"Tool · "+message.optString("toolName"):role.equals("user")?"You":"Agent")+"\n"+text,15);view.setTextIsSelectable(true);
-            AgentStyle.card(view);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(5),0,dp(5));messages.addView(view,params);}
-        JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null)messages.addView(label("Agent\n"+messageText(streaming),15));
+            if(role.equals("toolResult")){disclosure(messages,"Tool · "+message.optString("toolName"),text);continue;}
+            JSONArray parts=message.optJSONArray("content");StringBuilder visibleText=new StringBuilder(),tools=new StringBuilder();if(parts!=null)for(int j=0;j<parts.length();j++){JSONObject part=parts.optJSONObject(j);if(part==null)continue;if(part.optString("type").equals("text"))visibleText.append(part.optString("text"));if(part.optString("type").equals("toolCall"))tools.append(part.optString("name")).append("\n").append(part.opt("arguments")).append("\n");}
+            String content=parts==null?text:visibleText.toString().trim();if(!content.isEmpty())bubble(messages,content,role.equals("user"),message.optLong("timestamp"));if(tools.length()>0)disclosure(messages,"Tools used",tools.toString());if(message.has("errorMessage"))bubble(messages,message.optString("errorMessage"),false,0);}
+        JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null){String preview=messageText(streaming);if(!preview.isEmpty())bubble(messages,preview,false,0);}
         JSONArray approvals=value.optJSONArray("approvals");for(int i=0;i<approvals.length();i++){JSONObject approval=approvals.optJSONObject(i);messages.addView(label("Allow "+approval.optString("tool")+"?\n"+approval.opt("args"),15));LinearLayout buttons=row();messages.addView(buttons);
             button(buttons,"Allow",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",true),v -> refreshChat()));button(buttons,"Deny",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",false),v -> refreshChat()));}
-        if(value.optBoolean("busy"))messages.addView(label("Agent is working…",13));chatScroll.post(() -> {if(follow)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
+        if(value.optBoolean("busy"))working(messages,"Agent is working");chatScroll.post(() -> {if(follow)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
     }
     private void terminal() {
         String selected=project;terminalId=prefs().getString("terminal-"+selected,"");LinearLayout keys=row();HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.addView(keys);body.addView(scroll);
