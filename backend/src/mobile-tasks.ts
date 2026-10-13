@@ -94,6 +94,9 @@ export class MobileTasks {
     agent.subscribe((event: any) => {
       if (event.type === "message_end") {
         const message = event.message;
+        if (message.role === "assistant" && message.stopReason === "error" && task.status === "running") {
+          task.status = "paused"; task.error = message.errorMessage || "The model request failed. Review your connection and resume.";
+        }
         const value = typeof message.content === "string" ? message.content : (message.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
         if (value) task.history.push({ role: message.role, text: value.slice(0, 10000) });
         task.history = task.history.slice(-50);

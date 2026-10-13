@@ -147,7 +147,7 @@ export async function createApp(options: {
   app.get("/api/mobile/health", async (_req, res) => res.json(await mobile.health()));
   app.get("/api/mobile/tasks", (_req, res) => res.type("json").send(redact(mobile.list())));
   app.post("/api/mobile/tasks", async (req, res) => res.status(201).json(await mobile.create(req.body.prompt)));
-  app.get("/api/mobile/tasks/:id", (req, res) => res.type("json").send(redact(mobile.state(req.params.id))));
+  app.get("/api/mobile/tasks/:id", (req, res) => { const { history, ...task } = mobile.state(req.params.id); res.type("json").send(redact(task)); });
   app.post("/api/mobile/tasks/:id/resume", async (req, res) => res.status(202).json(await mobile.start(req.params.id)));
   app.post("/api/mobile/tasks/:id/pause", async (req, res) => { await mobile.interrupt(req.params.id); res.json({ ok: true }); });
   app.post("/api/mobile/tasks/:id/stop", async (req, res) => { await mobile.interrupt(req.params.id, true); res.json({ ok: true }); });
