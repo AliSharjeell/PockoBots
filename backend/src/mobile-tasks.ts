@@ -16,6 +16,7 @@ export class MobileTasks {
   private records = new Map<string, MobileTask>();
   private agents = new Map<string, Agent>();
   private questions = new Map<string, { resolve: (value: string) => void; reject: (e: Error) => void }>();
+  private launching = false;
   constructor(private store: Store, private settings: () => Settings, private token: string,
     private publish: (event: unknown) => void, private bridgeBase?: string) {}
   async init() {
@@ -30,7 +31,7 @@ export class MobileTasks {
   list() { return [...this.records.values()].map(({ history, ...task }) => task); }
   state(id: string) { const task = this.records.get(id); if (!task) throw Error("Mobile task not found"); return task; }
   health() { return new ArtemisBridge(this.token, this.bridgeBase).health(); }
-  anyBusy() { return this.agents.size > 0; }
+  anyBusy() { return this.agents.size > 0 || this.launching; }
   async create(prompt: unknown) {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 16000) throw Error("Enter a mobile task of at most 16000 characters");
     if (this.records.size >= 30) throw Error("Delete an old mobile task before creating another");
@@ -42,11 +43,13 @@ export class MobileTasks {
     const task = this.state(id);
     if (!["queued", "paused"].includes(task.status)) throw Error("Only queued or paused tasks can start");
     if (this.anyBusy()) throw Error("Another mobile task is using this device");
+    this.launching = true;
+    try {
     const bridge = new ArtemisBridge(this.token, this.bridgeBase);
     const health = await bridge.health();
     if (!health.ready || !health.authenticated || !health.task_allowed) throw Error("Enable Accessibility and start the Mobile Use foreground controller before resuming");
     const settings = { ...this.settings() };
-    if (!settings.apiKey && !settings.baseUrl.includes("127.0.0.1") && !settings.baseUrl.includes("localhost")) throw Error("Configure your BYOK model connection first");
+    if (!settings.apiKey && !["127.0.0.1", "localhost", "[::1]"].includes(new URL(settings.baseUrl).hostname)) throw Error("Configure your BYOK model connection first");
     const { model, models } = connection(settings, true);
     task.status = "running"; task.error = undefined; task.question = undefined;
     if (reply) task.history.push({ role: "user", text: reply });
@@ -116,6 +119,7 @@ export class MobileTasks {
       }
     })();
     return task;
+    } finally { this.launching = false; }
   }
   async answer(id: string, questionId: string, text: unknown) {
     const task = this.state(id);
