@@ -101,6 +101,9 @@ public class MainActivity extends Activity {
     }
     private void closeDrawer(){if(drawer!=null){shellRoot.removeView(drawer);drawer=null;}}
     private void openDrawer(){
+        loadState(this::showDrawer);
+    }
+    private void showDrawer(){
         if(drawer!=null)return;drawer=new FrameLayout(this);drawer.setBackgroundColor(0x99000000);shellRoot.addView(drawer,new FrameLayout.LayoutParams(-1,-1));drawer.setOnClickListener(v -> closeDrawer());
         LinearLayout panel=column();panel.setClickable(true);panel.setBackgroundColor(AgentStyle.BACK);panel.setPadding(dp(12),dp(24),dp(12),dp(16));
         FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(dp(304),getResources().getDisplayMetrics().widthPixels-dp(48)),-1,Gravity.LEFT);drawer.addView(panel,position);
@@ -362,6 +365,12 @@ public class MainActivity extends Activity {
         EditText context=field(advanced,"Context tokens",String.valueOf(saved.optInt("contextWindow")),false),max=field(advanced,"Maximum output tokens",String.valueOf(saved.optInt("maxTokens")),false);context.setInputType(InputType.TYPE_CLASS_NUMBER);max.setInputType(InputType.TYPE_CLASS_NUMBER);
         protocol.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){int previous=protocol.getSelectedItemPosition();public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int pos,long id){AgentStyle.selected(openai,pos!=2);AgentStyle.selected(anthropic,pos==2);if((previous==2)!=(pos==2)){base.setText(pos==2?"https://api.anthropic.com":"https://api.openai.com/v1");if(pos==2)model.setText("claude-sonnet-4-6");key.setText("");}previous=pos;}});
         java.util.function.Supplier<JSONObject> connection=() -> json("provider",protocol.getSelectedItemPosition()==2?"anthropic":"openai","api",protocol.getSelectedItemPosition()==2?"anthropic-messages":protocol.getSelectedItemPosition()==1?"openai-completions":"openai-responses","baseUrl",base.getText().toString().trim(),"model",model.getText().toString().trim(),"apiKey",key.getText().toString(),"contextWindow",Integer.parseInt(context.getText().toString()),"maxTokens",Integer.parseInt(max.getText().toString()));
+        if(mode.equals("Coding")&&!session.isEmpty()){
+            content.addView(label("PERMISSIONS · SHELL COMMANDS",11));LinearLayout choices=row();content.addView(choices);TextView review=permissionCard(choices,"Ask for review","Confirm each shell command"),full=permissionCard(choices,"Full access","Run shell commands directly");
+            java.util.function.Consumer<Boolean> paint=trusted -> {permissionSelected(review,!trusted);permissionSelected(full,trusted);};String conversation=session;
+            request("GET","/sessions/"+conversation,null,v -> paint.accept(((JSONObject)v).optBoolean("trusted")));
+            review.setOnClickListener(v -> request("PUT","/sessions/"+conversation+"/trust",json("trust",false),result -> paint.accept(false)));full.setOnClickListener(v -> request("PUT","/sessions/"+conversation+"/trust",json("trust",true),result -> paint.accept(true)));
+        }
         LinearLayout saveActions=row();saveActions.setPadding(0,dp(18),0,dp(12));content.addView(saveActions);
         Button save=button(saveActions,"Save Settings",() -> {try{request("PUT","/settings",connection.get(),v -> {state.put("settings",v);key.setText("");Toast.makeText(this,"Connection saved",Toast.LENGTH_SHORT).show();});}catch(Exception e){error(e);}});save.setLayoutParams(new LinearLayout.LayoutParams(0,dp(46),1));
         button(saveActions,"Test API",() -> {try{request("POST","/settings/test",connection.get(),v -> Toast.makeText(this,"Connected · "+((JSONObject)v).optLong("latencyMs")+" ms",Toast.LENGTH_LONG).show());}catch(Exception e){error(e);}});
@@ -371,11 +380,11 @@ public class MainActivity extends Activity {
         EditText gitName=field(workspace,"Your name","",false),gitEmail=field(workspace,"Your email","",false);
         request("GET","/git/identity",null,v -> {if(tab.equals("Settings")){gitName.setText(((JSONObject)v).optString("name"));gitEmail.setText(((JSONObject)v).optString("email"));}});
         button(workspace,"Save Git identity",() -> request("PUT","/git/identity",json("name",gitName.getText().toString(),"email",gitEmail.getText().toString()),v -> Toast.makeText(this,"Git identity saved",Toast.LENGTH_SHORT).show()));
-        CheckBox trust=new CheckBox(this);trust.setText("Allow shell commands in this conversation");trust.setEnabled(!session.isEmpty());workspace.addView(trust);
-        if(!session.isEmpty())request("GET","/sessions/"+session,null,v -> {trust.setChecked(((JSONObject)v).optBoolean("trusted"));trust.setOnCheckedChangeListener((view,checked) -> request("PUT","/sessions/"+session+"/trust",json("trust",checked),result -> {}));});
         content.addView(label("Files and tools run on this device. Model requests go to your provider. Closing this screen keeps servers running; use the notification to stop the environment.",14));
         button(workspace,"Stop coding environment",() -> {MobileAccess.authorize(false);stopService(new Intent(this,MobileOverlayService.class));startService(new Intent(this,RuntimeService.class).setAction("stop"));api.closeEvents();api=null;setup();});
     }
+    private TextView permissionCard(LinearLayout parent,String title,String subtitle){TextView view=label(title+"\n"+subtitle,12);view.setPadding(dp(12),dp(14),dp(12),dp(14));view.setLineSpacing(dp(6),1);view.setMinHeight(dp(80));view.setBackground(AgentStyle.surface(this,AgentStyle.BACK,16,true));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,-2,1);params.setMargins(dp(3),dp(8),dp(3),0);parent.addView(view,params);return view;}
+    private void permissionSelected(TextView view,boolean selected){android.graphics.drawable.GradientDrawable shape=AgentStyle.surface(this,selected?AgentStyle.PANEL:AgentStyle.BACK,16,true);if(selected)shape.setStroke(dp(1),AgentStyle.BLUE);view.setBackground(shape);view.setSelected(selected);view.setContentDescription(view.getText()+", "+(selected?"selected":"not selected"));}
     private void listen() {
         if(listening||!visible||api==null)return;listening=true;int epoch=++generation;AgentApi connection=api;
         new Thread(() -> {try{connection.listen(value -> handler.post(() -> {if(visible&&epoch==generation)event(value);}));}catch(Exception ignored){}
