@@ -95,12 +95,12 @@ try:
         os.replace(output, assets / f"{abi}.zip")
         (assets / f"{abi}.json").write_text(json.dumps(metadata))
         print(json.dumps(metadata))
-finally:
     backend_assets = repo / "android/app/src/main/assets/backend"
     backend_assets.mkdir(parents=True, exist_ok=True)
     run("docker", "cp", f"{container}:/opt/pocket-agent/dist/server.js", str(backend_assets / "server.js"))
     import shutil
     shutil.copyfile(repo / "backend/runtime/terminal_bridge.py", backend_assets / "terminal_bridge.py")
+finally:
     run("docker", "rm", container)
 
 # Ship the exact upstream native source and build recipes with each APK.
