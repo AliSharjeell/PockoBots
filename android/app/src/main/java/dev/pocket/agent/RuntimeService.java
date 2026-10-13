@@ -60,6 +60,8 @@ public class RuntimeService extends Service {
                 "POCKET_WORKSPACE=/workspace", "POCKET_STATE=/state", "POCKET_PORT=8787",
                 "LD_PRELOAD=/usr/local/lib/libpocket-compat.so", "UV_USE_IO_URING=0",
                 "node", "/opt/pocket-agent/dist/server.js"));
+            File appBackend=PackagedBackend.prepare(this);
+            command.addAll(command.indexOf("-w"),Arrays.asList("-b",appBackend+"/dist:/opt/pocket-agent/dist","-b",appBackend+"/runtime:/opt/pocket-agent/runtime"));
             File logFile = new File(files, "runtime.log");
             // A pipe reader can block Process.destroy() on Android. Write directly
             // to a file so lifecycle shutdown never waits on a stdout reader lock.

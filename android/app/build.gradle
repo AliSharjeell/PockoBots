@@ -45,6 +45,7 @@ dependencies {
 tasks.register('verifyPackagedRuntime') {
     doLast {
         if (!project.hasProperty('compileOnly')) {
+            if (!file('src/main/assets/backend/server.js').exists()) throw new GradleException('Generate the packaged backend with npm ci && npm run build:android, or runtime/package.py.')
             def abis = (runtimeAbi != null ? [runtimeAbi] : ['arm64-v8a', 'x86_64']).findAll { file("src/main/assets/runtime/${it}.zip").exists() }
             if (abis.empty) throw new GradleException('Run python3 runtime/package.py arm64 (or amd64) before building the standalone APK.')
             abis.each { abi ->
@@ -57,4 +58,5 @@ tasks.register('verifyPackagedRuntime') {
 }
 tasks.named('preBuild').configure { dependsOn 'verifyPackagedRuntime' }
 tasks.named('preBuild').configure { dependsOn 'bundleBackend' }
+tasks.named('verifyPackagedRuntime').configure { dependsOn 'bundleBackend' }
 if (runtimeAbi != null) tasks.named('preBuild').configure { dependsOn 'prepareRuntimeAssets' }
