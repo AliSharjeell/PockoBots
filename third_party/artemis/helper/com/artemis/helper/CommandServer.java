@@ -236,6 +236,8 @@ public class CommandServer extends Thread {
             }
 
             // Route endpoints
+            dev.pocket.agent.MobileOverlayService.suspendOverlay(true);
+            try {
             if (path.equals("/snapshot")) {
                 HierarchyDumper.DumpOptions options = HierarchyDumper.DumpOptions.forSnapshot().apply(query);
                 JSONObject json = HierarchyDumper.dumpAtomicSnapshot(service, options);
@@ -254,6 +256,7 @@ public class CommandServer extends Thread {
             } else {
                 sendJson(output, 404, errorJson("Unknown endpoint: " + path).toString());
             }
+            } finally { dev.pocket.agent.MobileOverlayService.suspendOverlay(false); }
 
         } catch (Exception e) {
             Log.e(TAG, "HTTP error", e);
@@ -280,7 +283,9 @@ public class CommandServer extends Thread {
             } else if (!dev.pocket.agent.MobileAccess.allowed()) {
                 resp = errorJson("Mobile task controller is paused or inactive");
             } else {
-                resp = executeCommand(cmd, json);
+                dev.pocket.agent.MobileOverlayService.suspendOverlay(true);
+                try { resp = executeCommand(cmd, json); }
+                finally { dev.pocket.agent.MobileOverlayService.suspendOverlay(false); }
             }
             byte[] bytes = resp.toString().getBytes(StandardCharsets.UTF_8);
             output.write(bytes);
