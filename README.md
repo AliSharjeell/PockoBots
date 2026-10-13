@@ -1,6 +1,6 @@
 # Pocket Agent
 
-A native Android coding app with its own packaged development environment.
+A native Android coding and Mobile Use app with its own packaged environment.
 Install one APK, let it unpack its included tools, add your model connection,
 create or clone a project, and start coding in chat. An installed Termux app,
 manual backend setup, and pairing tokens are not required.
@@ -9,6 +9,14 @@ The agent, project files, Bash, Git, Node.js, npm, Python, build tools and
 development servers run on your phone. Model requests go to your BYOK provider;
 this does not bundle an offline language model. Microsoft Dev Tunnels provides
 optional internet sharing for project ports.
+
+**Mobile Use** runs tasks across Android apps using the integrated Artemis native
+helper and a Flash-style on-device task runner. Start a task in chat, and the app
+backgrounds itself while a floating rounded pill shows progress, questions and
+results. Pause, resume, stop, or reply from the panel. Enable accessibility and
+display-over-other-apps permissions once in Android; no computer or ADB is
+required. Model requests use your BYOK provider. See
+[docs/MOBILE_USE.md](docs/MOBILE_USE.md) for setup, privacy and the port's scope.
 
 ## Use on your phone
 

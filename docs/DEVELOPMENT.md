@@ -35,11 +35,17 @@ installation step. The Android emulator does not need Termux.
 | Native project/chat/settings/file/server screens | `android/app/src/main/java/dev/pocket/agent/MainActivity.java` | Run or Debug again |
 | Native terminal input/rendering | `android/app/src/main/java/dev/pocket/agent/TerminalCanvas.java` | Run or Debug again |
 | Runtime setup and lifecycle | `RuntimeInstaller.java`, `RuntimeService.java` in the same Java directory | Run or Debug again |
-| Agent, API, project management, Git, server tools | `backend/src/` | Repackage the x86_64 runtime, then Run again |
-| PTY bridge | `backend/runtime/terminal_bridge.py` | Repackage the x86_64 runtime, then Run again |
+| Agent, API, Mobile Use, project management, Git, server tools | `backend/src/` | Run again; Gradle bundles the backend when npm dependencies are installed |
+| PTY bridge | `backend/runtime/terminal_bridge.py` | Run again; bundled alongside the backend |
 | Included Linux tools | `runtime/Dockerfile`, `runtime/package.py` | Repackage the runtime, then Run again |
 
-Native Java edits do not require rebuilding the Linux runtime. A normal IDE Run
+Run `npm ci` once from the repository root with Node.js 22+ installed. Gradle's
+`bundleBackend` task then rebuilds TypeScript changes into the small APK backend
+assets. The runtime packager also generates those assets for Docker/CI builds.
+The installed Linux runtime is reused across backend edits; the new backend is
+bound into the guest runtime from a separate versioned private directory.
+
+Native Java and backend edits do not require rebuilding the Linux runtime. A normal IDE Run
 keeps app data, projects, and settings; uninstalling or clearing app data removes
 them. Changed runtime archives have a new checksum and are extracted at startup.
 Old runtime directories are currently retained, so repeated runtime rebuilds may
@@ -52,9 +58,10 @@ npm ci
 npm run dev
 ```
 
-This watches TypeScript changes and serves the desktop backend/browser UI. It
-does **not** automatically update the backend inside the Android app. Android
-Studio's Java debugger does not attach to the Node backend.
+This watches TypeScript changes and serves the desktop backend/browser UI.
+For the Android app, Run builds the new backend into the APK; it is not a live
+connection to `npm run dev`. Android Studio's Java debugger does not attach to
+the Node backend.
 
 ## Logs and checks
 
