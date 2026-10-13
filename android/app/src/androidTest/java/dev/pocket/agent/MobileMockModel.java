@@ -33,7 +33,9 @@ final class MobileMockModel implements AutoCloseable {
             else{name="report_task_status";args.put("status","completed").put("summary","Battery screen verified through Artemis on this device.");}
             JSONObject function=new JSONObject().put("name",name).put("arguments",args.toString());
             JSONObject call=new JSONObject().put("index",0).put("id","phone-"+turn).put("type","function").put("function",function);
-            String payload="data: "+chunk(new JSONObject().put("tool_calls",new JSONArray().put(call)),JSONObject.NULL)+"\n\n"+"data: "+chunk(new JSONObject(),"tool_calls")+"\n\ndata: [DONE]\n\n";
+            JSONObject delta=new JSONObject().put("tool_calls",new JSONArray().put(call));
+            if(name.equals("ask_user"))delta.put("content","Opened the Battery page. Waiting for your reply.");
+            String payload="data: "+chunk(delta,JSONObject.NULL)+"\n\n"+"data: "+chunk(new JSONObject(),"tool_calls")+"\n\ndata: [DONE]\n\n";
             byte[] bytes=payload.getBytes(StandardCharsets.UTF_8);OutputStream output=connection.getOutputStream();
             output.write(("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: "+bytes.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));output.write(bytes);output.flush();
         }catch(Exception e){if(running)failure=e;}},"mobile-model");worker.setDaemon(true);worker.start();

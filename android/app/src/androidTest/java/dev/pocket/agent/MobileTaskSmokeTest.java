@@ -49,6 +49,8 @@ public class MobileTaskSmokeTest {
                 JSONObject waiting;try{waiting=until(api,id,"waiting");}catch(AssertionError e){if(mock.failure!=null)throw mock.failure;throw new AssertionError(e.getMessage()+"\nObserved labels: "+mock.observedLabels,e);}if(mock.failure!=null)throw mock.failure;
                 assertEquals(id,MobileOverlayService.activeTask);assertTrue(mock.sawImage);assertTrue(mock.stage>=6);
                 long gated=System.currentTimeMillis()+6000;while(MobileAccess.allowed()&&System.currentTimeMillis()<gated)Thread.sleep(100);assertFalse("Device access must pause for user input",MobileAccess.allowed());
+                android.graphics.Bitmap preview=automation.takeScreenshot();
+                if(preview!=null){try(OutputStream out=new FileOutputStream(new File(context.getFilesDir(),"mobile-waiting.png"))){preview.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}preview.recycle();}
                 MobileAccess.authorize(true); // Same local consent transition as Reply & continue.
                 api.request("POST","/mobile/tasks/"+id+"/answer",object("questionId",waiting.getJSONObject("question").getString("id"),"text","ready"));
                 JSONObject completed=until(api,id,"completed");if(mock.failure!=null)throw mock.failure;
