@@ -21,7 +21,7 @@ public class MobileOverlayService extends Service {
     private final ScheduledExecutorService polling=Executors.newSingleThreadScheduledExecutor();
     private WindowManager windows;private WindowManager.LayoutParams layout;private LinearLayout surface;
     private AgentApi api;private JSONObject task=new JSONObject();private String id="",signature="",draft="";
-    private boolean expanded,attached,closing;private EditText answer;private float startX,startY;private int windowX,windowY;
+    private boolean expanded,attached,closing,suspended;private EditText answer;private float startX,startY;private int windowX,windowY;
     private long armingUntil;
     private NotificationManager notifications;
     private ThinkingOrbView orb;private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
@@ -124,7 +124,7 @@ public class MobileOverlayService extends Service {
             button(controls,"Open",() -> startActivity(new Intent(this,MainActivity.class).putExtra("mobileTask",id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
             button(controls,"×",() -> {control("pause");stopSelf();},false);
         }
-        layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);
         int width=expanded?Math.min(dp(344),getResources().getDisplayMetrics().widthPixels-dp(24)):dp(228);
         surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int height=surface.getMeasuredHeight();
         boolean transition=targetWidth>0&&(renderedExpanded!=expanded||targetWidth!=width||Math.abs(targetHeight-height)>dp(16));renderedExpanded=expanded;targetWidth=width;targetHeight=height;
@@ -138,7 +138,7 @@ public class MobileOverlayService extends Service {
     public static void suspendOverlay(boolean hide){
         MobileOverlayService service=instance;if(service==null||!service.attached)return;
         CountDownLatch ready=new CountDownLatch(1);service.main.post(() -> {try{
-            if(service.attached){service.surface.setAlpha(hide?0:1);if(hide)service.layout.flags|=WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            if(service.attached){service.suspended=hide;service.surface.setAlpha(hide?0:1);if(hide)service.layout.flags|=WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
                 else service.layout.flags&=~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;service.windows.updateViewLayout(service.surface,service.layout);}
         }finally{ready.countDown();}});
         try{ready.await(1,TimeUnit.SECONDS);if(hide)Thread.sleep(60);}catch(InterruptedException e){Thread.currentThread().interrupt();}
