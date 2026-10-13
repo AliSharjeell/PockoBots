@@ -1,6 +1,43 @@
-# Verification - 2026-10-06
+# Verification
 
-## Standalone native Android v0.2
+## Native Mobile Use v0.3 — 2026-10-13
+
+The pinned Artemis native helper and adapted Flash-style task loop run inside
+Pocket Agent. Android 14 x86_64 emulator coverage exercised real screenshots,
+app launch, a grounded tap into Settings > Battery, background operation,
+question handoff, native action suspension while waiting, reply, fresh screen
+observation, and completion. The provider fixture received screenshot images;
+no paid provider account was used.
+
+Both Android instrumentation tests passed (32.358 seconds with the runtime
+already extracted): MobileTaskSmokeTest and RuntimeSmokeTest. The latter also
+checks the packaged coding agent, PTY, Git, npm server, and restart persistence.
+All 11 backend integration tests passed against both the ordinary and
+Android-bundled builds in Linux. TypeScript checks and both build targets passed.
+Both architecture-specific APK builds and Android lint passed; lint reports
+zero errors and 25 warnings.
+
+The native mode switch, coding screen, and floating question panel were visually
+checked against the requested zinc/Inter sidebar styling. The captured panel is
+shown in [the emulator screenshot](images/mobile-use-panel.png). Android Settings
+hides application overlays, so the question panel was captured on Home. Permissions
+were restored after the instrumentation fixture.
+
+Both APK signatures verify. Each APK includes only its selected native ABI,
+the packaged runtime, the current small backend bundle, and attribution assets.
+Generated APKs and runtime archives remain ignored build artifacts.
+
+| Debug APK | Bytes | SHA-256 |
+| --- | ---: | --- |
+| ARM64 v0.3.0 | 252337681 | `6298422c6a18f323b21b188677c85fef47016add2a634593f170555a93f7ac5e` |
+| x86_64 v0.3.0 | 272658760 | `624d846e1343fff133bd212ed3d6ee69483fe258f162c2f674f05b66d44ad0b9` |
+
+Remaining coverage includes physical ARM64 phones, vendor battery/background
+policies, real vision-provider credentials, and authenticated tunnel hosting.
+The integration ports the native helper and Flash-style loop; it does not include
+Artemis's desktop Python/ADB runner, Pro orchestration, OCR/explorer, or benchmarks.
+
+## Historical standalone native Android v0.2 — 2026-10-06
 
 The v0.2 implementation replaces the Android WebView/Termux pairing flow with native Java screens and an app-owned PRoot runtime. Both ARM64 and x86_64 runtime archives were built locally from `runtime/Dockerfile`, with checksum-verified Android libraries and upstream native source archives.
 
