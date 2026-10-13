@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { mkdir, copyFile } from "node:fs/promises";
 import "./copy-runtime.mjs";
 await build({
   entryPoints: ["backend/src/server.ts"],
@@ -12,3 +13,6 @@ await build({
   target: "node22",
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
 });
+await mkdir("android/app/src/main/assets/backend", { recursive: true });
+await copyFile("dist/server.js", "android/app/src/main/assets/backend/server.js");
+await copyFile("backend/runtime/terminal_bridge.py", "android/app/src/main/assets/backend/terminal_bridge.py");

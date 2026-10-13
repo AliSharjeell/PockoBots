@@ -16,3 +16,4 @@ __pycache__/
 android/app/src/main/assets/licenses/
 runtime/generated/
 runtime/terminal_bridge.py
+android/app/src/main/assets/backend/
