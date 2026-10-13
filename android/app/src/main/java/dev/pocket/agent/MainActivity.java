@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
     private String project = "", projectName = "", session = "", tab = "Projects", directory = ".", terminalId = "", pendingClone = "";
     private LinearLayout body, messages, jobs;
     private FrameLayout shellRoot,drawer;
+    private final java.util.Set<String> expandedDetails=new java.util.HashSet<>();
     private ScrollView chatScroll;
     private EditText prompt;
     private TextView setupStatus;
@@ -265,7 +266,7 @@ public class MainActivity extends Activity {
         if(timestamp>0){TextView time=label(new java.text.SimpleDateFormat("HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(timestamp)),10);time.setTextColor(AgentStyle.MUTED);line.addView(time);}
     }
     private void disclosure(LinearLayout parent,String title,String detail){
-        LinearLayout group=column();TextView heading=label(title+"  ›",12);heading.setTextColor(AgentStyle.MUTED);group.addView(heading);TextView log=label(detail,12);log.setTypeface(Typeface.MONOSPACE);log.setTextIsSelectable(true);log.setVisibility(View.GONE);AgentStyle.card(log);group.addView(log);heading.setOnClickListener(v -> {boolean open=log.getVisibility()!=View.VISIBLE;log.setVisibility(open?View.VISIBLE:View.GONE);heading.setText(title+(open?"  ⌄":"  ›"));});parent.addView(group);
+        String key=title+":"+detail.hashCode();boolean expanded=expandedDetails.contains(key);LinearLayout group=column();TextView heading=label(title+(expanded?"  ⌄":"  ›"),12);heading.setTextColor(AgentStyle.MUTED);group.addView(heading);TextView log=label(detail,12);log.setTypeface(Typeface.MONOSPACE);log.setTextIsSelectable(true);log.setVisibility(expanded?View.VISIBLE:View.GONE);AgentStyle.card(log);group.addView(log);heading.setOnClickListener(v -> {boolean open=log.getVisibility()!=View.VISIBLE;if(open)expandedDetails.add(key);else expandedDetails.remove(key);log.setVisibility(open?View.VISIBLE:View.GONE);heading.setText(title+(open?"  ⌄":"  ›"));});parent.addView(group);
     }
     private void working(LinearLayout parent,String status){
         LinearLayout wrap=row();wrap.setGravity(Gravity.CENTER);LinearLayout pill=AgentStyle.segment(this);pill.setPadding(dp(10),dp(6),dp(14),dp(6));ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");pill.addView(orb,new LinearLayout.LayoutParams(dp(24),dp(24)));ShimmerTextView caption=new ShimmerTextView(this,status);caption.active(true);caption.setPadding(dp(8),0,0,0);pill.addView(caption);wrap.addView(pill);parent.addView(wrap);
@@ -300,8 +301,8 @@ public class MainActivity extends Activity {
         for(int i=0;i<all.length();i++){JSONObject message=all.optJSONObject(i);String role=message.optString("role");if(role.equals("system"))continue;String text=messageText(message);if(text.isEmpty())continue;
             if(role.equals("toolResult")){disclosure(messages,"Tool · "+message.optString("toolName"),text);continue;}
             JSONArray parts=message.optJSONArray("content");StringBuilder visibleText=new StringBuilder(),tools=new StringBuilder();if(parts!=null)for(int j=0;j<parts.length();j++){JSONObject part=parts.optJSONObject(j);if(part==null)continue;if(part.optString("type").equals("text"))visibleText.append(part.optString("text"));if(part.optString("type").equals("toolCall"))tools.append(part.optString("name")).append("\n").append(part.opt("arguments")).append("\n");}
-            String content=parts==null?text:visibleText.toString().trim();if(!content.isEmpty())bubble(messages,content,role.equals("user"),message.optLong("timestamp"));if(tools.length()>0)disclosure(messages,"Tools used",tools.toString());if(message.has("errorMessage"))bubble(messages,message.optString("errorMessage"),false,0);}
-        JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null){String preview=messageText(streaming);if(!preview.isEmpty())bubble(messages,preview,false,0);}
+            String content=parts==null?text:visibleText.toString().trim();if(!content.isEmpty())bubble(messages,content,role.equals("user"),message.optLong("timestamp"));if(tools.length()>0)disclosure(messages,"Tools used",tools.toString());if(parts!=null&&message.has("errorMessage"))bubble(messages,message.optString("errorMessage"),false,0);}
+        JSONObject streaming=value.optJSONObject("streaming");if(streaming!=null){JSONArray parts=streaming.optJSONArray("content");StringBuilder preview=new StringBuilder();if(parts==null)preview.append(messageText(streaming));else for(int i=0;i<parts.length();i++){JSONObject part=parts.optJSONObject(i);if(part!=null&&part.optString("type").equals("text"))preview.append(part.optString("text"));}if(preview.length()>0)bubble(messages,preview.toString(),false,0);}
         JSONArray approvals=value.optJSONArray("approvals");for(int i=0;i<approvals.length();i++){JSONObject approval=approvals.optJSONObject(i);messages.addView(label("Allow "+approval.optString("tool")+"?\n"+approval.opt("args"),15));LinearLayout buttons=row();messages.addView(buttons);
             button(buttons,"Allow",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",true),v -> refreshChat()));button(buttons,"Deny",() -> request("POST","/approvals/"+approval.optString("id"),json("allow",false),v -> refreshChat()));}
         if(value.optBoolean("busy"))working(messages,"Agent is working");chatScroll.post(() -> {if(follow)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
