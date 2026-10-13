@@ -4,6 +4,8 @@ import android.app.UiAutomation;
 import android.content.*;
 import android.os.*;
 import android.provider.Settings;
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.view.accessibility.*;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import com.artemis.helper.ArtemisAccessibilityService;
@@ -17,12 +19,22 @@ import static org.junit.Assert.*;
 public class MobileTaskSmokeTest {
     private static String shell(UiAutomation automation,String command)throws Exception{try(ParcelFileDescriptor fd=automation.executeShellCommand(command);InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd)){return new String(Io.bytes(in),java.nio.charset.StandardCharsets.UTF_8).trim();}}
     private static JSONObject object(Object...pairs)throws Exception{JSONObject value=new JSONObject();for(int i=0;i<pairs.length;i+=2)value.put((String)pairs[i],pairs[i+1]);return value;}
+    private static AccessibilityNodeInfo node(UiAutomation automation,String text,boolean edit)throws Exception{
+        long deadline=System.currentTimeMillis()+5000;while(System.currentTimeMillis()<deadline){for(AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;AccessibilityNodeInfo found=find(root,text,edit);if(found!=null)return found;}Thread.sleep(100);}throw new AssertionError("Missing floating control: "+text);
+    }
+    private static AccessibilityNodeInfo find(AccessibilityNodeInfo root,String text,boolean edit){
+        if(edit?"android.widget.EditText".contentEquals(root.getClassName()==null?"":root.getClassName()):text.contentEquals(root.getText()==null?"":root.getText()))return root;
+        for(int i=0;i<root.getChildCount();i++){AccessibilityNodeInfo child=root.getChild(i);if(child!=null){AccessibilityNodeInfo found=find(child,text,edit);if(found!=null)return found;}}return null;
+    }
+    private static void toggle(UiAutomation automation)throws Exception{AccessibilityNodeInfo control=node(automation,"Needs your reply",false);while(control!=null&&!control.isClickable())control=control.getParent();assertNotNull(control);assertTrue(control.performAction(AccessibilityNodeInfo.ACTION_CLICK));Thread.sleep(450);}
+    private static void capture(UiAutomation automation,Context context,String name)throws Exception{android.graphics.Bitmap preview=automation.takeScreenshot();if(preview!=null){try(OutputStream out=new FileOutputStream(new File(context.getFilesDir(),name))){preview.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}preview.recycle();}}
     private static JSONObject until(AgentApi api,String id,String status)throws Exception{long end=System.currentTimeMillis()+45000;JSONObject last=new JSONObject();while(System.currentTimeMillis()<end){last=api.get("/mobile/tasks/"+id);if(status.equals(last.optString("status")))return last;Thread.sleep(150);}fail("Expected "+status+": "+last);return last;}
     @Test public void artemisLaunchTapBackgroundQuestionAndReply()throws Exception{
         // Never grant broad accessibility access on someone's physical phone.
         Assume.assumeTrue(Build.HARDWARE.contains("ranchu")||Build.HARDWARE.contains("goldfish"));
         android.app.Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();Context context=instrumentation.getTargetContext();
         UiAutomation automation=instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+        AccessibilityServiceInfo info=automation.getServiceInfo();info.flags|=AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;automation.setServiceInfo(info);
         if(Build.VERSION.SDK_INT>=33)automation.grantRuntimePermission(context.getPackageName(),android.Manifest.permission.POST_NOTIFICATIONS);
         String original=Settings.Secure.getString(context.getContentResolver(),"enabled_accessibility_services");
         String enabled=context.getPackageName()+"/com.artemis.helper.ArtemisAccessibilityService";
@@ -52,10 +64,9 @@ public class MobileTaskSmokeTest {
                 // System settings can hide application overlays. The waiting
                 // question must also remain usable on the normal home screen.
                 shell(automation,"input keyevent KEYCODE_HOME");Thread.sleep(900);
-                android.graphics.Bitmap preview=automation.takeScreenshot();
-                if(preview!=null){try(OutputStream out=new FileOutputStream(new File(context.getFilesDir(),"mobile-waiting.png"))){preview.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}preview.recycle();}
-                MobileAccess.authorize(true); // Same local consent transition as Reply & continue.
-                api.request("POST","/mobile/tasks/"+id+"/answer",object("questionId",waiting.getJSONObject("question").getString("id"),"text","ready"));
+                capture(automation,context,"mobile-waiting.png");toggle(automation);capture(automation,context,"mobile-island.png");toggle(automation);
+                Bundle reply=new Bundle();reply.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"ready");assertTrue(node(automation,"reply",true).performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,reply));
+                assertTrue(node(automation,"Reply & continue",false).performAction(AccessibilityNodeInfo.ACTION_CLICK));
                 JSONObject completed=until(api,id,"completed");if(mock.failure!=null)throw mock.failure;
                 assertTrue(completed.getString("output").contains("Battery screen verified"));
                 assertTrue(Io.text(new File(context.getFilesDir(),"state/mobile-tasks.json")).contains("completed"));
