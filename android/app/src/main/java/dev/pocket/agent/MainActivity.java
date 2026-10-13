@@ -21,6 +21,7 @@ public class MainActivity extends Activity {
     private JSONObject state = new JSONObject();
     private String project = "", projectName = "", session = "", tab = "Projects", directory = ".", terminalId = "", pendingClone = "";
     private LinearLayout body, messages, jobs;
+    private FrameLayout shellRoot,drawer;
     private ScrollView chatScroll;
     private EditText prompt;
     private TextView setupStatus;
@@ -76,8 +77,12 @@ public class MainActivity extends Activity {
             v.setPadding(dp(8)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(8)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-        page.addView(label("Pocket Agent"+(!mode.equals("Coding")||projectName.isEmpty()?"":" · "+projectName),21));
-        LinearLayout modes=row();modes.setPadding(0,0,0,dp(5));page.addView(modes);
+        LinearLayout brand=row();brand.setGravity(Gravity.CENTER_VERTICAL);brand.setPadding(dp(10),dp(12),dp(10),dp(10));
+        TextView wordmark=label("Pocket Agent",18);wordmark.setTypeface(AgentStyle.font(this),Typeface.BOLD);brand.addView(wordmark,new LinearLayout.LayoutParams(0,-2,1));
+        TextView context=label(mode.equals("Coding")?projectName:"Mobile Use",11);context.setTextColor(AgentStyle.MUTED);context.setSingleLine(true);context.setMaxWidth(dp(150));brand.addView(context);page.addView(brand);
+        LinearLayout top=row();top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(4),0,dp(4),dp(12));page.addView(top);
+        top.addView(new AgentIcon(this,tab.equals("Settings")?"back":"menu",tab.equals("Settings")?"Back":"Open navigation",() -> {if(tab.equals("Settings"))show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");else openDrawer();}),new LinearLayout.LayoutParams(dp(44),dp(44)));
+        LinearLayout modes=AgentStyle.segment(this);LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(0,dp(44),1);modeParams.setMargins(dp(10),0,dp(10),0);top.addView(modes,modeParams);
         for(String option:new String[]{"Mobile Use","Coding"}){
             Button choice=button(modes,option,() -> {
                 if(option.equals("Coding")&&!MobileOverlayService.activeTask.isEmpty()){
@@ -85,12 +90,34 @@ public class MainActivity extends Activity {
                 }
                 mode=option;prefs().edit().putString("mode",mode).apply();show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");
             });
-            choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
-            if(mode.equals(option)){choice.setBackground(AgentStyle.surface(this,AgentStyle.WHITE,10,false));choice.setTextColor(AgentStyle.BACK);}
+            choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(36),1));AgentStyle.selected(choice,mode.equals(option));
         }
-        HorizontalScrollView nav = new HorizontalScrollView(this); LinearLayout tabs = row(); nav.addView(tabs); page.addView(nav);
-        for (String name : mode.equals("Mobile Use")?new String[]{"Tasks","Settings"}:new String[]{"Projects","Chat","Terminal","Files","Servers","Settings"}) button(tabs,name,() -> show(name));
-        body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1)); setContentView(page);
+        top.addView(new AgentIcon(this,"settings","Model and settings",() -> show("Settings")),new LinearLayout.LayoutParams(dp(44),dp(44)));
+        if(mode.equals("Coding")&&!tab.equals("Settings")&&!tab.equals("Projects")){
+            LinearLayout tabs=AgentStyle.segment(this);LinearLayout.LayoutParams tabParams=new LinearLayout.LayoutParams(-1,dp(44));tabParams.setMargins(dp(32),0,dp(32),dp(10));page.addView(tabs,tabParams);
+            for(String name:new String[]{"Chat","Terminal","Files"}){Button choice=button(tabs,name,() -> show(name));choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(36),1));AgentStyle.selected(choice,tab.equals(name));}
+        }
+        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));shellRoot=new FrameLayout(this);shellRoot.addView(page);drawer=null;setContentView(shellRoot);
+    }
+    private void closeDrawer(){if(drawer!=null){shellRoot.removeView(drawer);drawer=null;}}
+    private void openDrawer(){
+        if(drawer!=null)return;drawer=new FrameLayout(this);drawer.setBackgroundColor(0x99000000);shellRoot.addView(drawer,new FrameLayout.LayoutParams(-1,-1));drawer.setOnClickListener(v -> closeDrawer());
+        LinearLayout panel=column();panel.setClickable(true);panel.setBackgroundColor(AgentStyle.BACK);panel.setPadding(dp(12),dp(24),dp(12),dp(16));
+        FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(dp(304),getResources().getDisplayMetrics().widthPixels-dp(48)),-1,Gravity.LEFT);drawer.addView(panel,position);
+        LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);TextView title=label("Pocket Agent",20);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(new AgentIcon(this,"close","Close navigation",this::closeDrawer),new LinearLayout.LayoutParams(dp(44),dp(44)));panel.addView(heading);
+        drawerRow(panel,"＋  "+(mode.equals("Mobile Use")?"New task":"New chat"),false,() -> {closeDrawer();if(mode.equals("Mobile Use")){mobileTask="";show("Tasks");}else if(!project.isEmpty())newChat();else createProject();});
+        ScrollView scroll=new ScrollView(this);LinearLayout list=column();scroll.addView(list);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        list.addView(label("Recent",14));
+        if(mode.equals("Mobile Use")){
+            JSONArray tasks=state.optJSONArray("mobileTasks");if(tasks!=null)for(int i=tasks.length()-1;i>=0;i--){JSONObject task=tasks.optJSONObject(i);if(task==null)continue;drawerRow(list,"▢  "+task.optString("prompt"),task.optString("id").equals(mobileTask),() -> {mobileTask=task.optString("id");prefs().edit().putString("mobile-task",mobileTask).apply();closeDrawer();show("Tasks");});}
+        }else{
+            JSONArray sessions=state.optJSONArray("sessions");if(sessions!=null)for(int i=sessions.length()-1;i>=0;i--){JSONObject item=sessions.optJSONObject(i);if(item==null)continue;JSONObject owner=findProject(item.optString("projectId"));if(owner==null)continue;drawerRow(list,"▢  "+item.optString("title"),item.optString("id").equals(session),() -> {project=owner.optString("id");projectName=owner.optString("name");terminalId="";directory=".";prefs().edit().putString("project",project).apply();setSession(item);closeDrawer();show("Chat");});}
+            list.addView(label("Workspace",14));for(String destination:new String[]{"Projects","Files","Terminal","Servers"})drawerRow(list,destination,tab.equals(destination),() -> {closeDrawer();show(destination);});
+        }
+        drawerRow(panel,"⚙  Settings",tab.equals("Settings"),() -> {closeDrawer();show("Settings");});panel.setTranslationX(-position.width);panel.animate().translationX(0).setDuration(240).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+    }
+    private void drawerRow(LinearLayout parent,String title,boolean selected,Runnable action){
+        TextView item=AgentStyle.text(this,title,14);item.setSingleLine(true);item.setEllipsize(android.text.TextUtils.TruncateAt.END);item.setGravity(Gravity.CENTER_VERTICAL);item.setPadding(dp(14),0,dp(14),0);item.setBackground(AgentStyle.surface(this,selected?AgentStyle.PANEL:Color.TRANSPARENT,16,false));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(48));params.setMargins(0,dp(3),0,dp(3));parent.addView(item,params);item.setOnClickListener(v -> action.run());
     }
     LinearLayout scrolling() {
         ScrollView scroll=new ScrollView(this); LinearLayout content=column(); content.setPadding(dp(6),dp(6),dp(6),dp(16));
@@ -340,6 +367,6 @@ public class MainActivity extends Activity {
     }
     private void scheduleChat(){if(!chatScheduled){chatScheduled=true;handler.postDelayed(chatUpdate,100);}}
     private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){error(e);}}
-    private void back(){if(mode.equals("Mobile Use")){if(!tab.equals("Tasks"))show("Tasks");else finish();}else if(!tab.equals("Projects"))show("Projects");else finish();}
+    private void back(){if(drawer!=null){closeDrawer();return;}if(mode.equals("Mobile Use")){if(!tab.equals("Tasks"))show("Tasks");else finish();}else if(!tab.equals("Projects"))show("Projects");else finish();}
     @Override public void onBackPressed(){back();}
 }
