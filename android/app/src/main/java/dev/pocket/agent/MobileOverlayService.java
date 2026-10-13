@@ -1,6 +1,7 @@
 package dev.pocket.agent;
 
 import android.app.*;
+import android.animation.ValueAnimator;
 import android.content.*;
 import android.graphics.PixelFormat;
 import android.os.*;
@@ -23,6 +24,7 @@ public class MobileOverlayService extends Service {
     private boolean expanded,attached,closing;private EditText answer;private float startX,startY;private int windowX,windowY;
     private long armingUntil;
     private NotificationManager notifications;
+    private ThinkingOrbView orb;private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
     @Override public void onCreate(){
         super.onCreate();instance=this;notifications=getSystemService(NotificationManager.class);
         notifications.createNotificationChannel(new NotificationChannel("mobile-tasks","Mobile Use tasks",NotificationManager.IMPORTANCE_LOW));
@@ -30,9 +32,9 @@ public class MobileOverlayService extends Service {
         windows=getSystemService(WindowManager.class);
         layout=new WindowManager.LayoutParams(-2,-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,PixelFormat.TRANSLUCENT);
-        layout.gravity=Gravity.TOP|Gravity.LEFT;layout.x=AgentStyle.dp(this,16);layout.y=AgentStyle.dp(this,100);
+        layout.gravity=Gravity.TOP|Gravity.LEFT;layout.x=Math.max(dp(12),(getResources().getDisplayMetrics().widthPixels-dp(228))/2);layout.y=dp(40);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
-        surface.setElevation(dp(12));surface.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
+        surface.setElevation(dp(16));surface.setBackground(AgentStyle.surface(this,android.graphics.Color.BLACK,28,true));surface.setClipToOutline(true);orb=new ThinkingOrbView(this);
         surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());}
         catch(Exception e){MobileAccess.authorize(false);stopSelf();return;}
@@ -82,11 +84,13 @@ public class MobileOverlayService extends Service {
     private void render(){
         if(surface==null||!attached)return;if(answer!=null)draft=answer.getText().toString();answer=null;surface.removeAllViews();
         String status=task.optString("status","queued");
-        String shortTitle=status.equals("waiting")?"●  Needs you":status.equals("running")?"●  Working · "+task.optInt("steps"):"○  "+status;
+        String shortTitle=status.equals("waiting")?"Needs your reply":status.equals("running")?"Agent is working":status.equals("completed")?"Task complete":status.equals("queued")?"Getting ready":status.equals("paused")?"Task paused":status.equals("failed")?"Task needs attention":"Task stopped";
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView pill=text(shortTitle,12);pill.setTextIsSelectable(false);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);header.addView(pill,new LinearLayout.LayoutParams(0,-2,1));
-        TextView chevron=text(expanded?"−":"↗",16);chevron.setTextIsSelectable(false);chevron.setPadding(dp(12),0,0,0);header.addView(chevron);surface.addView(header);
-        View.OnTouchListener drag=!expanded?(v,event) -> {
+        if(orb.getParent()!=null)((android.view.ViewGroup)orb.getParent()).removeView(orb);orb.state(status);LinearLayout.LayoutParams orbParams=new LinearLayout.LayoutParams(dp(34),dp(34));orbParams.setMargins(0,0,dp(10),0);header.addView(orb,orbParams);
+        LinearLayout captions=new LinearLayout(this);captions.setOrientation(LinearLayout.VERTICAL);TextView pill=text(shortTitle,12);pill.setTextIsSelectable(false);pill.setPadding(0,0,0,0);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);captions.addView(pill);
+        TextView detail=text(status.equals("waiting")?"Paused until you reply":task.optInt("steps")+" steps · Mobile Use",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,dp(3),0,0);captions.addView(detail);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
+        TextView chevron=text(expanded?"⌄":"⌃",16);chevron.setContentDescription(expanded?"Collapse task panel":"Expand task panel");chevron.setTextIsSelectable(false);chevron.setPadding(dp(8),0,dp(2),0);header.addView(chevron);surface.addView(header);
+        View.OnTouchListener drag=(v,event) -> {
             switch(event.getAction()){
                 case MotionEvent.ACTION_DOWN:startX=event.getRawX();startY=event.getRawY();windowX=layout.x;windowY=layout.y;return true;
                 case MotionEvent.ACTION_MOVE:layout.x=Math.max(0,Math.min(getResources().getDisplayMetrics().widthPixels-surface.getWidth(),windowX+(int)(event.getRawX()-startX)));
@@ -94,13 +98,13 @@ public class MobileOverlayService extends Service {
                 case MotionEvent.ACTION_UP:if(Math.abs(event.getRawX()-startX)<dp(8)&&Math.abs(event.getRawY()-startY)<dp(8))v.performClick();return true;
                 default:return true;
             }
-        }:null;
-        surface.setOnTouchListener(drag);header.setOnTouchListener(drag);
+        };
+        surface.setOnTouchListener(!expanded?drag:null);header.setOnTouchListener(drag);
         surface.setOnClickListener(!expanded?v -> {expanded=true;render();}:null);
         header.setOnClickListener(v -> {expanded=!expanded;render();});
         if(expanded){
-            TextView title=text("MOBILE USE",10);title.setTextColor(AgentStyle.MUTED);surface.addView(title);
-            TextView goal=text(task.optString("prompt"),13);goal.setMaxLines(3);surface.addView(goal);
+            TextView title=text("MOBILE USE",10);title.setTextColor(AgentStyle.MUTED);title.setPadding(0,dp(16),0,dp(6));surface.addView(title);
+            TextView goal=text(task.optString("prompt"),13);goal.setMaxLines(3);goal.setPadding(dp(12),dp(10),dp(12),dp(10));goal.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));surface.addView(goal);
             ScrollView scroll=new ScrollView(this);LinearLayout logs=new LinearLayout(this);logs.setOrientation(LinearLayout.VERTICAL);scroll.addView(logs);
             String output=task.optString("output");if(!output.isEmpty())logs.addView(text(output,13));
             JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0){TextView current=text(trace.optJSONObject(trace.length()-1).optString("text"),11);current.setTextColor(AgentStyle.MUTED);logs.addView(current);}
@@ -120,10 +124,15 @@ public class MobileOverlayService extends Service {
             button(controls,"Open",() -> startActivity(new Intent(this,MainActivity.class).putExtra("mobileTask",id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
             button(controls,"×",() -> {control("pause");stopSelf();},false);
         }
-        layout.width=expanded?Math.min(dp(328),getResources().getDisplayMetrics().widthPixels-dp(24)):dp(186);
         layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
-        layout.x=Math.min(layout.x,Math.max(0,getResources().getDisplayMetrics().widthPixels-layout.width));
-        if(attached)windows.updateViewLayout(surface,layout);
+        int width=expanded?Math.min(dp(344),getResources().getDisplayMetrics().widthPixels-dp(24)):dp(228);
+        surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int height=surface.getMeasuredHeight();
+        boolean transition=targetWidth>0&&(renderedExpanded!=expanded||targetWidth!=width||Math.abs(targetHeight-height)>dp(16));renderedExpanded=expanded;targetWidth=width;targetHeight=height;
+        if(transition&&ValueAnimator.areAnimatorsEnabled()){
+            if(morph!=null)morph.cancel();int fromWidth=surface.getWidth(),fromHeight=surface.getHeight(),center=layout.x+fromWidth/2;
+            morph=ValueAnimator.ofFloat(0,1);morph.setDuration(320);morph.setInterpolator(new android.view.animation.DecelerateInterpolator(1.8f));
+            morph.addUpdateListener(frame -> {if(!attached)return;float f=(float)frame.getAnimatedValue();layout.width=fromWidth+Math.round((width-fromWidth)*f);layout.height=fromHeight+Math.round((height-fromHeight)*f);layout.x=Math.max(0,Math.min(getResources().getDisplayMetrics().widthPixels-layout.width,center-layout.width/2));windows.updateViewLayout(surface,layout);});morph.start();
+        }else if(morph==null||!morph.isRunning()){layout.width=width;layout.height=height;layout.x=Math.min(layout.x,Math.max(0,getResources().getDisplayMetrics().widthPixels-layout.width));if(attached)windows.updateViewLayout(surface,layout);}
     }
     /** Hide our own control surface while Artemis observes/acts, never the target app. */
     public static void suspendOverlay(boolean hide){
@@ -135,6 +144,7 @@ public class MobileOverlayService extends Service {
         try{ready.await(1,TimeUnit.SECONDS);if(hide)Thread.sleep(60);}catch(InterruptedException e){Thread.currentThread().interrupt();}
     }
     @Override public void onDestroy(){
+        if(morph!=null)morph.cancel();
         closing=true;MobileAccess.authorize(false);if(instance==this){instance=null;activeTask="";}
         if(api!=null&&!id.isEmpty())requests.execute(() -> {try{api.request("POST","/mobile/tasks/"+id+"/pause",new JSONObject());}catch(Exception ignored){}});
         polling.shutdownNow();requests.shutdown();main.removeCallbacksAndMessages(null);if(attached){windows.removeView(surface);attached=false;}
