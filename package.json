@@ -1,7 +1,7 @@
 {
   "name": "pocket-agent",
-  "version": "0.1.0",
-  "description": "On-device Android coding agent powered by pi-agent-core and Termux",
+  "version": "0.3.0",
+  "description": "Native Android coding and mobile-use agents with a packaged on-device runtime",
   "scripts": {
     "dev": "tsx watch backend/src/server.ts",
     "build": "tsc && node scripts/copy-runtime.mjs",
