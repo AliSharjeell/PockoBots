@@ -21,6 +21,7 @@ public class MobileOverlayService extends Service {
     private WindowManager windows;private WindowManager.LayoutParams layout;private LinearLayout surface;
     private AgentApi api;private JSONObject task=new JSONObject();private String id="",signature="",draft="";
     private boolean expanded,attached,closing;private EditText answer;private float startX,startY;private int windowX,windowY;
+    private long armingUntil;
     private NotificationManager notifications;
     @Override public void onCreate(){
         super.onCreate();instance=this;notifications=getSystemService(NotificationManager.class);
@@ -46,7 +47,7 @@ public class MobileOverlayService extends Service {
         String next=intent.getStringExtra("taskId");
         if(next!=null&&!next.equals(id)){id=next;activeTask=next;signature="";task=new JSONObject();expanded=false;draft="";}
         if(!Settings.canDrawOverlays(this)){MobileAccess.authorize(false);stopSelf();return START_NOT_STICKY;}
-        MobileAccess.syncToken(this);MobileAccess.authorize(true);
+        MobileAccess.syncToken(this);armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);
         if(!attached){windows.addView(surface,layout);attached=true;}
         render();return START_NOT_STICKY;
     }
@@ -64,7 +65,7 @@ public class MobileOverlayService extends Service {
         try{JSONObject result=api.get("/mobile/tasks/"+selected);main.post(() -> {
             if(closing||!selected.equals(id))return;String previous=task.optString("status");task=result;
             String status=task.optString("status");
-            if(!status.equals("running")&&!status.equals("queued"))MobileAccess.authorize(false);
+            if(!status.equals("running")&&System.currentTimeMillis()>armingUntil)MobileAccess.authorize(false);
             if(status.equals("waiting")&&!previous.equals("waiting"))expanded=true;
             String changed=task.toString();if(!signature.equals(changed)){signature=changed;render();}
             notifications.notify(2,notification(status.equals("waiting")?"Your reply is needed":status+" · "+task.optInt("steps")+" steps"));
@@ -74,7 +75,7 @@ public class MobileOverlayService extends Service {
         String selected=id;requests.execute(() -> {try{api.request("POST","/mobile/tasks/"+selected+"/"+endpoint,body);main.post(done);}
             catch(Exception e){main.post(() -> {MobileAccess.authorize(false);try{task.put("error",e.getMessage());}catch(Exception ignored){}expanded=true;render();});}});
     }
-    private void control(String action){MobileAccess.authorize(false);if(!id.isEmpty()&&api!=null)call(action,new JSONObject(),this::pollSoon);}
+    private void control(String action){armingUntil=0;MobileAccess.authorize(false);if(!id.isEmpty()&&api!=null)call(action,new JSONObject(),this::pollSoon);}
     private void pollSoon(){if(!closing&&!polling.isShutdown())polling.execute(this::poll);}
     private Button button(LinearLayout parent,String title,Runnable click,boolean primary){Button view=new Button(this);view.setText(title);AgentStyle.button(view,primary);parent.addView(view);view.setOnClickListener(v -> click.run());return view;}
     private TextView text(String value,int size){TextView view=AgentStyle.text(this,value,size);view.setPadding(0,dp(5),0,dp(5));view.setTextIsSelectable(true);return view;}
@@ -107,11 +108,11 @@ public class MobileOverlayService extends Service {
             if(question!=null){
                 surface.addView(text(question.optString("text"),13));answer=new EditText(this);AgentStyle.input(answer);answer.setHint("Reply or say ready after handling it in the app");answer.setText(draft);answer.setMaxLines(3);surface.addView(answer);
                 button(surface,"Reply & continue",() -> {String reply=answer.getText().toString().trim();if(reply.isEmpty())return;
-                    MobileAccess.authorize(true);JSONObject body=new JSONObject();try{body.put("questionId",question.optString("id")).put("text",reply);}catch(Exception ignored){}
+                    armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);JSONObject body=new JSONObject();try{body.put("questionId",question.optString("id")).put("text",reply);}catch(Exception ignored){}
                     call("answer",body,() -> {draft="";if(answer!=null)answer.setText("");expanded=false;pollSoon();render();});},true);
             }
             LinearLayout controls=new LinearLayout(this);surface.addView(controls);
-            if(status.equals("paused")||status.equals("queued"))button(controls,"Resume",() -> {MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);},true);
+            if(status.equals("paused")||status.equals("queued"))button(controls,"Resume",() -> {armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);},true);
             if(status.equals("running")||status.equals("waiting"))button(controls,"Pause",() -> control("pause"),false);
             if(!status.equals("completed")&&!status.equals("failed")&&!status.equals("stopped"))button(controls,"Stop",() -> control("stop"),false);
             button(controls,"Open",() -> startActivity(new Intent(this,MainActivity.class).putExtra("mobileTask",id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
