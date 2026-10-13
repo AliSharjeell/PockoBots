@@ -177,8 +177,11 @@ public class MainActivity extends Activity {
             for(int i=0;i<all.length();i++){JSONObject other=all.getJSONObject(i);if(!id.equals(other.optString("id"))&&("running".equals(other.optString("status"))||"waiting".equals(other.optString("status"))))throw new Exception("Pause or stop the current mobile task first");}
             handler.post(() -> startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",id)));
             long until=System.currentTimeMillis()+3000;while((!id.equals(MobileOverlayService.activeTask)||!MobileAccess.allowed())&&System.currentTimeMillis()<until)Thread.sleep(50);
-            if(run)connection.request("POST","/mobile/tasks/"+id+"/resume",json());
-            handler.post(() -> {if(run)moveTaskToBack(true);});
+            if(run){
+                CountDownLatch backgrounded=new CountDownLatch(1);handler.post(() -> {moveTaskToBack(true);backgrounded.countDown();});
+                if(!backgrounded.await(2,TimeUnit.SECONDS))throw new Exception("Could not background the activity");
+                Thread.sleep(350);connection.request("POST","/mobile/tasks/"+id+"/resume",json());
+            }
         }catch(Exception e){handler.post(() -> {stopService(new Intent(this,MobileOverlayService.class));error(e);});}});
     }
     private void renderMobileTask(JSONObject task){

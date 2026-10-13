@@ -41,8 +41,8 @@ public class MobileTaskSmokeTest {
                 JSONObject task=(JSONObject)api.request("POST","/mobile/tasks",object("prompt","Open the Battery page in Settings, ask me if ready, and verify completion"));id=task.getString("id");
                 context.startForegroundService(new Intent(context,MobileOverlayService.class).putExtra("taskId",id));
                 long armed=System.currentTimeMillis()+5000;while(!MobileAccess.allowed()&&System.currentTimeMillis()<armed)Thread.sleep(100);assertTrue(MobileAccess.allowed());
-                api.request("POST","/mobile/tasks/"+id+"/resume",object());
                 shell(automation,"input keyevent KEYCODE_HOME"); // Activity no longer hosts the task loop.
+                Thread.sleep(350);api.request("POST","/mobile/tasks/"+id+"/resume",object());
                 JSONObject waiting=until(api,id,"waiting");if(mock.failure!=null)throw mock.failure;
                 assertEquals(id,MobileOverlayService.activeTask);assertTrue(mock.sawImage);assertTrue(mock.stage>=6);
                 long gated=System.currentTimeMillis()+6000;while(MobileAccess.allowed()&&System.currentTimeMillis()<gated)Thread.sleep(100);assertFalse("Device access must pause for user input",MobileAccess.allowed());
