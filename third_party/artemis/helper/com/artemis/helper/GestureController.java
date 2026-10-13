@@ -83,6 +83,10 @@ public final class GestureController {
             return false;
         }
         try {
+            if (inputNode.isPassword()) {
+                Log.w(TAG, "Password entry requires user handoff in Pocket Agent");
+                return false;
+            }
             String value = text == null ? "" : text;
             if (append) {
                 CharSequence existing = inputNode.getText();
