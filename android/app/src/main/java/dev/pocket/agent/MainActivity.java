@@ -108,7 +108,7 @@ public class MainActivity extends Activity {
         LinearLayout panel=column();panel.setClickable(true);panel.setBackgroundColor(AgentStyle.BACK);panel.setPadding(dp(12),dp(24),dp(12),dp(16));
         FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(dp(304),getResources().getDisplayMetrics().widthPixels-dp(48)),-1,Gravity.LEFT);drawer.addView(panel,position);
         LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);TextView title=label("Pocket Agent",20);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(new AgentIcon(this,"close","Close navigation",this::closeDrawer),new LinearLayout.LayoutParams(dp(44),dp(44)));panel.addView(heading);
-        drawerRow(panel,"＋  "+(mode.equals("Mobile Use")?"New task":"New chat"),false,() -> {closeDrawer();if(mode.equals("Mobile Use")){mobileTask="";show("Tasks");}else if(!project.isEmpty())newChat();else createProject();});
+        drawerRow(panel,"＋  "+(mode.equals("Mobile Use")?"New task":"New chat"),false,() -> {closeDrawer();if(mode.equals("Mobile Use")){mobileTask="";prefs().edit().remove("mobile-task").apply();show("Tasks");}else if(!project.isEmpty())newChat();else createProject();});
         ScrollView scroll=new ScrollView(this);LinearLayout list=column();scroll.addView(list);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         list.addView(label("Recent",14));
         if(mode.equals("Mobile Use")){
