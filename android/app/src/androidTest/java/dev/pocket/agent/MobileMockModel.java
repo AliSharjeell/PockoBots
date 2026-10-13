@@ -27,7 +27,8 @@ final class MobileMockModel implements AutoCloseable {
             else if(turn==3){name="click";int target=-1;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery")){target=elements.getJSONObject(i).getInt("index");break;}
                 if(target<0){stage=2;name="wait_for_delay";args.put("milliseconds",750);}
                 else args.put("screen_id",screen.getString("screen_id")).put("target",target);}
-            else if(turn==5){name="ask_user";args.put("question","Battery is open. Say ready to finish.");}
+            else if(turn==5){boolean batteryPage=false;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery usage"))batteryPage=true;
+                if(!batteryPage){stage=4;name="wait_for_delay";args.put("milliseconds",750);}else{name="ask_user";args.put("question","Battery is open. Say ready to finish.");}}
             else{name="report_task_status";args.put("status","completed").put("summary","Battery screen verified through Artemis on this device.");}
             JSONObject function=new JSONObject().put("name",name).put("arguments",args.toString());
             JSONObject call=new JSONObject().put("index",0).put("id","phone-"+turn).put("type","function").put("function",function);
