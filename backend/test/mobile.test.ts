@@ -20,7 +20,8 @@ function observation(body: any) {
 function device() {
   const calls:any[]=[];let label="Battery";let token="test-token";let allowed=true;
   const server=http.createServer(async(req,res)=>{
-    assert.equal(req.headers["x-artemis-token"],token);
+    if(req.headers["x-artemis-token"]!==token){res.statusCode=401;res.end(JSON.stringify({success:false,error:"unauthorized"}));return;}
+    if(!allowed&&!req.url?.startsWith("/ping")){res.statusCode=409;res.end(JSON.stringify({success:false,error:"controller inactive"}));return;}
     let body="";for await(const chunk of req)body+=chunk;
     const command=body?JSON.parse(body):null;if(command)calls.push(command);
     const screen={success:true,package:"com.android.settings",width:1000,height:2000,rotation:0,
@@ -46,6 +47,8 @@ function model() {
 test("Artemis transport rejects stale indices, unauthenticated actions and guessed coordinates",async()=>{
   const native=device();const port=await listen(native.server);const bridge=new ArtemisBridge("test-token","http://127.0.0.1:"+port);
   try{
+    await assert.rejects(new ArtemisBridge("wrong","http://127.0.0.1:"+port).observe(),/unauthorized/);
+    native.setAllowed(false);await assert.rejects(bridge.observe(),/inactive/);native.setAllowed(true);
     const screen=await bridge.observe();native.setLabel("Storage");
     await assert.rejects(bridge.target("tap",screen.id,0),/changed/);assert.equal(native.calls.length,0);
     native.setLabel("Battery");await assert.rejects(bridge.target("tap",screen.id,[500,500]),/description/);
