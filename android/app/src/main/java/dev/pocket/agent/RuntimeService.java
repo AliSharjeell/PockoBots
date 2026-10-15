@@ -75,6 +75,7 @@ public class RuntimeService extends Service {
             builder.environment().put("PROOT_TMP_DIR", files + "/tmp");
             builder.environment().put("PROOT_NO_SECCOMP", "1");
             builder.environment().put("LD_LIBRARY_PATH", nativeDir);
+            builder.environment().put("LD_PRELOAD", nativeDir + "/libpocket-host-compat.so");
             synchronized (runtimeLock) {
                 if (lastRuntime != null && lastRuntime.isAlive()) {
                     status = "Waiting for the previous environment to stop…";
