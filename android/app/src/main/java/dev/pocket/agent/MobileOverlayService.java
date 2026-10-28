@@ -55,7 +55,7 @@ public class MobileOverlayService extends Service {
         render();return START_NOT_STICKY;
     }
     private Notification notification(String value){
-        Intent open=new Intent(this,MainActivity.class).putExtra("mobileTask",id);
+        Intent open=new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId"));
         Notification.Builder builder=new Notification.Builder(this,"mobile-tasks").setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentTitle("Pocket Agent · Mobile Use").setContentText(value).setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this,2,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
@@ -122,7 +122,7 @@ public class MobileOverlayService extends Service {
             if(status.equals("paused")||status.equals("queued"))button(controls,"Resume",() -> {armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);},true);
             if(status.equals("running")||status.equals("waiting"))button(controls,"Pause",() -> control("pause"),false);
             if(!status.equals("completed")&&!status.equals("failed")&&!status.equals("stopped"))button(controls,"Stop",() -> control("stop"),false);
-            button(controls,"Open",() -> startActivity(new Intent(this,MainActivity.class).putExtra("mobileTask",id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
+            button(controls,"Open",() -> startActivity(new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
             button(controls,"×",() -> {control("pause");stopSelf();},false);
         }
         layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);

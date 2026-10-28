@@ -51,7 +51,7 @@ public class RuntimeService extends Service {
             starting = true;
             new Thread(this::startRuntime, "pocket-runtime").start();
         }
-        return getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",false)?START_STICKY:START_NOT_STICKY;
+        return getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",true)?START_STICKY:START_NOT_STICKY;
     }
     private void startRuntime() {
         try {
@@ -117,7 +117,7 @@ public class RuntimeService extends Service {
         finally { starting = false; if (!stopping && active == this) stopSelf(); }
     }
     private void pollBots(){
-        if(!getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",false))return;
+        if(!getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",true))return;
         try{
             if(botApi==null)botApi=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());
             JSONObject inbox=botApi.get("/bots");JSONArray bots=inbox.optJSONArray("bots");
