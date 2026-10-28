@@ -1,5 +1,50 @@
 # Verification
 
+## Unified bots v0.5.0 - 2026-10-28
+
+All 20 backend tests pass under Linux Node 22.23.3. New coverage verifies one
+unified bot writing files and operating the phone in one conversation, unlimited
+default starts, existing bot/workspace migration, and stopping repeated app opens
+after three attempts within a minute. TypeScript checking passes.
+
+Four Android journeys passed on the Pixel 10 Pro XL API 37 in 4 KB mode, using a
+separate dev.pocket.agent.qa installation with local model fixtures:
+UnifiedBotSmokeTest (47.127 seconds) and BotsSmokeTest, MobileTaskSmokeTest,
+RuntimeSmokeTest (the latter three passed together in 85.667 seconds). No real
+provider account was used. QA app and instrumentation packages were removed.
+
+The unified journey created a bot through the two-field dialog, verified default
+shell/ringing access and unlimited runs, sent a real chat task, checked written
+files, native Markdown bold/link spans and a rendered table, switched between
+Chat/Terminal/Files, opened model settings and the sidebar, and ran real project
+and /workspace terminal commands. That same bot then selected use_phone and
+verified a local page in the real Chrome app. Chrome welcome screens required
+waiting for transitions; the regression fixture now waits instead of reopening.
+
+Regression coverage includes on-device stdio MCP execution, proactive checks,
+notification RemoteInput replies, lock-screen alarm ringing and answer-to-speech,
+floating questions/replies, phone-action suspension, PTY, Git, npm and runtime
+restart persistence. [Reviewed captures](UI.md#unified-bot-workspace-in-v05) show
+the actual updated screens.
+
+Both architecture builds and APK signature checks pass. Lint reports zero errors
+and 53 warnings. Package checks verify the normal app ID/version, selected ABI,
+current backend and bundled Markdown/MCP notices. ARM64 physical devices and
+real authenticated public Dev Tunnel creation were not tested. Sharing requires
+the owner's tunnel login; the UI and agent report actual logs/URLs or a blocker.
+
+The emulator's original app store was empty before the final normal-app update;
+the saved Quick Boot snapshot also had no bot/settings/project records. Existing
+user-state preservation could therefore not be verified on this AVD. Migration
+preservation is covered by the backend test. No normal-app data-clear or uninstall
+was performed. The launcher helper now syncs Android storage before restart.
+
+| Debug APK | Bytes | SHA-256 |
+| --- | ---: | --- |
+| pocket-agent-v0.5.0-x86_64-debug.apk | 273108079 | `c27ffcca86c672a97d077ff8e82cfe5ce1d95eb7ec9ab18e4cbfa6b9f2e916eb` |
+| pocket-agent-v0.5.0-arm64-debug.apk | 252787095 | `811056a2d581c21e9b2fd4a8ed5c28ffb1dc3e48cb8de8aa02dc901e25e7697f` |
+
+
 ## Local bot inbox and alerts v0.4.0 - 2026-10-28
 
 Verified on the existing Pixel_10_Pro_XL x86_64 emulator, Android 17/API 37,
