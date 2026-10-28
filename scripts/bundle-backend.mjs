@@ -21,8 +21,11 @@ for (const input of Object.keys(result.metafile.inputs)) {
   if (!input.includes("node_modules/")) continue;
   let directory = dirname(resolve(input));
   while (directory !== dirname(directory)) {
-    try { await readFile(join(directory, "package.json")); roots.add(directory); break; }
-    catch { directory = dirname(directory); }
+    try {
+      const pkg = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
+      if (pkg.name && pkg.version) { roots.add(directory); break; }
+    } catch {}
+    directory = dirname(directory);
   }
 }
 const notices = [];
