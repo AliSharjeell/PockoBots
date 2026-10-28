@@ -1,5 +1,31 @@
 # Native sidebar and island UI
 
+## Unified bot workspace in v0.5
+
+Actual Pixel captures from the isolated QA installation, using local fixtures.
+Each bot handles coding and phone/browser work in the same conversation.
+
+![Simple bot creation](images/v0.5-create.png)
+
+![Rendered Markdown, table and preview link](images/v0.5-chat.png)
+
+![Project file browser](images/v0.5-files.png)
+
+![Project terminal](images/v0.5-terminal.png)
+
+![Sidebar settings and MCP navigation](images/v0.5-sidebar.png)
+
+![Shared main terminal](images/v0.5-main-terminal.png)
+
+![Unified model settings](images/v0.5-settings.png)
+
+![First-run setup checklist](images/v0.5-setup.png)
+
+![Same bot operates the phone browser](images/v0.5-browser.png)
+
+![Completed mixed conversation](images/v0.5-completed.png)
+
+
 ## Bot inbox and priority alerts in v0.4
 
 The new launcher is a messaging inbox with separate coding, phone and browser
