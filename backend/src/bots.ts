@@ -112,9 +112,9 @@ export class Bots {
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
       if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1); return { content: [{ type: "text", text: "Queued task " + queued.id }], details: {} }; } });
     tools.push({ name: "use_phone", label: "Use phone or browser", description: "Execute a concrete task using the phone's visible apps or browser through Artemis. Use for opening apps, browsing, searching or interacting with the Android screen. Coding and files use your normal tools. The phone controller appears automatically; setup permissions and an unlocked device are needed. Waits for verified results or an owner reply. Never invent screen actions.", parameters: Type.Object({ task: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any, signal) => {
-      if (this.jobs.some(j => j.id !== job.id && (j.phoneArming || j.mobileTaskId && ["arming", "running", "waiting"].includes(j.status))) || this.mobile.anyBusy()) throw Error("Another bot is using the phone. Try again after its task finishes.");
+      if (this.jobs.some(j => j.id !== job.id && ["arming", "running", "waiting"].includes(j.status) && (j.phoneArming || j.mobileTaskId)) || this.mobile.anyBusy()) throw Error("Another bot is using the phone. Try again after its task finishes.");
       job.phoneArming = true;
-      const task = await this.mobile.create(p.task, bot.id); job.phoneTaskId = task.id; await this.changed();
+      let task; try { task = await this.mobile.create(p.task, bot.id); } catch (error) { job.phoneArming = false; await this.changed(); throw error; } job.phoneTaskId = task.id; await this.changed();
       try {
         const deadline = Date.now() + 90000;
         while (!this.armed.has(task.id)) {
