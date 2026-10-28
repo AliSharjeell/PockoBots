@@ -83,7 +83,7 @@ test("proactive checks coalesce missed intervals, honor daily limits and keep NO
 test("ringing alerts require per-bot consent, persist acknowledgements and rate-limit rings",async()=>{
   const root=await mkdtemp(join(tmpdir(),"pocket-alerts-"));const app=await createApp({stateDir:join(root,"state"),workspace:join(root,"workspace"),port:18878});
   try{
-    const bot=await app.bots.create({name:"Notifier",role:"Notify me",kind:"coding"});
+    const bot=await app.bots.create({name:"Notifier",role:"Notify me",allowUrgent:false});
     await assert.rejects(app.bots.alert(bot.id,"Please check",true),/disabled/);
     const ordinary=await app.bots.alert(bot.id,"An update",false);assert.equal(app.bots.pendingAlerts().length,1);await app.bots.acknowledgeAlert(ordinary.id);assert.equal(app.bots.pendingAlerts().length,0);
     await app.bots.update(bot.id,{allowUrgent:true});const urgent=await app.bots.alert(bot.id,"Time sensitive update",true);assert.equal(urgent.urgent,true);
@@ -99,4 +99,17 @@ test("pausing during an MCP connection prevents the queued agent from starting",
   const connected=new Promise<void>(r=>connecting=r);const tools=new Promise<any[]>(r=>release=r);
   const bots=new Bots(store,{create:async()=>({id:randomUUID()})} as any,{create:async()=>({id:randomUUID()}),stop:()=>{},setTrust:()=>{},prompt:async()=>{started++;},state:()=>({busy:false,messages:[]})} as any,{} as any,{require:()=>{},tools:()=>{connecting();return tools;}} as any,()=>{},s=>s);
   await bots.init();try{const bot=await bots.create({name:"Slow connector",role:"Wait",kind:"coding"});await bots.enqueue(bot.id,"Do a task");await bots.engine(true);const tick=bots.tick();await connected;await bots.pause(bot.id);release([]);await tick;assert.equal(started,0);assert.equal(bots.state(bot.id).jobs[0].status,"paused");}finally{release([]);await bots.close();await rm(root,{recursive:true,force:true});}
+});
+
+
+test("unified bot defaults are unlimited and migrate existing profiles without losing their workspace",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"pocket-unified-"));const store=new Store(root);await store.init();let runs=0;
+ const sessions:any={create:async()=>({id:randomUUID()}),stop:()=>{},setTrust:()=>{},prompt:async()=>{runs++;},state:()=>({busy:false,messages:[{role:"assistant",content:[{type:"text",text:"Done"}]}]})};
+ const make=()=>new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
+ let bots=make();await bots.init();const bot=await bots.create({name:"All tools",role:"Help me"});
+ try{assert.equal(bot.kind,"unified");assert.equal(bot.allowShell,true);assert.equal(bot.allowUrgent,true);assert.equal(bot.dailyLimit,0);assert.equal(bots.enabled,true);
+ for(let i=0;i<26;i++){await bots.enqueue(bot.id,"Task "+i);await bots.tick();await bots.tick();}assert.equal(runs,26);
+ await bots.close();const data:any=await store.read("bots",{});delete data.schema;data.bots[0].kind="phone";data.bots[0].dailyLimit=24;data.bots[0].allowShell=false;await store.write("bots",data);
+ bots=make();await bots.init();const migrated=bots.get(bot.id);assert.equal(migrated.kind,"unified");assert.equal(migrated.projectId,bot.projectId);assert.equal(migrated.sessionId,bot.sessionId);assert.equal(migrated.allowShell,true);assert.equal(migrated.dailyLimit,0);assert.equal(bots.state(bot.id).messages.length>0,true);
+ }finally{await bots.close();await rm(root,{recursive:true,force:true});}
 });

@@ -39,6 +39,7 @@ function model() {
     const [name,args]=script(stage++,body);
     res.setHeader("Content-Type","text/event-stream");
     const event=(delta:any,finish:any=null)=>res.write("data: "+JSON.stringify({id:"mobile-mock",object:"chat.completion.chunk",created:1,model:"mock",choices:[{index:0,delta,finish_reason:finish}]})+"\n\n");
+    if(name==="text"){event({role:"assistant",content:args.text});event({},"stop");res.end("data: [DONE]\n\n");return;}
     event({role:"assistant",tool_calls:[{index:0,id:"mobile-"+stage,type:"function",function:{name,arguments:JSON.stringify(args)}}]});event({},"tool_calls");res.end("data: [DONE]\n\n");
   });
   return {server,requests,setScript:(value:typeof script)=>{script=value;stage=0;}};
@@ -94,4 +95,28 @@ test("mobile agent runs off-request, asks for input, resumes, persists and seria
     await request("/mobile/tasks/"+active.id+"/pause","POST",{});await until(async()=>runtime.mobile.anyBusy(),(busy)=>!busy);
     assert.equal((await request("/mobile/tasks/"+active.id)).status,"paused");
   }finally{runtime.close();await close(server);await close(provider.server);await close(native.server);await rm(temp,{recursive:true,force:true});}
+});
+
+
+test("one unified bot writes files then uses the phone and continues the same conversation",async()=>{
+ const temp=await mkdtemp(join(tmpdir(),"pocket-unified-phone-")),native=device(),provider=model();
+ const bridgePort=await listen(native.server),modelPort=await listen(provider.server);const reserve=http.createServer();const port=await listen(reserve);await close(reserve);const runtime=await createApp({stateDir:join(temp,"state"),workspace:join(temp,"projects"),port,mobileBridgeBase:"http://127.0.0.1:"+bridgePort});native.setToken(runtime.token);
+ const server=http.createServer(runtime.app);await new Promise<void>(r=>server.listen(port,"127.0.0.1",r));
+ const call=async(path:string,method="GET",data?:any)=>{const res=await fetch("http://127.0.0.1:"+port+"/api"+path,{method,headers:{Authorization:"Bearer "+runtime.token,"Content-Type":"application/json"},body:data?JSON.stringify(data):undefined});const value:any=await res.json();assert.ok(res.ok,JSON.stringify(value));return value;};
+ try{
+ await call("/settings","PUT",{provider:"openai",api:"openai-completions",baseUrl:"http://127.0.0.1:"+modelPort,model:"fixture",apiKey:"fixture-key"});
+ provider.setScript((_stage,body)=>{
+  const names=body.tools.map((t:any)=>t.function.name);
+  if(names.includes("write_file")){
+   if(!body.messages.some((m:any)=>m.role==="tool"))return ["write_file",{path:"mixed.txt",content:"Created before phone work"}];
+   if(!body.messages.some((m:any)=>m.role==="assistant"&&m.tool_calls?.some((t:any)=>t.function.name==="use_phone")))return ["use_phone",{task:"Check the Battery page"}];
+   return ["text",{text:"File saved and Battery checked on this phone"}];
+  }
+  if(!body.messages.some((m:any)=>m.role==="tool"))return ["observe_screen",{}];
+  return ["report_task_status",{status:"completed",summary:"Battery verified from the current screen"}];
+ });
+ const bot=await call("/bots","POST",{name:"Universal",role:"Code and use the phone"});await call("/bots/"+bot.id+"/messages","POST",{text:"Write a file and check Battery"});
+ const pending=await until(()=>call("/bots/phone"),v=>v?.taskId);await call("/bots/phone/ready","POST",{taskId:pending.taskId});
+ const result=await until(()=>call("/bots/"+bot.id),v=>v.jobs[0]?.status==="completed");assert.match(result.messages.at(-1).text,/Battery checked/);assert.equal(result.jobs[0].phoneTaskId,pending.taskId);assert.equal((await call("/file?projectId="+bot.projectId+"&path=mixed.txt")).content,"Created before phone work");assert.equal(runtime.mobile.state(pending.taskId).status,"completed");
+ }finally{await runtime.close();await close(server);await close(provider.server);await close(native.server);await rm(temp,{recursive:true,force:true});}
 });
