@@ -10,7 +10,7 @@ import java.util.*;
 
 /** Lock-screen call-style page: answering reveals the message and starts Android TTS. */
 public class BotAlertActivity extends Activity {
-    private TextToSpeech speech;private JSONObject alert;private TextView message,status;private boolean answered;
+    private TextToSpeech speech;private JSONObject alert;private TextView message,status;private boolean answered;private final Handler main=new Handler(Looper.getMainLooper());private final Runnable voiceTimeout=() -> status.setText("Android voice is taking too long ? message shown above");
     private int dp(int v){return AgentStyle.dp(this,v);}
     @Override public void onCreate(Bundle saved){super.onCreate(saved);if(Build.VERSION.SDK_INT>=27){setShowWhenLocked(true);setTurnScreenOn(true);}else getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -24,9 +24,9 @@ public class BotAlertActivity extends Activity {
         Button answer=new Button(this);answer.setText("Answer");AgentStyle.button(answer,true);controls.addView(answer);answer.setOnClickListener(v -> {if(!answered){answered=true;answer.setText("Open chat");stopRinging("answer");message.setText(alert.optString("text"));speak();}else{startActivity(new Intent(this,BotsActivity.class).putExtra("botId",alert.optString("botId")));finish();}});page.addView(controls);setContentView(page);
     }
     private void stopRinging(String action){startService(new Intent(this,BotAlertService.class).setAction(action));}
-    private void speak(){status.setText("Starting Android voice…");speech=new TextToSpeech(this,result -> runOnUiThread(() -> {if(isFinishing()||speech==null)return;if(result!=TextToSpeech.SUCCESS){status.setText("Voice unavailable · read the message above");return;}
-        Voice offline=null;Set<Voice> voices=speech.getVoices();if(voices!=null)for(Voice voice:voices)if(!voice.isNetworkConnectionRequired()&&voice.getLocale().getLanguage().equals(Locale.getDefault().getLanguage())){offline=voice;break;}
-        if(offline==null){status.setText("No offline Android voice installed · message shown above");return;}speech.setVoice(offline);speech.setOnUtteranceProgressListener(new UtteranceProgressListener(){public void onStart(String id){runOnUiThread(() -> status.setText("Reading the bot's message"));}public void onDone(String id){runOnUiThread(() -> status.setText("Message read · tap Open chat to reply"));}public void onError(String id){runOnUiThread(() -> status.setText("Voice unavailable · message shown above"));}});
-        speech.speak(alert.optString("text"),TextToSpeech.QUEUE_FLUSH,null,"bot-alert");}));}
-    @Override protected void onDestroy(){if(speech!=null){speech.stop();speech.shutdown();}super.onDestroy();}
+    private void speak(){status.setText("Starting Android voice…");main.postDelayed(voiceTimeout,10000);speech=new TextToSpeech(this,result -> runOnUiThread(() -> {main.removeCallbacks(voiceTimeout);if(isFinishing()||speech==null)return;if(result!=TextToSpeech.SUCCESS){status.setText("Voice unavailable · read the message above");return;}
+        Voice offline=null;Set<Voice> voices=speech.getVoices();if(voices!=null)for(Voice voice:voices)if(!voice.isNetworkConnectionRequired()&&(voice.getFeatures()==null||!voice.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))&&voice.getLocale().getLanguage().equals(Locale.getDefault().getLanguage())){offline=voice;break;}
+        if(offline==null){status.setText("No offline Android voice installed · message shown above");return;}if(speech.setVoice(offline)!=TextToSpeech.SUCCESS){status.setText("Voice unavailable ? message shown above");return;}speech.setOnUtteranceProgressListener(new UtteranceProgressListener(){public void onStart(String id){runOnUiThread(() -> status.setText("Reading the bot's message"));}public void onDone(String id){runOnUiThread(() -> status.setText("Message read · tap Open chat to reply"));}public void onError(String id){runOnUiThread(() -> status.setText("Voice unavailable · message shown above"));}});
+        if(speech.speak(alert.optString("text"),TextToSpeech.QUEUE_FLUSH,null,"bot-alert")==TextToSpeech.ERROR)status.setText("Voice unavailable ? message shown above");}));}
+    @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);if(speech!=null){speech.stop();speech.shutdown();}super.onDestroy();}
 }
