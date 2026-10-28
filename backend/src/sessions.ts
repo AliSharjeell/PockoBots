@@ -20,6 +20,17 @@ type Approval = {
   args: unknown;
   resolve: (allowed: boolean) => void;
 };
+/** Keep complete user/assistant/tool groups so long-lived bots never replay orphan tool results. */
+export function botContext(messages: AgentMessage[], budget: number) {
+  const groups: AgentMessage[][] = [];
+  for (const message of messages.filter(m => m.role !== "system")) {
+    if (message.role === "user" || !groups.length) groups.push([]);
+    groups[groups.length - 1].push(message);
+  }
+  let size = 0; const kept: AgentMessage[][] = [];
+  for (const group of groups.reverse()) { const chars = JSON.stringify(group).length; if (size + chars > budget) break; kept.unshift(group); size += chars; }
+  return kept.flat();
+}
 export class Sessions {
   private records = new Map<string, Session>();
   private agents = new Map<string, Agent>();
@@ -161,7 +172,7 @@ export class Sessions {
     if (record.messages.length)
       agent.state.messages = [
         ...agent.state.messages,
-        ...record.messages.filter((m) => m.role !== "system"),
+        ...(profile ? botContext(record.messages, Math.min(settings.contextWindow * 2, 180000)) : record.messages.filter((m) => m.role !== "system")),
       ];
     this.agents.set(id, agent);
     this.busy.add(id);

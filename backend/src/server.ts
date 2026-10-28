@@ -326,8 +326,8 @@ export async function createApp(options: {
     processes,
     mobile,
     bots, connectors,
-    close: () => {
-      void bots.close().finally(() => connectors.close());
+    close: async () => {
+      await bots.close(); await connectors.close();
       sessions.stopAll();
       processes.stopAll();
       terminals.stopAll();
