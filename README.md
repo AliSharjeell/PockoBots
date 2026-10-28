@@ -20,12 +20,13 @@ required. Model requests use your BYOK provider. See
 
 ## Bot inbox
 
-Version 0.4 opens as a messaging app for multiple local bots. Give each bot a
-role and its own coding, phone or browser tasks. Queues, routines, memory,
-selected MCP tools and chats persist on the phone. Results support notification
-replies. Opt-in priority alerts ring like an incoming call, including while
-locked when Android permits; Answer reveals the message and uses offline Android
-TTS when a voice is installed. See [bot setup and limits](docs/BOTS.md).
+Version 0.5 opens as a messaging app for local bots. Each bot can code, browse and
+operate your phone from the same chat. Create one with just a name and instructions.
+Chat, project terminal, file browser, model settings and MCP connections live in
+one native interface. The sidebar also provides a shared main terminal and server
+sharing. Markdown and preview links render directly in chat. Bots run in the
+background with unlimited runs by default; Android permissions are explained in
+a first-run checklist. See [bot setup and limits](docs/BOTS.md).
 
 ## Use on your phone
 

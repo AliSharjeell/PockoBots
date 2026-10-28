@@ -134,3 +134,17 @@ backend/src/connectors.ts provides MCP stdio and Streamable HTTP clients.
 BotsSmokeTest exercises these together on an emulator using local provider
 fixtures. It requires an empty bot inbox and no real model key, restores provider
 and accessibility settings, and leaves four sample bots after success.
+
+
+## Safe UI testing with saved user credentials
+
+The optional Gradle flag `-PqaInstall` builds dev.pocket.agent.qa alongside the
+normal app, with separate private data. UnifiedBotSmokeTest requires this QA
+package and local model fixtures. Stop the normal app's runtime while testing
+because the localhost backend and Artemis bridge ports are shared on the device;
+restore the normal app afterward. Do not run credential-replacing tests against
+an installation holding your real provider key.
+
+Unified bot UI: BotsActivity; embedded terminal/files/settings/sharing: BotWorkspace;
+native Markdown spans: ChatMarkdown. Legacy MainActivity remains for compatibility
+and its original runtime tests; the bot sidebar never navigates into its mode UI.

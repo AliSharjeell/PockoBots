@@ -1,76 +1,93 @@
-# Local bots
+# Unified local bots
 
-Pocket Agent 0.4 opens as a native messaging inbox. Create separate coding,
-phone, or browser bots with their own names, instructions, workspace and chat.
-Set your BYOK connection from Model settings. The runtime and tools execute on
-the phone; inference still goes to your configured provider.
+Pocket Agent 0.5 uses one native bot interface. Create a bot using only its name
+and instructions. Every bot can code, use phone apps, browse, run shell commands,
+use selected MCP tools, remember notes and send notifications. There is no
+Coding/Mobile Use/Browser mode selector. Existing bots retain their workspace,
+chat and queue when migrated to the unified tool set.
 
-## Start a bot
+## First launch
 
-Tap +, choose its type, and enter its instructions. Send a task in its chat and
-leave the app. Tasks queue in order for each bot. Up to two bots run at once;
-phone and browser tasks take turns controlling the device. Pause, resume or
-cancel tasks from their conversation. Coding bots have independent workspaces;
-Open workspace provides the existing editor, terminal, Git, npm and servers.
-Shell commands require approval unless you explicitly enable trusted shell for
-that bot. MCP tools inherit the access of their selected server.
+The Setup & permissions checklist appears once after updating to this interface.
+It shows notification, full-screen alert, Accessibility and floating-island
+access and opens the corresponding Android settings. Install an offline Android
+voice using Android voice data. Granting these OS permissions requires your own
+taps; the app does not bypass Android consent. Phone tasks need an unlocked
+screen. Coding remains available when phone permissions are missing.
 
-Keep bots running enables the foreground runtime notification and restart on
-boot. Queues, chats, roles and concise bot memory survive restart. An interrupted
-running task becomes paused for review; already queued tasks remain queued.
-Android can stop background work after force-stop, shutdown, battery restrictions
-or low memory. This is best-effort continuous operation, not guaranteed 24/7 uptime.
+Shell commands without per-command prompts and priority ringing alerts are on
+by default for new and migrated bots, as requested. Change either in Bot profile
+> Tools, alerts & routines. BYOK settings apply to every bot; save a connection
+before sending tasks. The app preserves a draft when a model connection is missing.
 
-## Proactive checks
+## One conversation and workspace
 
-Edit a bot to set a routine task, an interval (15 minutes to 7 days), and daily
-run limit (default 24, max 144). Run routine now tests it immediately. Limits
-count all starts, including ordinary messages and resumed tasks, on UTC days.
-Missed intervals coalesce into one check instead of replaying every missed run.
-The routine skips when that bot already has unfinished work. NO_UPDATE suppresses
-unnecessary messages. Bots can retain short notes and delegate bounded tasks to
-other bots; delegation depth is limited to three.
+Chat renders Markdown, tables, code and clickable links. Chat / Terminal / Files
+stay inside the bot interface. The file area uses directory rows and opens a file
+editor. The terminal is a real PTY in that bot's project directory, with input,
+resize, paste, control keys and persistent shells.
 
-## Phone and browser tasks
+The sidebar contains all bots, Settings, MCP connections, a bot's MCP tool
+selector, Servers & sharing, Setup & permissions and Main terminal. Main terminal
+starts in /workspace and shares the packaged environment with every bot. Use it
+for installing CLIs or managing repositories. Installed tools use phone storage
+and network access; no separate Termux app is needed.
 
-Enable Android Accessibility and display-over-other-apps permissions in Mobile
-Use setup. Keep the phone unlocked for automation. The floating island displays
-progress, questions and results, and provides pause/stop/reply controls. The
-native controller must be attached before the backend starts phone actions.
-Waiting for a reply suspends access to device actions.
+Bots run in the background by default, with no Keep bots running toggle or
+default daily run cap. Their durable queues retain order. Two bot runs can run
+at once; phone control is serialized across bots. Pause/resume/cancel controls
+appear for unfinished work. Old failed jobs stay in history but do not clutter
+the conversation with permanent failed-job cards. Force-stop, shutdown, battery
+restrictions and low memory can still interrupt Android services. Interrupted
+work becomes paused for review after runtime restart.
 
-Browser bots use the phone's visible browser while Pocket Agent is in the
-background. They do not create an invisible browser or bypass the lock screen.
-Screenshots and selected screen text go to your configured model provider.
+## Phone and browser work
 
-## Notifications and ringing alerts
+The model chooses use_phone for a concrete phone/browser task, then continues
+in the same conversation with the verified result. The native floating island
+attaches automatically once permissions are enabled and the screen is unlocked.
+The bot asks questions in chat and the island; waiting for a reply suspends
+phone actions. A paused controller can reattach after permissions are enabled.
 
-Allow Android notifications for results and inline Reply. Replies queue real bot
-tasks; failed delivery preserves a local draft to retry from the conversation.
+Browser work happens in the phone's visible browser while Pocket Agent is in
+the background. Screenshots and selected screen text go to your configured
+model provider. It is not an invisible browser or an offline language model.
+A repeated navigation guard pauses after three attempts to open the same app
+or URL within one minute, instead of looping through a welcome/sign-in screen.
+Complete the browser's setup if necessary, then resume or ask the bot to retry.
 
-Enable Allow priority ringing alerts separately for each bot. The bot can then
-use notify_user with urgent=true. An urgent alert rings and vibrates for at most
-60 seconds, with a private incoming-call-style screen when Android permits it,
-including on the lock screen. Answer stops ringing, reveals the message and
-starts Android TTS with an installed offline voice. Without a working voice,
-the screen displays a clear text fallback. Install voice data through the bot's
-Android voice setup button. No carrier call or voice conversation is involved.
+## Previews and public links
 
-On Android 14+, allow full-screen alerts using the bot settings button. Without
-that access, use the priority notification's Answer action. Android notification
-settings, alarm volume and Do Not Disturb still apply. Each bot can ring at most
-once per ten minutes. Ordinary messages use notification replies without ringing.
+Local preview links such as http://127.0.0.1:3000 open on the device running the
+server. To access an emulator server from a separate phone, open Servers & sharing,
+sign in to Microsoft Dev Tunnels, and share the server's port. The logs show the
+actual clickable public URL. Allow anyone with the link is an explicit sharing
+choice. Agents can also use share_port and report its actual URL or login blocker;
+they are instructed not to invent public links. External sharing needs network
+access and the tunnel provider's authentication. Public account login was not
+performed by the automated local-fixture checks.
 
-## MCP connections
+## Routines, notifications and ringing
 
-Open MCP connections to add a Streamable HTTP server (HTTPS, or localhost HTTP)
-with optional bearer token, or a local stdio command with a JSON argument array.
-Test the connection, then select it for each bot that should use its tools.
-Local commands run inside the packaged Linux environment. Pause tasks before
-changing connections; detach a deleted connection from any bot that used it.
-Tokens stay in private app storage and are removed from public state and logs.
-OAuth login, legacy SSE servers, resource/prompt browsing and custom stdio
-environment-variable forms are not implemented in this release.
+Optional proactive routines are in Bot profile > Tools, alerts & routines. Set a
+task and interval (15 minutes to 7 days); 0 disables the routine. Missed intervals
+coalesce into one check. NO_UPDATE suppresses unnecessary notifications.
 
-The implementation is original. See [OpenBot research](OPENBOT_RESEARCH.md)
-for the inspected upstream revision, design comparison and license boundary.
+Normal notifications support inline Reply. Priority alerts ring/vibrate for at
+most 60 seconds and show a private incoming-call-style screen when Android permits,
+including while locked. Answer stops ringing, reveals the message and uses an
+installed offline Android TTS voice. Voice failure or slow initialization shows
+a text fallback. Each bot can ring at most once per ten minutes. Android alarm
+volume, Do Not Disturb, notification settings and full-screen permissions apply.
+This is an app alert, not a carrier phone call or voice conversation.
+
+## MCP tools
+
+Add Streamable HTTP connections (HTTPS, or localhost HTTP) with optional bearer
+token, or local stdio commands with JSON argument arrays. Test the connection and
+select its tools for a bot in the sidebar. Tokens remain in private app storage.
+Pause tasks before changing a connection. OAuth login, legacy SSE, resource/prompt
+browsing and custom stdio environment forms are outside this release.
+
+See [OpenBot research](OPENBOT_RESEARCH.md) for the inspected reference and original
+implementation's license boundary.
