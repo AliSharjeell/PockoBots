@@ -9,7 +9,7 @@ import type { Settings, Store } from "./storage.js";
 export type MobileStatus = "queued" | "running" | "waiting" | "paused" | "completed" | "failed" | "stopped";
 export type MobileTask = { id: string; prompt: string; status: MobileStatus; created: number; updated: number;
   steps: number; output: string; error?: string; question?: { id: string; text: string }; history: { role: string; text: string }[];
-  trace: { time: number; text: string }[] };
+  trace: { time: number; text: string }[]; ownerBotId?: string };
 
 /** One device, one task. Model requests and actions continue independently of Activity/SSE. */
 export class MobileTasks {
@@ -32,10 +32,14 @@ export class MobileTasks {
   state(id: string) { const task = this.records.get(id); if (!task) throw Error("Mobile task not found"); return task; }
   health() { return new ArtemisBridge(this.token, this.bridgeBase).health(); }
   anyBusy() { return this.agents.size > 0 || this.launching; }
-  async create(prompt: unknown) {
+  async create(prompt: unknown, ownerBotId?: string) {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 16000) throw Error("Enter a mobile task of at most 16000 characters");
-    if (this.records.size >= 30) throw Error("Delete an old mobile task before creating another");
-    const task: MobileTask = { id: randomUUID(), prompt: prompt.trim(), status: "queued", created: Date.now(), updated: Date.now(), steps: 0, output: "", history: [], trace: [] };
+    if (this.records.size >= 30) {
+      const archived = [...this.records.values()].filter(t => t.ownerBotId && ["completed", "failed", "stopped"].includes(t.status) && !this.agents.has(t.id)).sort((a,b) => a.updated-b.updated)[0];
+      if (!archived) throw Error("Delete an old mobile task before creating another");
+      this.records.delete(archived.id);
+    }
+    const task: MobileTask = { id: randomUUID(), prompt: prompt.trim(), status: "queued", created: Date.now(), updated: Date.now(), steps: 0, output: "", history: [], trace: [], ownerBotId };
     this.records.set(task.id, task); await this.changed(task); return task;
   }
   async remove(id: string) { if (this.agents.has(id)) throw Error("Stop the task first"); this.records.delete(id); await this.persist(); }

@@ -148,7 +148,7 @@ export class Bots {
         job.updated = now; bot.runs++;
         try {
           if (bot.kind === "coding") { job.status = "running"; await this.changed(); this.sessions.setTrust(bot.sessionId, bot.allowShell); await this.sessions.prompt(bot.sessionId, job.text, await this.profile(bot, job)); }
-          else { if (!job.mobileTaskId) { const task = await this.mobile.create(bot.role + "\n\n" + (bot.kind === "browser" ? "Use the phone's browser for this task. " : "") + job.text); job.mobileTaskId = task.id; } job.status = "arming"; await this.changed(); }
+          else { if (!job.mobileTaskId) { const task = await this.mobile.create(bot.role + "\n\n" + (bot.kind === "browser" ? "Use the phone's browser for this task. " : "") + job.text, bot.id); job.mobileTaskId = task.id; } job.status = "arming"; await this.changed(); }
         } catch (e) { await this.finish(job, "failed", this.redact(String(e))); }
       }
     } finally { this.ticking = false; }
