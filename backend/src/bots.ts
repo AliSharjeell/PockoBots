@@ -124,7 +124,7 @@ export class Bots {
           const task = this.mobile.state(job.mobileTaskId);
           if (["completed", "failed", "paused", "stopped"].includes(task.status) && !(job.status === "arming" && task.status === "paused")) { await this.finish(job, task.status === "completed" ? "completed" : task.status === "paused" ? "paused" : "failed", task.error || task.output); continue; }
           if (job.status === "arming") {
-            try { const health = await this.mobile.health(); if (health.ready && health.task_allowed && this.armed.has(task.id)) { await this.mobile.start(task.id, undefined, await this.profile(bot, job)); this.armed.delete(task.id); job.status = "running"; await this.changed(); } }
+            try { const health = await this.mobile.health(); if (health.ready && health.task_allowed && this.armed.has(task.id)) { const profile = await this.profile(bot, job); if (this.enabled && bot.enabled && job.status === "arming") { await this.mobile.start(task.id, undefined, profile); this.armed.delete(task.id); job.status = "running"; await this.changed(); } } }
             catch (e) { job.error = this.redact(String(e)); }
             if (job.status === "arming" && now - job.updated > 30000) await this.finish(job, "paused", job.error || "Enable Accessibility and floating windows, then resume this bot.");
           } else if (job.status !== task.status && ["running", "waiting"].includes(task.status)) { job.status = task.status as "running" | "waiting"; await this.changed(); }
@@ -147,9 +147,9 @@ export class Bots {
         if (bot.kind !== "coding" && (this.mobile.anyBusy() || this.jobs.some(j => j.mobileTaskId && ["arming", "running", "waiting"].includes(j.status)))) continue;
         job.updated = now; bot.runs++;
         try {
-          if (bot.kind === "coding") { job.status = "running"; await this.changed(); this.sessions.setTrust(bot.sessionId, bot.allowShell); await this.sessions.prompt(bot.sessionId, job.text, await this.profile(bot, job)); }
+          if (bot.kind === "coding") { job.status = "running"; await this.changed(); const profile = await this.profile(bot, job); if (this.enabled && bot.enabled && job.status === "running") { this.sessions.setTrust(bot.sessionId, bot.allowShell); await this.sessions.prompt(bot.sessionId, job.text, profile); } }
           else { if (!job.mobileTaskId) { const task = await this.mobile.create(bot.role + "\n\n" + (bot.kind === "browser" ? "Use the phone's browser for this task. " : "") + job.text, bot.id); job.mobileTaskId = task.id; } job.status = "arming"; await this.changed(); }
-        } catch (e) { await this.finish(job, "failed", this.redact(String(e))); }
+        } catch (e) { if (["running", "arming", "waiting"].includes(job.status)) await this.finish(job, "failed", this.redact(String(e))); }
       }
     } finally { this.ticking = false; }
   }
