@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 /** Local provider and web page: real SDK/MCP/Artemis actions, no paid provider calls. */
 final class BotModelFixture implements AutoCloseable {
     private final ServerSocket model=new ServerSocket(0,8,InetAddress.getByName("127.0.0.1")),web=new ServerSocket(0,4,InetAddress.getByName("127.0.0.1"));
-    volatile Exception failure;volatile boolean sawMcp,sawBrowser;private volatile boolean running=true;private int browserStage;
+    volatile Exception failure;volatile boolean sawMcp,sawBrowser,sawUnified;private volatile boolean running=true;private int browserStage;
     BotModelFixture()throws IOException{
         Thread page=new Thread(() -> {while(running)try(Socket socket=web.accept()){InputStream input=socket.getInputStream();while(!line(input).isEmpty()){}byte[] body="<!doctype html><html><body><h1>Pocket browser check completed</h1><p>This local page is open in the real phone browser.</p></body></html>".getBytes(StandardCharsets.UTF_8);respond(socket,"text/html",body);}catch(Exception e){if(running)failure=e;}},"bot-page");page.setDaemon(true);page.start();
         Thread worker=new Thread(() -> {while(running)try(Socket socket=model.accept()){
@@ -22,10 +22,12 @@ final class BotModelFixture implements AutoCloseable {
                     else if(welcome>=0){name="click";args.put("screen_id",screen.getString("screen_id")).put("target",welcome);}
                     else{name="open_url";args.put("screen_id",screen.getString("screen_id")).put("url",pageUrl());Thread.sleep(600);}}
                 delta=tool(name,args,"browser-"+turn);finish="tool_calls";
+            }else if(last.optString("role").equals("user")&&last.toString().contains("BROWSER_FIXTURE")){
+                sawUnified=true;delta=tool("use_phone",new JSONObject().put("task","BROWSER_FIXTURE: open and verify "+pageUrl()),"unified-phone");finish="tool_calls";
             }else if(last.optString("role").equals("user")){
                 String name="write_file";JSONArray tools=request.getJSONArray("tools");for(int i=0;i<tools.length();i++){String candidate=tools.getJSONObject(i).getJSONObject("function").getString("name");if(candidate.startsWith("mcp_")){name=candidate;sawMcp=true;break;}}
                 delta=tool(name,name.equals("write_file")?new JSONObject().put("path","src/bot.txt").put("content","Created by my local coding bot"):new JSONObject(),"bot-tool");finish="tool_calls";
-            }else delta.put("content",sawMcp&&request.getJSONArray("tools").toString().contains("mcp_")?"Read the local MCP note successfully.":"Created src/bot.txt in my own workspace.");
+            }else delta.put("content",sawMcp&&request.getJSONArray("tools").toString().contains("mcp_")?"Read the local MCP note successfully.":"**Created** `src/bot.txt` in my workspace.\n\n| File | Status |\n| --- | --- |\n| bot.txt | Saved |\n\n[Open preview]("+pageUrl()+")");
             String payload="data: "+chunk(delta,JSONObject.NULL)+"\n\ndata: "+chunk(new JSONObject(),finish)+"\n\ndata: [DONE]\n\n";respond(socket,"text/event-stream",payload.getBytes(StandardCharsets.UTF_8));
         }catch(Exception e){if(running)failure=e;}},"bot-model");worker.setDaemon(true);worker.start();
     }
