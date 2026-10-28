@@ -27,12 +27,14 @@ __attribute__((constructor)) static void initialize(void) {
         }
         fclose(maps);
     }
+    fprintf(stderr, "Pocket runtime pages: Android=%ld kernel=%ld\n", original_sysconf ? original_sysconf(_SC_PAGESIZE) : -1, kernel_page_size);
     /* Never inject an Android/Bionic library into the Linux/glibc guest. */
     unsetenv("LD_PRELOAD");
 }
 
 long sysconf(int name) {
-    if (name == _SC_PAGESIZE && kernel_page_size) return kernel_page_size;
+    /* Bionic gives these synonymous POSIX queries distinct numeric IDs. */
+    if ((name == _SC_PAGESIZE || name == _SC_PAGE_SIZE) && kernel_page_size) return kernel_page_size;
     if (!original_sysconf) original_sysconf = (long (*)(int))dlsym(RTLD_NEXT, "sysconf");
     return original_sysconf ? original_sysconf(name) : -1;
 }
