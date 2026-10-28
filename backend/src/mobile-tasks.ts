@@ -57,7 +57,7 @@ export class MobileTasks {
     const { model, models } = connection(settings, true);
     task.status = "running"; task.error = undefined; task.question = undefined;
     if (reply) task.history.push({ role: "user", text: reply });
-    let turns = 0; let currentTool = ""; let lastPreview = 0;
+    let turns = 0; let currentTool = ""; let lastPreview = 0; const navigationAttempts = new Map<string, number[]>();
     const safe = (text: string) => settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text;
     const ask = async (question: string, signal?: AbortSignal) => {
       task.status = "waiting"; task.question = { id: randomUUID(), text: safe(question) };
@@ -78,6 +78,15 @@ export class MobileTasks {
       beforeToolCall: async (context) => {
         if (task.status !== "running") return { block: true, reason: "Task is paused or already finished" };
         currentTool = context.toolCall.name;
+        if (["open_url", "manage_app"].includes(currentTool)) {
+          const args: any = context.args; const key = currentTool + ":" + (args.url || args.app_name);
+          const recent = (navigationAttempts.get(key) || []).filter(time => Date.now() - time < 60000);
+          if (recent.length >= 3) {
+            task.status = "paused"; task.error = "Stopped repeated app/page reopening. Complete any browser welcome or sign-in screen, then resume. No further phone actions were taken.";
+            await this.changed(task); return { block: true, reason: task.error };
+          }
+          recent.push(Date.now()); navigationAttempts.set(key, recent);
+        }
         task.trace.push({ time: Date.now(), text: currentTool.replaceAll("_", " ") }); task.trace = task.trace.slice(-200);
         task.steps++; await this.changed(task);
       },

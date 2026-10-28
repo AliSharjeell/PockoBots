@@ -120,3 +120,16 @@ test("one unified bot writes files then uses the phone and continues the same co
  const result=await until(()=>call("/bots/"+bot.id),v=>v.jobs[0]?.status==="completed");assert.match(result.messages.at(-1).text,/Battery checked/);assert.equal(result.jobs[0].phoneTaskId,pending.taskId);assert.equal((await call("/file?projectId="+bot.projectId+"&path=mixed.txt")).content,"Created before phone work");assert.equal(runtime.mobile.state(pending.taskId).status,"completed");
  }finally{await runtime.close();await close(server);await close(provider.server);await close(native.server);await rm(temp,{recursive:true,force:true});}
 });
+
+
+test("phone tasks pause repeated app relaunches instead of looping",async()=>{
+ const temp=await mkdtemp(join(tmpdir(),"pocket-loop-")),native=device(),provider=model();const bridgePort=await listen(native.server),modelPort=await listen(provider.server);
+ const runtime=await createApp({stateDir:join(temp,"state"),workspace:join(temp,"projects"),mobileBridgeBase:"http://127.0.0.1:"+bridgePort});native.setToken(runtime.token);
+ try{ // Configure through the authenticated API below
+ const server=http.createServer(runtime.app);await new Promise<void>(r=>server.listen(8787,"127.0.0.1",r));
+ try{const response=await fetch("http://127.0.0.1:8787/api/settings",{method:"PUT",headers:{Authorization:"Bearer "+runtime.token,"Content-Type":"application/json"},body:JSON.stringify({provider:"openai",api:"openai-completions",baseUrl:"http://127.0.0.1:"+modelPort,model:"fixture",apiKey:"fixture"})});assert.ok(response.ok);
+ provider.setScript((stage,body)=>stage%2===0?["observe_screen",{}]:["manage_app",{screen_id:observation(body).screen_id,app_name:"com.android.chrome"}]);
+ const task=await runtime.mobile.create("Open Chrome");await runtime.mobile.start(task.id);const result=await until(async()=>runtime.mobile.state(task.id),t=>t.status==="paused");assert.match(result.error,/repeated app/);assert.equal(native.calls.length,3);
+ }finally{await close(server);}
+ }finally{await runtime.close();await close(provider.server);await close(native.server);await rm(temp,{recursive:true,force:true});}
+});
