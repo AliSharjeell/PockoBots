@@ -25,6 +25,7 @@ public class RuntimeService extends Service {
         active = this; ready = false; status = "Starting coding environment…";
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("runtime", "Coding environment", NotificationManager.IMPORTANCE_LOW));
+        manager.createNotificationChannel(new NotificationChannel("bot-results", "Bot messages", NotificationManager.IMPORTANCE_DEFAULT));
         Intent open = new Intent(this, BotsActivity.class);
         PendingIntent content = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
         Intent stop = new Intent(this, RuntimeService.class).setAction("stop");
@@ -40,7 +41,11 @@ public class RuntimeService extends Service {
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent!=null&&intent.hasExtra("botsEnabled"))getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putBoolean("enabled",intent.getBooleanExtra("botsEnabled",false)).apply();
-        if (intent != null && "stop".equals(intent.getAction())) { stopping = true; stopSelf(); return START_NOT_STICKY; }
+        if (intent != null && "stop".equals(intent.getAction())) {
+            stopping = true;MobileAccess.authorize(false);getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();
+            main.postDelayed(this::stopSelf,3000);new Thread(() -> {try{AgentApi connection=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());connection.request("PUT","/bots/engine",new JSONObject().put("enabled",false));}catch(Exception ignored){}finally{stopSelf();}},"pocket-bots-stop").start();
+            return START_NOT_STICKY;
+        }
         if (!starting) {
             starting = true;
             new Thread(this::startRuntime, "pocket-runtime").start();
@@ -114,6 +119,16 @@ public class RuntimeService extends Service {
         if(!getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",false))return;
         try{
             if(botApi==null)botApi=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());
+            JSONObject inbox=botApi.get("/bots");JSONArray bots=inbox.optJSONArray("bots");
+            if(bots!=null)for(int i=0;i<bots.length();i++){
+                JSONObject bot=bots.optJSONObject(i),message=bot.optJSONObject("lastMessage");if(message==null||!message.optString("role").equals("assistant"))continue;
+                String key="notified-"+bot.optString("id"),messageId=message.optString("id");if(messageId.equals(getSharedPreferences("bot-runtime",MODE_PRIVATE).getString(key,"")))continue;
+                Intent open=new Intent(this,BotsActivity.class).putExtra("botId",bot.optString("id"));String preview=message.optString("text");
+                Notification notice=new Notification.Builder(this,"bot-results").setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(bot.optString("name"))
+                    .setContentText(preview.substring(0,Math.min(160,preview.length()))).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE)
+                    .setContentIntent(PendingIntent.getActivity(this,bot.optString("id").hashCode(),open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE)).build();
+                getSystemService(NotificationManager.class).notify(bot.optString("id").hashCode(),notice);getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putString(key,messageId).apply();
+            }
             Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
             if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;
             if(task.equals(MobileOverlayService.activeTask)){if(MobileAccess.allowed())botApi.request("POST","/bots/phone/ready",new JSONObject().put("taskId",task));}
