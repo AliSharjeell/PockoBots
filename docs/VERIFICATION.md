@@ -1,5 +1,53 @@
 # Verification
 
+## Local bot inbox and alerts v0.4.0 - 2026-10-28
+
+Verified on the existing Pixel_10_Pro_XL x86_64 emulator, Android 17/API 37,
+with the same AVD user data preserved and its experimental ps16k image started
+in 4 KB mode. The original 16 KB Intel mode caused PRoot/runtime startup failure;
+see [the emulator workaround](DEVELOPMENT.md#pixel-10-intel-emulator-startup).
+The app now reports that unsupported mode with an actionable setup message.
+
+All 17 backend tests pass under Linux Node 22.23.3, including independent bot
+inboxes and workspaces, FIFO queues, MCP Streamable HTTP and real stdio server
+processes, restart persistence, bounded history, routine coalescing/daily limits,
+quiet checks, pause during MCP connection, and alert consent/rate limits.
+Existing real PTY, Git, npm server, provider adapter and Artemis tests pass too.
+TypeScript checking and npm audit pass (zero production vulnerabilities).
+
+All four Android journeys passed on this Pixel: BotsSmokeTest (final run 51.468
+seconds), MobileTaskSmokeTest, NativeUiSmokeTest and RuntimeSmokeTest. The bot
+journey verified background coding edits, two independent coding bots, a real
+on-device stdio MCP tool writing a receipt, a proactive routine triggered from
+the UI, paused queues/resume, and a reply delivered through the actual Android
+RemoteInput PendingIntent. Browser and phone bots operated real Chrome/Settings
+through Artemis and handled the floating question/reply handoff.
+
+The urgent alert test slept the unlocked emulator, verified automatic lock-screen
+alert presentation and Android alarm-tone playback, tapped Answer, verified
+ringing stopped and the message appeared, then observed Android's offline TTS
+onStart callback: "Reading the bot's message". This confirms speech synthesis
+started; it is not an acoustic recording. Voice failure/slow initialization has
+a bounded text fallback. Full-screen permission was granted for the fixture and
+restored afterward. Provider and accessibility settings were also restored;
+no paid model key was used. Four example bots remain, with the engine off.
+
+[Reviewed Pixel captures](UI.md#bot-inbox-and-priority-alerts-in-v04) show the new
+inbox, conversation, ringing/answered alert and floating phone/browser flow.
+Both ABI builds and signature verification pass. Lint: zero errors, 52 warnings.
+Packaging checks verify the selected ABI, current backend, MCP/backend notices
+and modified PRoot loader source/license. APKs remain ignored local artifacts.
+
+Continuous execution remains subject to Android battery/process restrictions.
+Physical ARM64 devices, ARM64 16 KB configurations, real-provider billing,
+remote MCP account authentication and production distribution were not tested.
+
+| Debug APK | Bytes | SHA-256 |
+| --- | ---: | --- |
+| pocket-agent-v0.4.0-x86_64-debug.apk | 273081211 | `25f2af1323526d94eafb700c67fe07e252fb4821b1bbd507d878399f8e009311` |
+| pocket-agent-v0.4.0-arm64-debug.apk | 252650100 | `50b5bcff86cbe8b705410071cd5583d43411b5a86dc79b0a3baf0fe4236202b5` |
+
+
 ## Native sidebar and floating island v0.3.1 — 2026-10-13
 
 All three Android instrumentation tests passed on the Android 14 x86_64 emulator

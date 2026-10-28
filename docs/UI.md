@@ -1,5 +1,25 @@
 # Native sidebar and island UI
 
+## Bot inbox and priority alerts in v0.4
+
+The new launcher is a messaging inbox with separate coding, phone and browser
+bots. These captures come from the Pixel 10 Pro XL API 37 emulator, using local
+model fixtures and the real packaged runtime and Artemis helper.
+
+![Bot inbox](images/v0.4-inbox.png)
+
+![Bot conversation and proactive routine](images/v0.4-research.png)
+
+![Locked-screen priority alert](images/v0.4-incoming-alert.png)
+
+![Answered alert and Android voice status](images/v0.4-alert-answered.png)
+
+![Real phone browser with floating island](images/v0.4-browser.png)
+
+![Phone task question](images/v0.4-question.png)
+
+## Original sidebar adaptation
+
 Pocket Agent v0.3.1 adapts the supplied `form-filling-ai` sidebar and screenshot
 references to native Android views. Inter, zinc surfaces, white active segments,
 blue user bubbles and actions, a history drawer, collapsible tool output, and
