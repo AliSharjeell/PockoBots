@@ -17,7 +17,7 @@ final class BotModelFixture implements AutoCloseable {
             if(phone){JSONObject screen=screen(messages);String name;JSONObject args=new JSONObject();int turn=browserStage++;
                 if(turn==0||turn%2==0)name="observe_screen";
                 else if(turn==1){name="open_url";args.put("screen_id",screen.getString("screen_id")).put("url",pageUrl());}
-                else{JSONArray elements=screen.getJSONArray("elements");boolean verified=false;int welcome=-1;for(int i=0;i<elements.length();i++){String label=elements.getJSONObject(i).optString("text");if(label.contains("Pocket browser check completed"))verified=true;if(label.equals("Use without an account")||label.equals("Accept & continue")||label.equals("No thanks")||label.equals("Got it"))welcome=elements.getJSONObject(i).optInt("index");}
+                else{JSONArray elements=screen.getJSONArray("elements");boolean verified=false;int welcome=-1;for(int i=0;i<elements.length();i++){String label=elements.getJSONObject(i).optString("text");if(label.contains("Pocket browser check completed"))verified=true;if(label.equals("Use without an account")||label.equals("Stay signed out")||label.equals("Continue without an account")||label.equals("Accept & continue")||label.equals("No thanks")||label.equals("Got it"))welcome=elements.getJSONObject(i).optInt("index");}
                     if(verified){sawBrowser=true;name="report_task_status";args.put("status","completed").put("summary","Browser page verified through Artemis.");}
                     else if(welcome>=0){name="click";args.put("screen_id",screen.getString("screen_id")).put("target",welcome);}
                     else{name="open_url";args.put("screen_id",screen.getString("screen_id")).put("url",pageUrl());Thread.sleep(600);}}
