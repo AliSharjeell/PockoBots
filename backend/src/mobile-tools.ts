@@ -11,6 +11,11 @@ const text = (value: unknown): any => ({ content: [{ type: "text", text: typeof 
 export function mobileTools(bridge: ArtemisBridge, ask: (question: string, signal?: AbortSignal) => Promise<string>,
   report: (status: "completed" | "failed", summary: string) => Promise<void>): AgentTool<any>[] {
   return [
+    { name: "open_url", label: "Open phone browser", description: "Navigate the phone's default browser to an HTTP/HTTPS URL. Observe the browser afterward and handle any login through ask_user. This opens a visible browser while Pocket Agent stays in the background.",
+      parameters: Type.Object({ ...observed, url: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any, signal) => {
+        const url = new URL(p.url); if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw Error("Use an HTTP/HTTPS URL without embedded credentials");
+        return text(await bridge.command(p.screen_id, "open_url", { url: url.href }, signal));
+      } },
     { name: "observe_screen", label: "Observe screen", description: "Get the current Android screenshot and indexed visible elements. Always observe before acting and again after an action to verify its outcome.",
       parameters: Type.Object({}), execute: async (_id, _args, signal) => {
         const screen = await bridge.observe(signal);

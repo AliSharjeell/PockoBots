@@ -309,6 +309,15 @@ public class CommandServer extends Thread {
         JSONObject resp = new JSONObject();
         try {
             switch (cmd.toLowerCase(Locale.ROOT)) {
+                case "open_url":
+                    String address = params.getString("url");
+                    java.net.URI parsed = new java.net.URI(address);
+                    if (address.length() > 8000 || parsed.getHost() == null || parsed.getRawUserInfo() != null ||
+                            !("http".equalsIgnoreCase(parsed.getScheme()) || "https".equalsIgnoreCase(parsed.getScheme())))
+                        throw new IllegalArgumentException("Open an HTTP or HTTPS browser URL without embedded credentials");
+                    service.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(address))
+                            .addCategory(Intent.CATEGORY_BROWSABLE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    resp.put("success", true); break;
                 case "apps":
                     JSONArray apps = new JSONArray();
                     Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
