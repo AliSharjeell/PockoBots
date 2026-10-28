@@ -7,11 +7,12 @@ import type { MobileTasks } from "./mobile-tasks.js";
 import type { Connectors } from "./connectors.js";
 
 export type Bot = { id: string; name: string; role: string; memory: string; kind: "coding" | "phone" | "browser"; projectId: string; sessionId: string;
-  enabled: boolean; allowShell: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
+  enabled: boolean; allowShell: boolean; allowUrgent: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
   dailyLimit: number; day: string; runs: number; created: number };
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
   created: number; updated: number; mobileTaskId?: string; error?: string; output?: string };
 type Message = { id: string; botId: string; role: "user" | "assistant" | "system"; text: string; time: number; jobId?: string };
+export type BotAlert = { id: string; botId: string; botName: string; text: string; urgent: boolean; created: number; acknowledged: boolean };
 
 /** Durable bot inboxes and queues. One run per bot; at most two bot runs total. */
 export class Bots {
@@ -19,16 +20,17 @@ export class Bots {
   private records: Bot[] = []; private jobs: BotJob[] = []; private messages: Message[] = [];
   private timer?: ReturnType<typeof setInterval>; private ticking = false; private closing = false;
   private armed = new Set<string>();
+  private alerts: BotAlert[] = [];
   constructor(private store: Store, private projects: Projects, private sessions: Sessions, private mobile: MobileTasks,
     private connectors: Connectors, private publish: (value: unknown) => void, private redact: (text: string) => string) {}
   async init() {
     const data = await this.store.read<any>("bots", { enabled: false, bots: [], jobs: [], messages: [] });
-    this.enabled = data.enabled; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages;
+    this.enabled = data.enabled; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
     for (const job of this.jobs) if (["running", "arming", "waiting"].includes(job.status)) { job.status = "paused"; job.error = "Runtime restarted. Review and resume this task."; }
     await this.persist();
     this.timer = setInterval(() => { void this.tick().catch(e => this.publish({ type: "bot_error", error: this.redact(String(e)) })); }, 1000); this.timer.unref();
   }
-  private persist() { return this.store.write("bots", { enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages }); }
+  private persist() { return this.store.write("bots", { enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages, alerts: this.alerts }); }
   private async changed() { await this.persist(); this.publish({ type: "bots", bots: this.list() }); }
   private message(botId: string, role: Message["role"], text: string, jobId?: string) {
     this.messages.push({ id: randomUUID(), botId, role, text: this.redact(text).slice(0, 24000), time: Date.now(), jobId });
@@ -57,15 +59,26 @@ export class Bots {
     if (this.records.length >= 12) throw Error("Bot limit reached (12)"); const b = this.input(input); const id = randomUUID();
     const project = await this.projects.create("bot-" + id.slice(0, 8)); const session = await this.sessions.create(project.id);
     const bot: Bot = { id, name: b.name.trim(), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
-      allowShell: b.allowShell === true, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
+      allowShell: b.allowShell === true, allowUrgent: b.allowUrgent === true, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
       nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
     this.records.push(bot); this.message(id, "system", `${bot.name} is ready. ${bot.kind === "coding" ? "I have my own coding workspace." : "Phone tasks use the floating island and take turns with other bots."}`); await this.changed(); return bot;
   }
   async update(id: string, input: any) {
     const bot = this.get(id); if (this.jobs.some(j => j.botId === id && ["running", "arming", "waiting"].includes(j.status))) throw Error("Pause this bot before changing its role or connections");
-    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), role: b.role, connectors: b.connectors, allowShell: b.allowShell === true, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
+    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), role: b.role, connectors: b.connectors, allowShell: b.allowShell === true, allowUrgent: b.allowUrgent === true, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
   }
-  async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); await this.changed(); }
+  async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); this.alerts = this.alerts.filter(a => a.botId !== id); await this.changed(); }
+  pendingAlerts() { return this.alerts.filter(a => !a.acknowledged); }
+  async acknowledgeAlert(id: string) { const alert = this.alerts.find(a => a.id === id); if (!alert) throw Error("Alert not found"); alert.acknowledged = true; await this.changed(); }
+  async alert(id: string, text: unknown, urgent: boolean) {
+    const bot = this.get(id); if (typeof text !== "string" || !text.trim() || text.length > 4000) throw Error("Alert text must be 1–4000 characters");
+    if (urgent && !bot.allowUrgent) throw Error("Ringing alerts are disabled for this bot. Use a normal notification instead.");
+    if (urgent && this.alerts.some(a => a.botId === id && a.urgent && Date.now() - a.created < 600000)) throw Error("This bot already rang within the last ten minutes");
+    if (this.pendingAlerts().filter(a => a.botId === id).length >= 10) throw Error("This bot has too many unread alerts");
+    const alert: BotAlert = { id: randomUUID(), botId: id, botName: bot.name, text: this.redact(text.trim()), urgent, created: Date.now(), acknowledged: false };
+    this.alerts.push(alert); const finished = this.alerts.filter(a => a.acknowledged); const trim = new Set(finished.slice(0, Math.max(0, finished.length - 100)).map(a => a.id)); this.alerts = this.alerts.filter(a => !trim.has(a.id));
+    this.message(id, "assistant", (urgent ? "Priority alert: " : "Notification: ") + alert.text); await this.changed(); return alert;
+  }
   async engine(enabled: boolean) { if (typeof enabled !== "boolean") throw Error("Invalid engine setting"); this.enabled = enabled; if (!enabled) for (const bot of this.records) await this.pause(bot.id, false); await this.changed(); }
   async enqueue(id: string, text: unknown, source: BotJob["source"] = "user", depth = 0) {
     this.get(id); if (typeof text !== "string" || !text.trim() || text.length > 16000) throw Error("Enter a task of at most 16000 characters");
@@ -91,6 +104,7 @@ export class Bots {
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
     const tools = await this.connectors.tools(bot.connectors);
+    tools.push({ name: "notify_user", label: "Notify the owner", description: "Send a bot notification. Urgent rings like a local incoming call and reads the message after the owner answers, if this bot has permission. Use urgent only for important time-sensitive issues requested by the owner; never ring repeatedly.", parameters: Type.Object({ text: Type.String({ maxLength: 4000 }), urgent: Type.Optional(Type.Boolean()) }), execute: async (_id, p: any) => { const alert = await this.alert(bot.id, p.text, p.urgent === true); return { content: [{ type: "text", text: "Alert queued on this phone: " + alert.id }], details: {} }; } });
     tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
       if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1); return { content: [{ type: "text", text: "Queued task " + queued.id }], details: {} }; } });
