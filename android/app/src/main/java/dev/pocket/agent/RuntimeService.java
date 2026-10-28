@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.*;
 import java.io.*;
 import java.util.*;
+import org.json.*;
 
 public class RuntimeService extends Service {
     static volatile String status = "Starting coding environment…";
@@ -18,12 +19,13 @@ public class RuntimeService extends Service {
     private volatile boolean starting;
     private PowerManager.WakeLock wakeLock;
     private volatile boolean stopping;
+    private AgentApi botApi;private long lastBotPoll;private final Handler main=new Handler(Looper.getMainLooper());
     @Override public void onCreate() {
         super.onCreate();
         active = this; ready = false; status = "Starting coding environment…";
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("runtime", "Coding environment", NotificationManager.IMPORTANCE_LOW));
-        Intent open = new Intent(this, MainActivity.class);
+        Intent open = new Intent(this, BotsActivity.class);
         PendingIntent content = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
         Intent stop = new Intent(this, RuntimeService.class).setAction("stop");
         PendingIntent stopIntent = PendingIntent.getService(this, 1, stop, PendingIntent.FLAG_IMMUTABLE);
@@ -37,12 +39,13 @@ public class RuntimeService extends Service {
         wakeLock.acquire();
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        if(intent!=null&&intent.hasExtra("botsEnabled"))getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putBoolean("enabled",intent.getBooleanExtra("botsEnabled",false)).apply();
         if (intent != null && "stop".equals(intent.getAction())) { stopping = true; stopSelf(); return START_NOT_STICKY; }
         if (!starting) {
             starting = true;
             new Thread(this::startRuntime, "pocket-runtime").start();
         }
-        return START_NOT_STICKY;
+        return getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",false)?START_STICKY:START_NOT_STICKY;
     }
     private void startRuntime() {
         try {
@@ -99,10 +102,21 @@ public class RuntimeService extends Service {
                     else if (!ready && !output.isEmpty()) status = output.substring(output.lastIndexOf('\n') + 1);
                 }
                 Thread.sleep(200);
+                if(ready&&System.currentTimeMillis()-lastBotPoll>1000){lastBotPoll=System.currentTimeMillis();pollBots();}
             }
             if (!stopping && active == this) { ready = false; status = "Environment stopped (" + backend.waitFor() + "). Reopen the app to restart. See runtime logs for details."; }
         } catch (Exception e) { if (!stopping && active == this) { ready = false; status = "Setup failed: " + e.getMessage(); } }
         finally { starting = false; if (!stopping && active == this) stopSelf(); }
+    }
+    private void pollBots(){
+        if(!getSharedPreferences("bot-runtime",MODE_PRIVATE).getBoolean("enabled",false))return;
+        try{
+            if(botApi==null)botApi=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());
+            Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
+            if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;
+            if(task.equals(MobileOverlayService.activeTask)){if(MobileAccess.allowed())botApi.request("POST","/bots/phone/ready",new JSONObject().put("taskId",task));}
+            else main.post(() -> {try{startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",task).putExtra("botName",request.optString("botName")));}catch(RuntimeException e){android.util.Log.w("PocketBots","Open the app to start this phone task",e);}});
+        }catch(Exception e){android.util.Log.w("PocketBots","Bot controller poll will retry: "+e.getClass().getSimpleName());}
     }
     private static void stopProcess(java.lang.Process process, int pid) throws InterruptedException, IOException {
         if (!process.isAlive()) return;

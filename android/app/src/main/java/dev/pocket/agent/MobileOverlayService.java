@@ -48,6 +48,7 @@ public class MobileOverlayService extends Service {
         if("close".equals(action)){control("pause");stopSelf();return START_NOT_STICKY;}
         String next=intent.getStringExtra("taskId");
         if(next!=null&&!next.equals(id)){id=next;activeTask=next;signature="";task=new JSONObject();expanded=false;draft="";}
+        if(intent.getBooleanExtra("expand",false))expanded=true;
         if(!Settings.canDrawOverlays(this)){MobileAccess.authorize(false);stopSelf();return START_NOT_STICKY;}
         MobileAccess.syncToken(this);armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);
         if(!attached){windows.addView(surface,layout);attached=true;}

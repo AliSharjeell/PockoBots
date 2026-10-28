@@ -141,7 +141,7 @@ public class MainActivity extends Activity {
             try {
                 api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());listen();
                 MobileAccess.syncToken(this);
-                loadState(() -> {JSONObject selected=findProject(project);if(selected==null){project="";session="";}else projectName=selected.optString("name");show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");});
+                loadState(() -> {JSONObject selected=findProject(project);if(selected==null){project="";session="";}else projectName=selected.optString("name");show(getIntent().getBooleanExtra("openSettings",false)?"Settings":mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");});
             }catch(Exception e){api=null;error(e);handler.postDelayed(this::waitForRuntime,1000);}
         }else handler.postDelayed(this::waitForRuntime,500);
     }
