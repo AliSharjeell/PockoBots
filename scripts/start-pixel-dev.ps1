@@ -1,4 +1,4 @@
-﻿param([string]$Serial = 'emulator-5554', [string]$Avd = 'Pixel_10_Pro_XL')
+param([string]$Serial = 'emulator-5554', [string]$Avd = 'Pixel_10_Pro_XL')
 $ErrorActionPreference = 'Stop'
 $pixelSdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:LOCALAPPDATA 'Android/Sdk' }
 $pixelAdb = Join-Path $pixelSdk 'platform-tools/adb.exe'
@@ -53,6 +53,8 @@ $pixelPages = (& $pixelAdb -s $Serial shell getconf PAGE_SIZE | Out-String).Trim
 if ($pixelPages -ne '4096') {
     $pixelKernel = $pixelKernel -replace '\bpage_shift=\d+', 'page_shift=12'
     Write-Host 'Restarting the same Pixel AVD in 4 KB mode. User data is preserved.'
+    & $pixelAdb -s $Serial shell sync
+    if ($LASTEXITCODE -ne 0) { throw 'Could not flush emulator storage. No emulator was restarted.' }
     & $pixelAdb -s $Serial emu kill
     if ($LASTEXITCODE -ne 0) { throw 'Could not stop the emulator. Close it in Device Manager and retry.' }
     Start-Sleep -Seconds 4
