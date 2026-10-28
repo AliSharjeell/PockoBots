@@ -201,7 +201,7 @@ GitHub access is now verified: the ChatGPT Codex Connector is installed for all 
 
 ## GitHub build and preview release
 
-- GitHub Actions run [37416741177](https://github.com/AliSharjeell/pocket-agent/actions/runs/37416741177) passed backend and Android checks after fixing the obsolete Android SDK package in the setup action.
-- The manual preview run [37417208402](https://github.com/AliSharjeell/pocket-agent/actions/runs/37417208402) passed backend, Android, and release jobs at commit `0fb40c643838ab2f25620d6617b212b290e62555`.
-- The private [v0.1.0 preview release](https://github.com/AliSharjeell/pocket-agent/releases/tag/v0.1.0) is published, with `pocket-agent-debug.apk` attached from the verified GitHub build. The release tag points to the tested commit.
+- GitHub Actions run [37416741177](https://github.com/AliSharjeell/PockoBots/actions/runs/37416741177) passed backend and Android checks after fixing the obsolete Android SDK package in the setup action.
+- The manual preview run [37417208402](https://github.com/AliSharjeell/PockoBots/actions/runs/37417208402) passed backend, Android, and release jobs at commit `0fb40c643838ab2f25620d6617b212b290e62555`.
+- The private [v0.1.0 preview release](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1.0) is published, with `pocket-agent-debug.apk` attached from the verified GitHub build. The release tag points to the tested commit.
 - Workspace-to-GitHub asset upload was rejected by the network path, so the APK was published by GitHub Actions using its repository-scoped token. Release publishing is available through manual workflow dispatch, after both build jobs succeed.
