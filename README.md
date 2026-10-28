@@ -6,15 +6,15 @@
 
 An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
-**Free app ? No platform subscription ? Bring your own model ? Local execution**
+**Free app · No platform subscription · Bring your own model · Local execution**
 
-[Get started](#get-started) ? [See the app](#see-it-in-action) ? [How it compares](#how-it-compares) ? [Build it](#build-from-source)
+[Get started](#get-started) · [See the app](#see-it-in-action) · [How it compares](#how-it-compares) · [Build it](#build-from-source)
 
 </div>
 
 Give a bot a name, tell it what to do, and get on with your day. It can build an
 app, run a project, browse the web, operate Android apps, check for updates and
-message you when it needs you?all from the same conversation.
+message you when it needs you—all from the same conversation.
 
 **Your phone is the computer.** Project files, terminals, Git, Node.js, npm,
 Python and the task runner execute on your device. Install one packaged Android
@@ -70,7 +70,7 @@ affiliated client or a promise of identical features.
 | --- | --- | --- |
 | **PockoBots** | **$0 platform subscription.** BYOK model charges are separate. | Open-source Android app; files, shell tools and app actions execute on your own phone. No PockoBots account or country rollout gate. Your provider and connected services have their own availability rules. |
 | **Grok Bot** | Premium is listed at **$30/month**; other eligible plans may include access. | Grok Bot's computer, scheduled routines and included bot usage. [Official product and pricing](https://x.ai/bot). |
-| **Dots** | Individual access includes eligible Pro tiers, starting at **$100/month**. | ChatGPT's personal agent, subject to plan eligibility and rollout. [Official access guide](https://learn.chatgpt.com/docs/dots) ? [Official Pro pricing](https://learn.chatgpt.com/docs/pricing). |
+| **Dots** | Individual access includes eligible Pro tiers, starting at **$100/month**. | ChatGPT's personal agent, subject to plan eligibility and rollout. [Official access guide](https://learn.chatgpt.com/docs/dots) · [Official Pro pricing](https://learn.chatgpt.com/docs/pricing). |
 | **Muse** | Free for many uses, with optional paid plans; regional rollout. | Meta's personal agent and cloud VM. Availability has expanded beyond North America, including [Japan](https://about.fb.com/ja/news/2026/10/muse-personal-ai-agent-launches-in-japan/) and [Singapore](https://about.fb.com/news/2026/10/muse-is-now-available-in-singapore-the-worlds-first-personal-ai-agent-built-for-everyone/). |
 
 Comparison checked **October 28, 2026**. Listed dollar prices are USD; vendor
@@ -93,10 +93,10 @@ Actual Android emulator captures using local test fixtures:
 
 ## Try a task
 
-- ?Build me a to-do app in HTML, CSS and JavaScript. Run it and give me a preview link.?
-- ?Clone this repository, investigate the failing tests, and show me the fix.?
-- ?Open the phone browser, research these options, and summarize what you find.?
-- ?Check this project every morning and notify me when something needs attention.?
+- "Build me a to-do app in HTML, CSS and JavaScript. Run it and give me a preview link."
+- "Clone this repository, investigate the failing tests, and show me the fix."
+- "Open the phone browser, research these options, and summarize what you find."
+- "Check this project every morning and notify me when something needs attention."
 
 Bots report tool results, ask for missing information and keep their work in
 separate project directories. Phone actions share one device and take turns.
@@ -108,7 +108,7 @@ Repeated app/page reopening pauses instead of looping indefinitely.
    or `x86_64` for a matching emulator. Android 8+ is required; phone screenshots
    require Android 11+. Existing APKs may still display the name **Pocket Agent**.
 2. **Let the included environment unpack.** Allow several minutes and roughly
-   1?2 GB of free storage for tools and projects. Runtime setup uses the files
+   1–2 GB of free storage for tools and projects. Runtime setup uses the files
    packaged in the APK.
 3. **Follow Setup & permissions.** Enable notifications, phone Accessibility,
    the floating island and full-screen alerts as needed. Install offline Android
