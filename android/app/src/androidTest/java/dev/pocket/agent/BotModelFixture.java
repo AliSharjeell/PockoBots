@@ -20,7 +20,9 @@ final class BotModelFixture implements AutoCloseable {
                 else{JSONArray elements=screen.getJSONArray("elements");boolean verified=false;int welcome=-1;for(int i=0;i<elements.length();i++){String label=elements.getJSONObject(i).optString("text");if(label.contains("Pocket browser check completed"))verified=true;if(label.equals("Use without an account")||label.equals("Stay signed out")||label.equals("Continue without an account")||label.equals("Accept & continue")||label.equals("No thanks")||label.equals("Got it"))welcome=elements.getJSONObject(i).optInt("index");}
                     if(verified){sawBrowser=true;name="report_task_status";args.put("status","completed").put("summary","Browser page verified through Artemis.");}
                     else if(welcome>=0){name="click";args.put("screen_id",screen.getString("screen_id")).put("target",welcome);}
-                    else{name="open_url";args.put("screen_id",screen.getString("screen_id")).put("url",pageUrl());Thread.sleep(600);}}
+                    else if(turn>40){name="report_task_status";args.put("status","failed").put("summary","Chrome welcome screen did not become available");}
+                    else if(elements.length()<4||elements.toString().contains("fre_pager")){name="wait_for_delay";args.put("milliseconds",2000);}
+                    else{name="open_url";args.put("screen_id",screen.getString("screen_id")).put("url",pageUrl());}}
                 delta=tool(name,args,"browser-"+turn);finish="tool_calls";
             }else if(last.optString("role").equals("user")&&last.toString().contains("BROWSER_FIXTURE")){
                 sawUnified=true;delta=tool("use_phone",new JSONObject().put("task","BROWSER_FIXTURE: open and verify "+pageUrl()),"unified-phone");finish="tool_calls";
