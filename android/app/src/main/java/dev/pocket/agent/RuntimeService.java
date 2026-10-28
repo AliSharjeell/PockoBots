@@ -26,6 +26,7 @@ public class RuntimeService extends Service {
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("runtime", "Coding environment", NotificationManager.IMPORTANCE_LOW));
         manager.createNotificationChannel(new NotificationChannel("bot-results", "Bot messages", NotificationManager.IMPORTANCE_DEFAULT));
+        NotificationChannel priority=new NotificationChannel("bot-priority","Priority bot calls",NotificationManager.IMPORTANCE_HIGH);priority.setDescription("Opt-in ringing bot alerts. Android lock-screen, volume and Do Not Disturb settings apply.");priority.setSound(null,new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).build());priority.enableVibration(true);manager.createNotificationChannel(priority);
         Intent open = new Intent(this, BotsActivity.class);
         PendingIntent content = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
         Intent stop = new Intent(this, RuntimeService.class).setAction("stop");
@@ -121,13 +122,20 @@ public class RuntimeService extends Service {
             if(botApi==null)botApi=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());
             JSONObject inbox=botApi.get("/bots");JSONArray bots=inbox.optJSONArray("bots");
             if(bots!=null)for(int i=0;i<bots.length();i++){
-                JSONObject bot=bots.optJSONObject(i),message=bot.optJSONObject("lastMessage");if(message==null||!message.optString("role").equals("assistant"))continue;
+                JSONObject bot=bots.optJSONObject(i),message=bot.optJSONObject("lastMessage");if(message==null||!message.optString("role").equals("assistant")||message.optString("text").startsWith("Priority alert: ")||message.optString("text").startsWith("Notification: "))continue;
                 String key="notified-"+bot.optString("id"),messageId=message.optString("id");if(messageId.equals(getSharedPreferences("bot-runtime",MODE_PRIVATE).getString(key,"")))continue;
-                Intent open=new Intent(this,BotsActivity.class).putExtra("botId",bot.optString("id"));String preview=message.optString("text");
-                Notification notice=new Notification.Builder(this,"bot-results").setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(bot.optString("name"))
-                    .setContentText(preview.substring(0,Math.min(160,preview.length()))).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE)
-                    .setContentIntent(PendingIntent.getActivity(this,bot.optString("id").hashCode(),open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE)).build();
+                Notification notice=BotNotifications.message(this,bot.optString("id"),bot.optString("name"),message.optString("text"));
                 getSystemService(NotificationManager.class).notify(bot.optString("id").hashCode(),notice);getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putString(key,messageId).apply();
+            }
+            Object alerts=botApi.request("GET","/bots/alerts",null);if(alerts instanceof JSONArray)for(int i=0;i<((JSONArray)alerts).length();i++){
+                JSONObject alert=((JSONArray)alerts).getJSONObject(i);String alertId=alert.getString("id");android.content.SharedPreferences prefs=getSharedPreferences("bot-runtime",MODE_PRIVATE);String delivered="delivered-"+alertId;
+                if(!prefs.getBoolean(delivered,false)){
+                    if(alert.optBoolean("urgent")&&(!BotAlertService.activeAlert.isEmpty()||!BotAlertService.pendingAlert.isEmpty()))continue;
+                    BotNotifications.saveAlert(this,alert);prefs.edit().putBoolean(delivered,true).apply();
+                    if(alert.optBoolean("urgent")){BotAlertService.pendingAlert=alertId;main.post(() -> {try{startForegroundService(new Intent(this,BotAlertService.class).putExtra("alertId",alertId));}catch(RuntimeException e){BotAlertService.pendingAlert="";getSystemService(NotificationManager.class).notify(30,BotNotifications.priority(this,alert,false));}});}
+                    else getSystemService(NotificationManager.class).notify(alert.optString("botId").hashCode(),BotNotifications.message(this,alert.optString("botId"),alert.optString("botName"),alert.optString("text")));
+                }
+                botApi.request("POST","/bots/alerts/"+alertId+"/ack",new JSONObject());prefs.edit().remove(delivered).apply();
             }
             Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
             if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;

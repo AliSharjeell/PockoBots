@@ -7,11 +7,13 @@ import java.nio.charset.StandardCharsets;
 
 final class AgentApi {
     private final String token;
+    private final int timeout;
     private volatile HttpURLConnection events;
-    AgentApi(String token) { this.token = token; }
+    AgentApi(String token) { this(token,45000); }
+    AgentApi(String token,int timeout) { this.token = token; this.timeout = timeout; }
     Object request(String method, String path, JSONObject body) throws Exception {
         HttpURLConnection connection = connect(path);
-        connection.setReadTimeout(45000);
+        connection.setReadTimeout(timeout);
         connection.setRequestMethod(method);
         try {
             if (body != null) {
