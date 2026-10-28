@@ -49,6 +49,8 @@ public class RuntimeService extends Service {
     }
     private void startRuntime() {
         try {
+            if(Arrays.asList(Build.SUPPORTED_ABIS).contains("x86_64")&&android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE)>4096)
+                throw new IOException("This experimental 16 KB Intel emulator cannot run the included Linux tools. Restart this AVD in 4 KB mode using the development guide. Your projects are preserved.");
             File root = RuntimeInstaller.install(this, message -> status = message);
             if (stopping) return;
             status = "Starting Node.js and the coding agent…";
