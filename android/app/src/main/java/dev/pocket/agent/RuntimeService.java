@@ -67,7 +67,7 @@ public class RuntimeService extends Service {
             // to a file so lifecycle shutdown never waits on a stdout reader lock.
             File pidFile = new File(files, "runtime.pid");
             List<String> launcher = new ArrayList<>(Arrays.asList("/system/bin/sh", "-c",
-                "printf '%s\\n' \"$$\" > \"$1\"; shift; exec \"$@\"", "pocket-runtime", pidFile.getPath()));
+                "printf '%s\\n' \"$$\" > \"$1\"; shift; export LD_PRELOAD=\"$1\"; shift; exec \"$@\"", "pocket-runtime", pidFile.getPath(), nativeDir + "/libpocket-host-compat.so"));
             launcher.addAll(command);
             ProcessBuilder builder = new ProcessBuilder(launcher).redirectErrorStream(true).redirectOutput(logFile);
             builder.environment().put("PROOT_LOADER", nativeDir + "/libproot-loader.so");
@@ -75,7 +75,6 @@ public class RuntimeService extends Service {
             builder.environment().put("PROOT_TMP_DIR", files + "/tmp");
             builder.environment().put("PROOT_NO_SECCOMP", "1");
             builder.environment().put("LD_LIBRARY_PATH", nativeDir);
-            builder.environment().put("LD_PRELOAD", nativeDir + "/libpocket-host-compat.so");
             synchronized (runtimeLock) {
                 if (lastRuntime != null && lastRuntime.isAlive()) {
                     status = "Waiting for the previous environment to stop…";
