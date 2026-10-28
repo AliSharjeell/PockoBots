@@ -2,7 +2,7 @@ import { Type, type TSchema } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Workspace } from "./workspace.js";
 import type { Processes } from "./processes.js";
-import { validPort } from "./processes.js";
+import { validPort, tunnelCommand } from "./processes.js";
 function define<T extends TSchema>(tool: AgentTool<T>): AgentTool<T> {
   return tool;
 }
@@ -81,6 +81,23 @@ export function agentTools(
             ),
           ),
         ),
+    }),
+    define({
+      name: "share_port", label: "Share development server",
+      description: "Create a real Microsoft Dev Tunnel for an existing local server. Returns the actual public URL from tunnel output, or login instructions. Requires devtunnel user login first (use the Servers screen). Never invent the URL.",
+      parameters: Type.Object({ port: Type.Integer({ minimum: 1024, maximum: 65535 }), anonymous: Type.Optional(Type.Boolean()) }),
+      execute: async (_id, p, signal) => {
+        const port = validPort(p.port); const job = processes.start(tunnelCommand(port, p.anonymous === true), workspace.root, "tunnel", port, "Share server :" + port);
+        const end = Date.now() + 20000;
+        while (Date.now() < end && !signal?.aborted) {
+          const urls = job.output.match(/https:\/\/[a-zA-Z0-9.-]+\.devtunnels\.ms(?:[^\s<>"']*)?/g);
+          if (urls?.length) return output(JSON.stringify({ id: job.id, publicUrl: urls[0], localhost: `http://127.0.0.1:${port}` }));
+          if (job.status === "exited") break;
+          await new Promise(r => setTimeout(r, 250));
+        }
+        if (signal?.aborted) { processes.stop(job.id); throw Error("Tunnel cancelled"); }
+        return output(JSON.stringify({ id: job.id, output: job.output, status: job.status, instruction: "No public URL yet. Check process logs; sign in through Servers & sharing if needed." }));
+      },
     }),
     define({
       name: "list_processes",

@@ -246,7 +246,7 @@ export async function createApp(options: {
       ),
   );
   app.post("/api/terminals", async (req, res) => res.status(201).json(terminals.start(
-    await (await projects.workspace(req.body.projectId)).path(req.body.cwd),
+    req.body.root === true ? workspace.root : await (await projects.workspace(req.body.projectId)).path(req.body.cwd),
     req.body.cols, req.body.rows,
   )));
   app.get("/api/terminals/:id", (req, res) => res.json(terminals.state(req.params.id)));

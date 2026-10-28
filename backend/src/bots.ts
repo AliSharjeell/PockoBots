@@ -6,17 +6,17 @@ import type { Sessions } from "./sessions.js";
 import type { MobileTasks } from "./mobile-tasks.js";
 import type { Connectors } from "./connectors.js";
 
-export type Bot = { id: string; name: string; role: string; memory: string; kind: "coding" | "phone" | "browser"; projectId: string; sessionId: string;
+export type Bot = { id: string; name: string; role: string; memory: string; kind: "unified" | "coding" | "phone" | "browser"; projectId: string; sessionId: string;
   enabled: boolean; allowShell: boolean; allowUrgent: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
   dailyLimit: number; day: string; runs: number; created: number };
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
-  created: number; updated: number; mobileTaskId?: string; error?: string; output?: string };
+  created: number; updated: number; mobileTaskId?: string; phoneTaskId?: string; phoneArming?: boolean; error?: string; output?: string };
 type Message = { id: string; botId: string; role: "user" | "assistant" | "system"; text: string; time: number; jobId?: string };
 export type BotAlert = { id: string; botId: string; botName: string; text: string; urgent: boolean; created: number; acknowledged: boolean };
 
 /** Durable bot inboxes and queues. One run per bot; at most two bot runs total. */
 export class Bots {
-  enabled = false;
+  enabled = true;
   private records: Bot[] = []; private jobs: BotJob[] = []; private messages: Message[] = [];
   private timer?: ReturnType<typeof setInterval>; private ticking = false; private closing = false;
   private armed = new Set<string>();
@@ -24,13 +24,15 @@ export class Bots {
   constructor(private store: Store, private projects: Projects, private sessions: Sessions, private mobile: MobileTasks,
     private connectors: Connectors, private publish: (value: unknown) => void, private redact: (text: string) => string) {}
   async init() {
-    const data = await this.store.read<any>("bots", { enabled: false, bots: [], jobs: [], messages: [] });
-    this.enabled = data.enabled; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
+    const data = await this.store.read<any>("bots", { schema: 2, enabled: true, bots: [], jobs: [], messages: [] });
+    this.enabled = data.schema === 2 ? data.enabled : true; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
+    if (data.schema !== 2) for (const bot of this.records) Object.assign(bot, { kind: "unified", allowShell: true, allowUrgent: true, dailyLimit: 0 });
+    for (const job of this.jobs) { job.phoneArming = false; }
     for (const job of this.jobs) if (["running", "arming", "waiting"].includes(job.status)) { job.status = "paused"; job.error = "Runtime restarted. Review and resume this task."; }
     await this.persist();
     this.timer = setInterval(() => { void this.tick().catch(e => this.publish({ type: "bot_error", error: this.redact(String(e)) })); }, 1000); this.timer.unref();
   }
-  private persist() { return this.store.write("bots", { enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages, alerts: this.alerts }); }
+  private persist() { return this.store.write("bots", { schema: 2, enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages, alerts: this.alerts }); }
   private async changed() { await this.persist(); this.publish({ type: "bots", bots: this.list() }); }
   private message(botId: string, role: Message["role"], text: string, jobId?: string) {
     this.messages.push({ id: randomUUID(), botId, role, text: this.redact(text).slice(0, 24000), time: Date.now(), jobId });
@@ -40,32 +42,33 @@ export class Bots {
   get(id: string) { const bot = this.records.find(b => b.id === id); if (!bot) throw Error("Bot not found"); return bot; }
   state(id: string) {
     const bot = this.get(id); const jobs = this.jobs.filter(j => j.botId === id); const active = jobs.find(j => ["running", "waiting"].includes(j.status));
-    return { bot, jobs, messages: this.messages.filter(m => m.botId === id), session: bot.kind === "coding" ? this.sessions.state(bot.sessionId) : undefined,
-      mobileTask: active?.mobileTaskId ? this.mobile.state(active.mobileTaskId) : undefined };
+    return { bot, jobs, messages: this.messages.filter(m => m.botId === id), session: ["unified", "coding"].includes(bot.kind) ? this.sessions.state(bot.sessionId) : undefined,
+      mobileTask: (active?.phoneTaskId || active?.mobileTaskId) ? this.mobile.state((active.phoneTaskId || active.mobileTaskId)!) : undefined };
   }
   private input(input: any, previous?: Bot) {
-    const b = { ...previous, ...input };
+    const b = { ...previous, ...input }; b.role ??= "";
     if (typeof b.name !== "string" || !b.name.trim() || b.name.length > 60) throw Error("Enter a bot name (1–60 characters)");
     if (typeof b.role !== "string" || b.role.length > 8000) throw Error("Role instructions must be at most 8000 characters");
-    if (!["coding", "phone", "browser"].includes(b.kind)) throw Error("Choose coding, phone, or browser");
+    b.kind ??= "unified"; b.role ??= "";
+    if (!["unified", "coding", "phone", "browser"].includes(b.kind)) throw Error("Choose coding, phone, or browser");
     if (previous && b.kind !== previous.kind) throw Error("Create a new bot to change its task type");
     b.connectors ??= []; if (!Array.isArray(b.connectors) || b.connectors.length > 8 || b.connectors.some((id: unknown) => typeof id !== "string")) throw Error("Invalid bot connections"); this.connectors.require(b.connectors);
     b.intervalMinutes ??= 0; if (!Number.isInteger(b.intervalMinutes) || (b.intervalMinutes !== 0 && (b.intervalMinutes < 15 || b.intervalMinutes > 10080))) throw Error("Use 0 to disable routines, or an interval of 15–10080 minutes");
     b.heartbeat ??= ""; if (typeof b.heartbeat !== "string" || b.heartbeat.length > 8000 || (b.intervalMinutes && !b.heartbeat.trim())) throw Error("Enter a routine task");
-    b.dailyLimit ??= 24; if (!Number.isInteger(b.dailyLimit) || b.dailyLimit < 1 || b.dailyLimit > 144) throw Error("Daily run limit must be 1–144");
+    b.dailyLimit ??= 0; if (!Number.isInteger(b.dailyLimit) || b.dailyLimit < 0 || b.dailyLimit > 144) throw Error("Daily run limit must be 1–144");
     return b;
   }
   async create(input: any) {
     if (this.records.length >= 12) throw Error("Bot limit reached (12)"); const b = this.input(input); const id = randomUUID();
     const project = await this.projects.create("bot-" + id.slice(0, 8)); const session = await this.sessions.create(project.id);
     const bot: Bot = { id, name: b.name.trim(), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
-      allowShell: b.allowShell === true, allowUrgent: b.allowUrgent === true, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
+      allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
       nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
-    this.records.push(bot); this.message(id, "system", `${bot.name} is ready. ${bot.kind === "coding" ? "I have my own coding workspace." : "Phone tasks use the floating island and take turns with other bots."}`); await this.changed(); return bot;
+    this.records.push(bot); this.message(id, "system", `${bot.name} is ready. I can code, use your phone and browser, and work in my own workspace.`); await this.changed(); return bot;
   }
   async update(id: string, input: any) {
     const bot = this.get(id); if (this.jobs.some(j => j.botId === id && ["running", "arming", "waiting"].includes(j.status))) throw Error("Pause this bot before changing its role or connections");
-    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), role: b.role, connectors: b.connectors, allowShell: b.allowShell === true, allowUrgent: b.allowUrgent === true, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
+    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), role: b.role, connectors: b.connectors, allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
   }
   async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); this.alerts = this.alerts.filter(a => a.botId !== id); await this.changed(); }
   pendingAlerts() { return this.alerts.filter(a => !a.acknowledged); }
@@ -94,13 +97,13 @@ export class Bots {
   async pause(id: string, disable = true) {
     const bot = this.get(id); if (disable) bot.enabled = false;
     for (const job of this.jobs.filter(j => j.botId === id && ["arming", "running", "waiting"].includes(j.status))) {
-      job.status = "paused"; job.error = "Paused by you"; this.sessions.stop(bot.sessionId); if (job.mobileTaskId) await this.mobile.interrupt(job.mobileTaskId);
+      job.status = "paused"; job.error = "Paused by you"; this.sessions.stop(bot.sessionId); if (job.phoneTaskId || job.mobileTaskId) await this.mobile.interrupt((job.phoneTaskId || job.mobileTaskId)!);
     } await this.changed();
   }
   async resume(id: string) { const bot = this.get(id); bot.enabled = true; for (const j of this.jobs.filter(j => j.botId === id && j.status === "paused")) { j.status = "queued"; j.error = undefined; } await this.changed(); }
   async runRoutine(id: string) { const bot = this.get(id); if (!bot.intervalMinutes || !bot.heartbeat) throw Error("Configure a proactive routine first"); return this.enqueue(id, bot.heartbeat, "routine"); }
-  async cancel(id: string, jobId: string) { const bot = this.get(id); const job = this.jobs.find(j => j.id === jobId && j.botId === id); if (!job) throw Error("Task not found"); if (["completed", "failed", "cancelled"].includes(job.status)) return; job.status = "cancelled"; if (job.mobileTaskId) await this.mobile.interrupt(job.mobileTaskId, true); if (this.jobs.every(j => j.botId !== id || !["running", "waiting"].includes(j.status))) this.sessions.stop(bot.sessionId); await this.changed(); }
-  phoneRequest() { if (!this.enabled) return null; const j = this.jobs.find(j => j.status === "arming" && this.get(j.botId).enabled); return j ? { taskId: j.mobileTaskId, botName: this.get(j.botId).name } : null; }
+  async cancel(id: string, jobId: string) { const bot = this.get(id); const job = this.jobs.find(j => j.id === jobId && j.botId === id); if (!job) throw Error("Task not found"); if (["completed", "failed", "cancelled"].includes(job.status)) return; job.status = "cancelled"; if (job.phoneTaskId || job.mobileTaskId) await this.mobile.interrupt((job.phoneTaskId || job.mobileTaskId)!, true); if (this.jobs.every(j => j.botId !== id || !["running", "waiting"].includes(j.status))) this.sessions.stop(bot.sessionId); await this.changed(); }
+  phoneRequest() { if (!this.enabled) return null; const j = this.jobs.find(j => (j.status === "arming" || j.phoneArming) && ["arming", "running", "waiting"].includes(j.status) && this.get(j.botId).enabled); return j ? { taskId: j.phoneTaskId || j.mobileTaskId, botName: this.get(j.botId).name } : null; }
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
     const tools = await this.connectors.tools(bot.connectors);
@@ -108,7 +111,30 @@ export class Bots {
     tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
       if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1); return { content: [{ type: "text", text: "Queued task " + queued.id }], details: {} }; } });
-    return { instructions: `Your name is ${bot.name}. ${bot.role}\nYour durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nFor routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
+    tools.push({ name: "use_phone", label: "Use phone or browser", description: "Execute a concrete task using the phone's visible apps or browser through Artemis. Use for opening apps, browsing, searching or interacting with the Android screen. Coding and files use your normal tools. The phone controller appears automatically; setup permissions and an unlocked device are needed. Waits for verified results or an owner reply. Never invent screen actions.", parameters: Type.Object({ task: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any, signal) => {
+      if (this.jobs.some(j => j.id !== job.id && (j.phoneArming || j.mobileTaskId && ["arming", "running", "waiting"].includes(j.status))) || this.mobile.anyBusy()) throw Error("Another bot is using the phone. Try again after its task finishes.");
+      job.phoneArming = true;
+      const task = await this.mobile.create(p.task, bot.id); job.phoneTaskId = task.id; await this.changed();
+      try {
+        const deadline = Date.now() + 90000;
+        while (!this.armed.has(task.id)) {
+          if (signal?.aborted || !this.enabled || !bot.enabled || !["running", "waiting"].includes(job.status)) throw Error("Phone task cancelled");
+          if (Date.now() > deadline) throw Error("Phone setup is needed. Open Setup & permissions, enable accessibility and floating island, unlock the device, then retry.");
+          await new Promise(r => setTimeout(r, 250));
+        }
+        if (signal?.aborted || !this.enabled || !bot.enabled || !["running", "waiting"].includes(job.status)) throw Error("Phone task cancelled");
+        await this.mobile.start(task.id, undefined, { instructions: bot.role, tools: tools.filter(t => t.name !== "use_phone") });
+        job.phoneArming = false; this.armed.delete(task.id); await this.changed();
+        for (;;) {
+          if (signal?.aborted || !this.enabled || !bot.enabled || !["running", "waiting"].includes(job.status)) throw Error("Phone task cancelled");
+          const current = this.mobile.state(task.id);
+          if (current.status === "completed") return { content: [{ type: "text", text: current.output }], details: {} };
+          if (["failed", "stopped", "paused"].includes(current.status)) throw Error(current.error || current.output || "Phone task paused. Review the floating island.");
+          await new Promise(r => setTimeout(r, 300));
+        }
+      } finally { job.phoneArming = false; this.armed.delete(task.id); if (!["completed", "failed", "stopped"].includes(this.mobile.state(task.id).status)) await this.mobile.interrupt(task.id); await this.changed(); }
+    } });
+    return { instructions: `Your name is ${bot.name}. ${bot.role}\nYour durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nYou are a unified local assistant: choose file/shell tools for coding, use_phone for visible phone/browser work, and selected MCP tools as needed. No mode selection is needed. Provide clickable Markdown links to verified local previews and share_port tunnel URLs; never fabricate a public URL. For routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
   }
   private async finish(job: BotJob, status: "completed" | "failed" | "paused", output: string) {
     job.status = status; job.updated = Date.now(); job.output = this.redact(output).slice(0, 24000);
@@ -130,24 +156,24 @@ export class Bots {
           } else if (job.status !== task.status && ["running", "waiting"].includes(task.status)) { job.status = task.status as "running" | "waiting"; await this.changed(); }
         } else {
           const state = this.sessions.state(bot.sessionId);
-          if (state.busy) { const next = state.approvals.length ? "waiting" : "running"; if (job.status !== next) { job.status = next; await this.changed(); } }
+          if (state.busy) { const next = state.approvals.length || job.phoneTaskId && this.mobile.state(job.phoneTaskId).status === "waiting" ? "waiting" : "running"; if (job.status !== next) { job.status = next; await this.changed(); } }
           else { const last: any = [...state.messages].reverse().find(m => m.role === "assistant"); const output = last?.errorMessage || (last?.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n"); await this.finish(job, last?.stopReason === "error" || last?.stopReason === "aborted" ? "failed" : "completed", output || "Task ended without a text response. Check the workspace and tool activity."); }
         }
       }
       for (const bot of this.records.filter(b => b.enabled)) {
         const day = new Date(now).toISOString().slice(0, 10); if (bot.day !== day) { bot.day = day; bot.runs = 0; }
-        if (bot.intervalMinutes && now >= bot.nextWake && bot.runs < bot.dailyLimit) {
+        if (bot.intervalMinutes && now >= bot.nextWake && (!bot.dailyLimit || bot.runs < bot.dailyLimit)) {
           bot.nextWake = now + bot.intervalMinutes * 60000;
           if (!this.jobs.some(j => j.botId === bot.id && ["queued", "arming", "running", "waiting", "paused"].includes(j.status))) await this.enqueue(bot.id, bot.heartbeat, "routine");
           await this.changed();
         }
-        if (bot.runs >= bot.dailyLimit || this.jobs.some(j => j.botId === bot.id && ["arming", "running", "waiting", "paused"].includes(j.status))) continue;
+        if ((bot.dailyLimit > 0 && bot.runs >= bot.dailyLimit) || this.jobs.some(j => j.botId === bot.id && ["arming", "running", "waiting", "paused"].includes(j.status))) continue;
         if (this.jobs.filter(j => ["arming", "running", "waiting"].includes(j.status)).length >= 2) break;
         const job = this.jobs.find(j => j.botId === bot.id && j.status === "queued"); if (!job) continue;
-        if (bot.kind !== "coding" && (this.mobile.anyBusy() || this.jobs.some(j => j.mobileTaskId && ["arming", "running", "waiting"].includes(j.status)))) continue;
+        if (!["coding", "unified"].includes(bot.kind) && (this.mobile.anyBusy() || this.jobs.some(j => j.mobileTaskId && ["arming", "running", "waiting"].includes(j.status)))) continue;
         job.updated = now; bot.runs++;
         try {
-          if (bot.kind === "coding") { job.status = "running"; await this.changed(); const profile = await this.profile(bot, job); if (this.enabled && bot.enabled && job.status === "running") { this.sessions.setTrust(bot.sessionId, bot.allowShell); await this.sessions.prompt(bot.sessionId, job.text, profile); } }
+          if (["coding", "unified"].includes(bot.kind)) { job.status = "running"; await this.changed(); const profile = await this.profile(bot, job); if (this.enabled && bot.enabled && job.status === "running") { this.sessions.setTrust(bot.sessionId, bot.allowShell); await this.sessions.prompt(bot.sessionId, job.text, profile); } }
           else { if (!job.mobileTaskId) { const task = await this.mobile.create(bot.role + "\n\n" + (bot.kind === "browser" ? "Use the phone's browser for this task. " : "") + job.text, bot.id); job.mobileTaskId = task.id; } job.status = "arming"; await this.changed(); }
         } catch (e) { if (["running", "arming", "waiting"].includes(job.status)) await this.finish(job, "failed", this.redact(String(e))); }
       }
