@@ -10,6 +10,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { Store } from "../src/storage.js";
+import { Connectors } from "../src/connectors.js";
+import { fileURLToPath } from "node:url";
 
 async function listen(server: http.Server) { await new Promise<void>(r => server.listen(0,"127.0.0.1",r)); return (server.address() as any).port as number; }
 async function close(server: http.Server) { server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); }
@@ -46,7 +49,15 @@ test("bots keep FIFO inboxes, isolate roles, run selected MCP tools and restore 
     await call("POST",`/bots/${alpha.id}/pause`,{});await call("POST",`/bots/${alpha.id}/messages`,{text:"Keep queued during pause"});await runtime.bots.tick();assert.equal((await call("GET",`/bots/${alpha.id}`)).jobs.at(-1).status,"queued");
     assert.ok((await readFile(join(root,"state/bots.json"),"utf8")).includes("Keep queued during pause"));
     await call("PUT","/bots/engine",{enabled:false});assert.equal((await call("GET","/bots")).enabled,false);
+    const reopened=await createApp({stateDir:join(root,"state"),workspace:join(root,"workspace"),port:18877});
+    assert.equal(reopened.bots.state(alpha.id).jobs.at(-1)?.status,"queued");assert.equal(reopened.bots.enabled,false);await reopened.close();
   } finally { await runtime.close(); await close(server); await mcp.close(); await close(mcpHttp); await close(model); await rm(root,{recursive:true,force:true}); }
+});
+
+test("MCP stdio starts a real local tool server and closes it",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"pocket-stdio-"));const store=new Store(root);await store.init();const connectors=new Connectors(store);await connectors.init();
+  try{const c=await connectors.save({name:"Local process",transport:"stdio",command:process.execPath,args:[fileURLToPath(new URL("./fixtures/mcp-stdio.mjs",import.meta.url))]});assert.equal((await connectors.inspect(c.id)).tools[0].name,"local_note");const tools=await connectors.tools([c.id]);const result=await tools[0].execute("test",{});assert.ok(JSON.stringify(result).includes("stdio transport ran on this machine"));}
+  finally{await connectors.close();await rm(root,{recursive:true,force:true});}
 });
 
 test("bot context keeps complete tool groups and bounds history",()=>{
