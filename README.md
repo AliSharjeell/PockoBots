@@ -18,18 +18,27 @@ display-over-other-apps permissions once in Android; no computer or ADB is
 required. Model requests use your BYOK provider. See
 [docs/MOBILE_USE.md](docs/MOBILE_USE.md) for setup, privacy and the port's scope.
 
+## Bot inbox
+
+Version 0.4 opens as a messaging app for multiple local bots. Give each bot a
+role and its own coding, phone or browser tasks. Queues, routines, memory,
+selected MCP tools and chats persist on the phone. Results support notification
+replies. Opt-in priority alerts ring like an incoming call, including while
+locked when Android permits; Answer reveals the message and uses offline Android
+TTS when a voice is installed. See [bot setup and limits](docs/BOTS.md).
+
 ## Use on your phone
 
 1. Install the standalone debug APK for your device: `arm64-v8a` for most current
    phones, or `x86_64` for a matching emulator/device. Android 8+ is required.
    The old **v0.1.0 APK still requires Termux**; use a build of v0.2.0 or later.
 2. Open Pocket Agent. First launch unpacks the coding environment from the APK
-   into private app storage. Allow several minutes and approximately 1–2 GB of
+   into private app storage. Allow several minutes and approximately 1â€“2 GB of
    free storage for the tools and your projects. Setup does not download a runtime.
 3. Open **Settings**, choose your API protocol, and enter your base URL, model and
    key. **Test connection** makes a small inference request; **Save connection**
    stores it. An empty key retains the saved key for the same provider.
-4. Open **Projects → Create project / clone repository**. Enter a project name and
+4. Open **Projects â†’ Create project / clone repository**. Enter a project name and
    optionally a Git URL. A clone opens the native terminal, including credential
    prompts for private repositories.
 5. Use **Chat** to build or change your project. File tools operate relative to

@@ -11,7 +11,7 @@ if requested, then let Gradle sync finish. On this workspace, a tested JDK 17
 is available at `C:\tmp\pocket-runtime-research\jdk17\jdk-17.0.20.1+1`.
 
 Select the `app` run configuration and an x86_64 emulator, then click **Run**
-or **Debug**. Android 14 / API 34 is the tested emulator configuration. Debug
+or **Debug**. Android 14 / API 34 and the Pixel 10 Pro XL API 37 in 4 KB mode have been tested. Debug
 supports Java breakpoints and variable inspection. Each Run builds and installs
 the current source; you do not need to drag a prebuilt APK into the emulator.
 
@@ -100,3 +100,34 @@ dev.pocket.agent.test/androidx.test.runner.AndroidJUnitRunner` directly. Retriev
 the PNG bytes with `adb exec-out run-as dev.pocket.agent cat files/ui-chat.png`
 using a binary-safe subprocess stream. Reviewed captures are also checked into
 [the UI gallery](UI.md).
+
+
+## Pixel 10 Intel emulator startup
+
+The experimental Android 17/API 37.2 ps16k x86_64 image fails with the packaged
+4 KB Linux runtime. This caused Environment stopped (255). For this existing
+Pixel AVD, start it in Android Studio, then from the repository root run:
+
+```powershell
+.\scripts\start-pixel-dev.ps1
+```
+
+The script verifies the AVD name, restarts the same emulator with page_shift=12,
+and preserves user data. Wait for boot, then select it and Run in Android Studio.
+It starts without snapshots, so repeat this after launching the experimental AVD
+normally. An ordinary 4 KB x86_64 image is also suitable. The runtime now shows an
+actionable setup error for experimental 16 KB Intel images. This does not establish
+support for physical ARM64 devices using 16 KB pages.
+
+SDK Manager also needs NDK 27.2.12479018; Gradle pins it for the small native host
+compatibility shim. Sources and GPL notices for the modified x86_64 PRoot loader
+are bundled in the APK. No Linux runtime repackaging is needed for bot UI or
+backend changes.
+
+BotsActivity is the native inbox/profile/thread UI; BotNotifications,
+BotReplyReceiver, BotAlertService and BotAlertActivity handle reply and ringing
+flows. backend/src/bots.ts provides durable queues and routines;
+backend/src/connectors.ts provides MCP stdio and Streamable HTTP clients.
+BotsSmokeTest exercises these together on an emulator using local provider
+fixtures. It requires an empty bot inbox and no real model key, restores provider
+and accessibility settings, and leaves four sample bots after success.
