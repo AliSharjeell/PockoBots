@@ -1,133 +1,217 @@
-# Pocket Agent
+<div align="center">
 
-A native Android coding and Mobile Use app with its own packaged environment.
-Install one APK, let it unpack its included tools, add your model connection,
-create or clone a project, and start coding in chat. An installed Termux app,
-manual backend setup, and pairing tokens are not required.
+# PockoBots
 
-The agent, project files, Bash, Git, Node.js, npm, Python, build tools and
-development servers run on your phone. Model requests go to your BYOK provider;
-this does not bundle an offline language model. Microsoft Dev Tunnels provides
-optional internet sharing for project ports.
+### Personal AI bots that live and work on your Android phone.
 
-**Mobile Use** runs tasks across Android apps using the integrated Artemis native
-helper and a Flash-style on-device task runner. Start a task in chat, and the app
-backgrounds itself while a floating rounded pill shows progress, questions and
-results. Pause, resume, stop, or reply from the panel. Enable accessibility and
-display-over-other-apps permissions once in Android; no computer or ADB is
-required. Model requests use your BYOK provider. See
-[docs/MOBILE_USE.md](docs/MOBILE_USE.md) for setup, privacy and the port's scope.
+An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
-## Bot inbox
+**Free app ? No platform subscription ? Bring your own model ? Local execution**
 
-Version 0.5 opens as a messaging app for local bots. Each bot can code, browse and
-operate your phone from the same chat. Create one with just a name and instructions.
-Chat, project terminal, file browser, model settings and MCP connections live in
-one native interface. The sidebar also provides a shared main terminal and server
-sharing. Markdown and preview links render directly in chat. Bots run in the
-background with unlimited runs by default; Android permissions are explained in
-a first-run checklist. See [bot setup and limits](docs/BOTS.md).
+[Get started](#get-started) ? [See the app](#see-it-in-action) ? [How it compares](#how-it-compares) ? [Build it](#build-from-source)
 
-## Use on your phone
+</div>
 
-1. Install the standalone debug APK for your device: `arm64-v8a` for most current
-   phones, or `x86_64` for a matching emulator/device. Android 8+ is required.
-   The old **v0.1.0 APK still requires Termux**; use a build of v0.2.0 or later.
-2. Open Pocket Agent. First launch unpacks the coding environment from the APK
-   into private app storage. Allow several minutes and approximately 1â€“2 GB of
-   free storage for the tools and your projects. Setup does not download a runtime.
-3. Open **Settings**, choose your API protocol, and enter your base URL, model and
-   key. **Test connection** makes a small inference request; **Save connection**
-   stores it. An empty key retains the saved key for the same provider.
-4. Open **Projects â†’ Create project / clone repository**. Enter a project name and
-   optionally a Git URL. A clone opens the native terminal, including credential
-   prompts for private repositories.
-5. Use **Chat** to build or change your project. File tools operate relative to
-   the selected project. Shell and server tools ask for approval unless you enable
-   trust for the conversation. Trust resets when the runtime restarts.
+Give a bot a name, tell it what to do, and get on with your day. It can build an
+app, run a project, browse the web, operate Android apps, check for updates and
+message you when it needs you?all from the same conversation.
 
-**Terminal** opens an interactive Bash PTY in the selected project directory.
-Use Git, npm, SSH, nano and other included tools. It supports input, resizing,
-colors, cursor control, scrollback, paste, arrow keys, Tab, Escape, Ctrl-C and
-Ctrl-D. Use the **Ctrl** toggle for other shortcuts, such as nano's Ctrl-O and
-Ctrl-X. Long-press the terminal to copy its transcript. Long-running commands
-can run here; **Servers** also offers managed
-development processes with logs, previews and stop controls.
+**Your phone is the computer.** Project files, terminals, Git, Node.js, npm,
+Python and the task runner execute on your device. Install one packaged Android
+app; its included environment sets itself up. No separate Termux installation
+or rented cloud execution machine is required.
 
-**Files** browses and edits project files. **Conversations** reopens saved chats
-for the selected project. Configure your Git name and email in **Settings**
-before committing.
+**PockoBots is free, open-source software. Model usage is separate:** bring your
+own API key and pay your chosen provider, if applicable. The current app does
+not bundle an offline language model. With a cloud provider, model requests
+and relevant conversation, tool output or phone screenshots leave the device.
 
-For internet previews, start your server in **Servers**, choose its port, and use
-**Sign in** followed by **Share this port**. Complete the displayed device login
-in your browser. Tunnel access is private unless you enable anonymous visitors.
-The agent control port cannot be shared through this API. The Dev Tunnels CLI is
-included; an account and internet access are needed for tunnel hosting.
+## What your bots can do
 
-The runtime runs as an Android foreground service with a notification. Closing
-the UI keeps development processes running. **Stop coding environment** or the
-notification's stop action shuts them down. Reopen the app to restart. Android
-may still stop processes under memory or battery pressure.
+| Capability | In your pocket |
+| --- | --- |
+| Build and run software | Edit files, clone repositories, run Git, install dependencies, execute commands and start development servers. |
+| Use your phone | Operate visible Android apps and the browser through the integrated Artemis helper. The bot chooses its tools from the task. |
+| Keep working in the background | Queue tasks, run proactive routines, retain notes and notify you while the app is closed. |
+| Work as a team | Create multiple bots with separate chats and workspaces; bots can delegate bounded tasks to one another. |
+| Connect your tools | Attach selected MCP servers over Streamable HTTP or launch local stdio tools. |
+| Reach you | Reply directly to notifications. Priority alerts can ring on the lock screen; Answer reveals the message and starts an installed offline Android voice. |
+| Share what you build | Open clickable local previews or create a real public Dev Tunnel link after signing in. |
 
-Project files, chats, keys and Git configuration persist in private app storage
-across runtime restarts and upgrades. Uninstalling the app removes them. Provider
-keys are protected by the app sandbox and private file permissions; the backend
-stores them without additional file encryption. Shell commands have full access
-to the app's runtime account. External model calls send the conversation and tool
-results to the configured provider.
+Each conversation has **Chat / Terminal / Files**. The sidebar brings together
+model settings, MCP connections, permissions, server sharing and a shared main
+terminal for your tools and repositories. Markdown, code, tables and links render
+right in chat.
 
-## Build the standalone APK
+Create a bot with just **a name and instructions**. Every bot gets the same
+coding, browsing and phone capabilities. There are no mode switches or default
+daily run caps.
 
-For editing and debugging the app directly in Android Studio, see
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+## Built around the phone you already carry
 
-Requirements: Linux or WSL, Docker (with ARM64 emulation for cross builds), Python
-3, curl, dpkg-deb, patchelf, JDK 17, Gradle 8.11.1 and Android SDK 35.
+Your phone is already with you throughout the day. PockoBots uses that hardware
+for persistent personal agents, with background services, durable queues,
+proactive checks and notifications. You do not need to keep a laptop open or
+provision a remote machine for task execution.
+
+Background operation is on by default. Android can still stop work after
+force-stop, shutdown, battery restrictions or low memory, so **uninterrupted
+24/7 operation is not guaranteed**. Phone UI actions require an unlocked screen
+and the relevant Android permissions; priority alerts can appear while locked
+when Android permits them.
+
+## How it compares
+
+PockoBots is for people who want to own the execution environment and choose
+the model behind their personal bots. It is an independent project, not an
+affiliated client or a promise of identical features.
+
+| Product | Price / access snapshot | What you are choosing |
+| --- | --- | --- |
+| **PockoBots** | **$0 platform subscription.** BYOK model charges are separate. | Open-source Android app; files, shell tools and app actions execute on your own phone. No PockoBots account or country rollout gate. Your provider and connected services have their own availability rules. |
+| **Grok Bot** | Premium is listed at **$30/month**; other eligible plans may include access. | Grok Bot's computer, scheduled routines and included bot usage. [Official product and pricing](https://x.ai/bot). |
+| **Dots** | Individual access includes eligible Pro tiers, starting at **$100/month**. | ChatGPT's personal agent, subject to plan eligibility and rollout. [Official access guide](https://learn.chatgpt.com/docs/dots) ? [Official Pro pricing](https://learn.chatgpt.com/docs/pricing). |
+| **Muse** | Free for many uses, with optional paid plans; regional rollout. | Meta's personal agent and cloud VM. Availability has expanded beyond North America, including [Japan](https://about.fb.com/ja/news/2026/10/muse-personal-ai-agent-launches-in-japan/) and [Singapore](https://about.fb.com/news/2026/10/muse-is-now-available-in-singapore-the-worlds-first-personal-ai-agent-built-for-everyone/). |
+
+Comparison checked **October 28, 2026**. Listed dollar prices are USD; vendor
+plans, included usage and availability can change. PockoBots has no software
+subscription, but inference, internet access and external services can cost money.
+
+## See it in action
+
+Actual Android emulator captures using local test fixtures:
+
+<table>
+<tr>
+<td align="center"><img src="docs/images/v0.5-chat.png" width="260" alt="Bot chat with rendered Markdown, a table and a clickable preview link"><br>One conversation</td>
+<td align="center"><img src="docs/images/v0.5-files.png" width="260" alt="Native project file browser inside the bot interface"><br>Your project files</td>
+<td align="center"><img src="docs/images/v0.5-browser.png" width="260" alt="Bot using the real Android browser with its floating progress island"><br>Real phone control</td>
+</tr>
+</table>
+
+[More screenshots: sidebar, terminals, settings and setup](docs/UI.md).
+
+## Try a task
+
+- ?Build me a to-do app in HTML, CSS and JavaScript. Run it and give me a preview link.?
+- ?Clone this repository, investigate the failing tests, and show me the fix.?
+- ?Open the phone browser, research these options, and summarize what you find.?
+- ?Check this project every morning and notify me when something needs attention.?
+
+Bots report tool results, ask for missing information and keep their work in
+separate project directories. Phone actions share one device and take turns.
+Repeated app/page reopening pauses instead of looping indefinitely.
+
+## Get started
+
+1. **Install a current standalone APK.** Use `arm64-v8a` for most Android phones
+   or `x86_64` for a matching emulator. Android 8+ is required; phone screenshots
+   require Android 11+. Existing APKs may still display the name **Pocket Agent**.
+2. **Let the included environment unpack.** Allow several minutes and roughly
+   1?2 GB of free storage for tools and projects. Runtime setup uses the files
+   packaged in the APK.
+3. **Follow Setup & permissions.** Enable notifications, phone Accessibility,
+   the floating island and full-screen alerts as needed. Install offline Android
+   voice data if you want answered alerts read aloud. Android requires you to
+   grant its permissions yourself.
+4. **Connect your model.** Open Settings, choose an OpenAI-compatible or
+   Anthropic-compatible protocol, then save your base URL, model and API key.
+   Phone/browser tasks need a model that can handle the supplied screen input.
+5. **Create a bot and send a task.** Use its Terminal and Files tabs, or open
+   Main terminal from the sidebar to manage shared CLIs and repositories.
+
+Current builds can be obtained from successful [GitHub Actions runs](https://github.com/AliSharjeell/PockoBots/actions/workflows/build.yml)
+or built from source below. Artifacts expire and may require GitHub sign-in.
+**The historical v0.1.0 release is a legacy Termux preview, not the current
+standalone bot app.**
+
+Shell commands without per-command prompts and ringing access are enabled by
+default. Per-bot preferences let you change these settings. Provider keys live
+in private app storage without additional file encryption; shell tools have
+access to the app's runtime account. See [bot setup and behavior](docs/BOTS.md)
+and [phone-control permissions and privacy](docs/MOBILE_USE.md).
+
+### Open a preview on another phone
+
+A `127.0.0.1` preview opens on the device hosting the project. To reach an emulator
+or phone server from another device, open **Servers & sharing**, sign in to
+Microsoft Dev Tunnels and share the server's port. Use the actual public URL
+shown in the logs. Public sharing needs internet access and the tunnel provider's
+account; the agent control port cannot be shared through this API.
+
+## What is local?
+
+| Runs or stays on your phone | Uses your chosen connection |
+| --- | --- |
+| Agent orchestration, queues and routine scheduling | Model inference through your configured BYOK endpoint |
+| Project files, chat storage and bot notes | Remote MCP tools, connected websites and external APIs |
+| Bash, Git, Node.js, npm, Python and development servers | Git hosting, package downloads and optional public tunnels |
+| Artemis actions and the native floating island | Screen images/text sent to the model for phone tasks |
+| Installed offline Android TTS voices | Any service you explicitly connect |
+
+**Local execution does not mean offline inference.** No PockoBots-hosted backend
+is needed for execution, but the current app requires a working model endpoint
+for AI tasks. Installing the app alone does not provide a free offline model.
+
+## Build from source
 
 ```bash
-python3 runtime/package.py arm64   # phone runtime, or amd64 for x86_64
-cd android
-gradle --no-daemon :app:assembleDebug :app:lintDebug
-```
-
-Output: `android/app/build/outputs/apk/debug/app-debug.apk`. Runtime packaging
-uses a Debian/Node image and checksum-pinned Android PRoot packages. The APK
-contains the runtime archive and executable libraries; no phone-side installer
-commands are needed. A build fails if the runtime is missing. `-PcompileOnly` is
-available for source compilation/lint during development, and must not be used
-to distribute an APK.
-
-If both runtime architectures are generated, the default APK contains both.
-Use `gradle :app:assembleDebug -PruntimeAbi=arm64-v8a` (or `x86_64`) for a smaller
-APK containing only the selected architecture. Rename or copy the resulting APK
-before building another architecture, since both builds use the same output path.
-
-GitHub Actions builds separate ARM64 and x86_64 APK artifacts and runs the
-packaged runtime smoke test in an Android emulator. To test locally with a
-connected x86_64 emulator and its matching runtime:
-
-```bash
-cd android
-gradle --no-daemon :app:connectedDebugAndroidTest
-```
-
-Backend checks (run in Linux for POSIX shell and PTY tests):
-
-```bash
+gh repo clone AliSharjeell/PockoBots
+cd PockoBots
 npm ci
+npm run check
+npm run build:android
+```
+
+Use Node.js **22.19+**, JDK **17**, Android SDK **35** and NDK **27.2.12479018**.
+The Gradle wrapper selects Gradle 8.11.1. A fresh checkout also needs the packaged
+Linux runtime; generate it on Linux/WSL with Docker, Python 3, curl, dpkg-deb and
+patchelf:
+
+```bash
+python3 runtime/package.py arm64   # use amd64 for an x86_64 emulator
+cd android
+./gradlew :app:assembleDebug :app:lintDebug -PruntimeAbi=arm64-v8a
+```
+
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
+For x86_64, package `amd64` and build with `-PruntimeAbi=x86_64`. Copy the APK
+before building another ABI; both use the same output path.
+
+For day-to-day development, open **the `android` directory** in Android Studio,
+select a running emulator and click Run. [Development guide](docs/DEVELOPMENT.md)
+covers source edits, logs, isolated QA builds and the experimental 16 KB Intel
+emulator workaround. Physical ARM64 and ARM64 16 KB support have not been
+established by the current emulator testing.
+
+Backend checks run on Linux/WSL:
+
+```bash
 npm run check
 npm test
 npm run build
 ```
 
-The browser UI and standalone Node backend remain available for development.
-The Android UI is native Java and does not load a WebView. Previous external
-Termux installation instructions are archived in [docs/LEGACY_TERMUX.md](docs/LEGACY_TERMUX.md).
-See [docs/VERIFICATION.md](docs/VERIFICATION.md) for validation and remaining
-device coverage.
+The native Android UI does not use a WebView. The standalone Node backend and
+browser UI remain available for development.
 
-Pocket Agent source is MIT licensed. Terminal emulator/renderer sources retain
-their upstream license and notices under `android/terminal`. Runtime components
-retain their own licenses, including Debian package copyright files and npm
-package licenses. PRoot and its libraries are separately licensed; see
-[runtime/NOTICE.md](runtime/NOTICE.md) for upstream sources and versions.
+## Project status
+
+PockoBots is preview software. Version 0.5's verification includes **20 backend
+checks** and **four Android test journeys** on a Pixel 10 Pro XL API 37 emulator
+in 4 KB mode. Coverage includes mixed coding/phone tasks, real terminals, Git,
+npm servers, MCP, Markdown, notification replies, ringing alerts and restart
+behavior. Real paid providers and authenticated public tunnel creation were not
+part of the local-fixture checks.
+
+Read [verification details](docs/VERIFICATION.md), [bot behavior](docs/BOTS.md),
+[development setup](docs/DEVELOPMENT.md) and the [OpenBot research notes](docs/OPENBOT_RESEARCH.md).
+
+## License and credits
+
+PockoBots application source is [MIT licensed](LICENSE). Included components keep
+their own licenses: the terminal implementation, Artemis helper, PRoot, Debian
+packages, native libraries and JavaScript/Markdown dependencies. See
+[runtime notices](runtime/NOTICE.md), [Artemis provenance](third_party/artemis/UPSTREAM.md)
+and bundled license notices. OpenBot informed the product research; its source
+was not copied into this MIT project.
