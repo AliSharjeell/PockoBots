@@ -6,7 +6,7 @@ import type { Sessions } from "./sessions.js";
 import type { MobileTasks } from "./mobile-tasks.js";
 import type { Connectors } from "./connectors.js";
 
-export type Bot = { id: string; name: string; role: string; kind: "coding" | "phone" | "browser"; projectId: string; sessionId: string;
+export type Bot = { id: string; name: string; role: string; memory: string; kind: "coding" | "phone" | "browser"; projectId: string; sessionId: string;
   enabled: boolean; allowShell: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
   dailyLimit: number; day: string; runs: number; created: number };
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
@@ -56,7 +56,7 @@ export class Bots {
   async create(input: any) {
     if (this.records.length >= 12) throw Error("Bot limit reached (12)"); const b = this.input(input); const id = randomUUID();
     const project = await this.projects.create("bot-" + id.slice(0, 8)); const session = await this.sessions.create(project.id);
-    const bot: Bot = { id, name: b.name.trim(), role: b.role, kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
+    const bot: Bot = { id, name: b.name.trim(), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
       allowShell: b.allowShell === true, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
       nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
     this.records.push(bot); this.message(id, "system", `${bot.name} is ready. ${bot.kind === "coding" ? "I have my own coding workspace." : "Phone tasks use the floating island and take turns with other bots."}`); await this.changed(); return bot;
@@ -90,9 +90,10 @@ export class Bots {
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
     const tools = await this.connectors.tools(bot.connectors);
+    tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
       if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1); return { content: [{ type: "text", text: "Queued task " + queued.id }], details: {} }; } });
-    return { instructions: `Your name is ${bot.name}. ${bot.role}\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nFor routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
+    return { instructions: `Your name is ${bot.name}. ${bot.role}\nYour durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nFor routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
   }
   private async finish(job: BotJob, status: "completed" | "failed" | "paused", output: string) {
     job.status = status; job.updated = Date.now(); job.output = this.redact(output).slice(0, 24000);
