@@ -5,6 +5,7 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createApp } from "../src/server.js";
+import { Bots } from "../src/bots.js";
 import { botContext } from "../src/sessions.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -63,4 +64,31 @@ test("MCP stdio starts a real local tool server and closes it",async()=>{
 test("bot context keeps complete tool groups and bounds history",()=>{
   const messages:any[]=[{role:"user",content:"old"},{role:"assistant",content:[{type:"toolCall",id:"call",name:"read",arguments:{}}]},{role:"toolResult",toolCallId:"call",content:[{type:"text",text:"x".repeat(5000)}]},{role:"user",content:"recent"},{role:"assistant",content:[{type:"text",text:"latest"}]}];
   const kept=botContext(messages,1000);assert.equal(kept.length,2);assert.equal(kept[0].role,"user");assert.equal((kept[0] as any).content,"recent");
+});
+
+
+test("proactive checks coalesce missed intervals, honor daily limits and keep NO_UPDATE quiet",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"pocket-routines-"));const store=new Store(root);await store.init();let runs=0;
+  const sessions:any={create:async()=>({id:randomUUID()}),stop:()=>{},setTrust:()=>{},prompt:async()=>{runs++;},state:()=>({busy:false,messages:[{role:"assistant",content:[{type:"text",text:"NO_UPDATE"}]}]})};
+  const bots=new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
+  await bots.init();try{
+    const bot=await bots.create({name:"Watcher",role:"Check updates",kind:"coding",intervalMinutes:15,heartbeat:"Check now",dailyLimit:1});await bots.engine(true);
+    const late=bot.nextWake+4*60*60000;await bots.tick(late);assert.equal(runs,1);assert.equal(bots.state(bot.id).jobs.length,1);assert.equal(bot.nextWake,late+15*60000);
+    await bots.tick(late+1000);assert.equal(bots.state(bot.id).jobs[0].status,"completed");assert.equal(bots.state(bot.id).messages.filter(m=>m.role==="assistant").length,0);
+    await bots.tick(late+16*60000);assert.equal(runs,1);assert.equal(bots.state(bot.id).jobs.length,1);
+    await bots.tick(late+24*60*60000);assert.equal(runs,2);assert.equal(bots.state(bot.id).jobs.length,2);
+  }finally{await bots.close();await rm(root,{recursive:true,force:true});}
+});
+
+test("ringing alerts require per-bot consent, persist acknowledgements and rate-limit rings",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"pocket-alerts-"));const app=await createApp({stateDir:join(root,"state"),workspace:join(root,"workspace"),port:18878});
+  try{
+    const bot=await app.bots.create({name:"Notifier",role:"Notify me",kind:"coding"});
+    await assert.rejects(app.bots.alert(bot.id,"Please check",true),/disabled/);
+    const ordinary=await app.bots.alert(bot.id,"An update",false);assert.equal(app.bots.pendingAlerts().length,1);await app.bots.acknowledgeAlert(ordinary.id);assert.equal(app.bots.pendingAlerts().length,0);
+    await app.bots.update(bot.id,{allowUrgent:true});const urgent=await app.bots.alert(bot.id,"Time sensitive update",true);assert.equal(urgent.urgent,true);
+    await app.bots.acknowledgeAlert(urgent.id);await assert.rejects(app.bots.alert(bot.id,"Ring again",true),/ten minutes/);
+    const persisted=JSON.parse(await readFile(join(root,"state/bots.json"),"utf8"));assert.equal(persisted.alerts.find((a:any)=>a.id===urgent.id).acknowledged,true);
+    for(let i=0;i<10;i++)await app.bots.alert(bot.id,"Queued update "+i,false);await assert.rejects(app.bots.alert(bot.id,"Too many",false),/unread/);
+  }finally{await app.close();await rm(root,{recursive:true,force:true});}
 });
