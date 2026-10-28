@@ -55,9 +55,9 @@ tasks.register('buildProotLoader', Exec) {
         new File(android.sdkDirectory, "ndk/${android.ndkVersion}").absolutePath,
         file('src/main/jniLibs/x86_64/libproot-loader.so').absolutePath
 }
-tasks.named('verifyPackagedRuntime').configure { dependsOn 'buildProotLoader' }
 
 tasks.register('verifyPackagedRuntime') {
+    dependsOn 'buildProotLoader'
     doLast {
         if (!project.hasProperty('compileOnly')) {
             if (!file('src/main/assets/backend/server.js').exists()) throw new GradleException('Generate the packaged backend with npm ci && npm run build:android, or runtime/package.py.')
