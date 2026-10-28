@@ -25,8 +25,8 @@ final class MobileMockModel implements AutoCloseable {
             if(screen!=null){StringBuilder labels=new StringBuilder(screen.optString("package")+" | ");JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(!elements.getJSONObject(i).optString("text").isEmpty())labels.append(elements.getJSONObject(i).optString("text")).append(" | ");observedLabels=labels.toString();}
             if(turn==0||turn==2||turn==4||turn==6)name="observe_screen";
             else if(turn==1){name="manage_app";args.put("screen_id",screen.getString("screen_id")).put("app_name","com.android.settings");}
-            else if(turn==3){name="click";int target=-1;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery")){target=elements.getJSONObject(i).getInt("index");break;}
-                if(target<0){stage=2;name="wait_for_delay";args.put("milliseconds",750);}
+            else if(turn==3){name="click";int target=-1;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery")||elements.getJSONObject(i).optString("text").equals("Battery & charging")){target=elements.getJSONObject(i).getInt("index");break;}
+                if(target<0){stage=2;name="swipe";args.put("screen_id",screen.getString("screen_id")).put("from",new JSONArray().put(500).put(800)).put("to",new JSONArray().put(500).put(300));}
                 else args.put("screen_id",screen.getString("screen_id")).put("target",target);}
             else if(turn==5){boolean batteryPage=false;JSONArray elements=screen.getJSONArray("elements");for(int i=0;i<elements.length();i++)if(elements.getJSONObject(i).optString("text").equals("Battery usage"))batteryPage=true;
                 if(!batteryPage){stage=4;name="wait_for_delay";args.put("milliseconds",750);}else{name="ask_user";args.put("question","Battery is open. Say ready to finish.");}}
