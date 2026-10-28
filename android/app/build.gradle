@@ -36,6 +36,7 @@ android {
         defaultConfig.ndk.abiFilters.add(runtimeAbi)
         sourceSets.main.assets.setSrcDirs([layout.buildDirectory.dir("generated/runtimeAssets/${runtimeAbi}")])
     } else { defaultConfig.ndk.abiFilters.addAll(['arm64-v8a', 'x86_64']) }
+    sourceSets.main.assets.srcDir '../../third_party/proot-loader/assets'
     packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
 }
 dependencies {
@@ -43,6 +44,18 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
 }
+
+tasks.register('buildProotLoader', Exec) {
+    onlyIf { runtimeAbi == null || runtimeAbi == 'x86_64' }
+    workingDir repoRoot
+    inputs.dir new File(repoRoot, 'third_party/proot-loader')
+    inputs.file new File(repoRoot, 'scripts/build-proot-loader.mjs')
+    outputs.file file('src/main/jniLibs/x86_64/libproot-loader.so')
+    commandLine 'node', new File(repoRoot, 'scripts/build-proot-loader.mjs').absolutePath,
+        new File(android.sdkDirectory, "ndk/${android.ndkVersion}").absolutePath,
+        file('src/main/jniLibs/x86_64/libproot-loader.so').absolutePath
+}
+tasks.named('verifyPackagedRuntime').configure { dependsOn 'buildProotLoader' }
 
 tasks.register('verifyPackagedRuntime') {
     doLast {
