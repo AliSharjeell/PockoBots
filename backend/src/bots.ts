@@ -85,6 +85,7 @@ export class Bots {
     } await this.changed();
   }
   async resume(id: string) { const bot = this.get(id); bot.enabled = true; for (const j of this.jobs.filter(j => j.botId === id && j.status === "paused")) { j.status = "queued"; j.error = undefined; } await this.changed(); }
+  async runRoutine(id: string) { const bot = this.get(id); if (!bot.intervalMinutes || !bot.heartbeat) throw Error("Configure a proactive routine first"); return this.enqueue(id, bot.heartbeat, "routine"); }
   async cancel(id: string, jobId: string) { const bot = this.get(id); const job = this.jobs.find(j => j.id === jobId && j.botId === id); if (!job) throw Error("Task not found"); if (["completed", "failed", "cancelled"].includes(job.status)) return; job.status = "cancelled"; if (job.mobileTaskId) await this.mobile.interrupt(job.mobileTaskId, true); if (this.jobs.every(j => j.botId !== id || !["running", "waiting"].includes(j.status))) this.sessions.stop(bot.sessionId); await this.changed(); }
   phoneRequest() { if (!this.enabled) return null; const j = this.jobs.find(j => j.status === "arming" && this.get(j.botId).enabled); return j ? { taskId: j.mobileTaskId, botName: this.get(j.botId).name } : null; }
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }

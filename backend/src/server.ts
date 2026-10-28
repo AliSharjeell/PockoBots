@@ -161,6 +161,7 @@ export async function createApp(options: {
   app.post("/api/bots/:id/messages", async (req, res) => res.status(202).json(await bots.enqueue(req.params.id, req.body.text)));
   app.post("/api/bots/:id/pause", async (req, res) => { await bots.pause(req.params.id); res.json({ ok: true }); });
   app.post("/api/bots/:id/resume", async (req, res) => { await bots.resume(req.params.id); res.json({ ok: true }); });
+  app.post("/api/bots/:id/routine/run", async (req, res) => res.status(202).json(await bots.runRoutine(req.params.id)));
   app.post("/api/bots/:id/jobs/:job/cancel", async (req, res) => { await bots.cancel(req.params.id, req.params.job); res.json({ ok: true }); });
   app.get("/api/connectors", (_req, res) => res.json(connectors.list()));
   app.post("/api/connectors", async (req, res) => { if (sessions.anyBusy() || mobile.anyBusy()) throw Error("Pause agents before changing connections"); res.status(201).json(await connectors.save(req.body)); });
