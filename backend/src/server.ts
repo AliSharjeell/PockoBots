@@ -153,6 +153,7 @@ export async function createApp(options: {
   app.get("/api/bots", (_req, res) => res.type("json").send(redact({ enabled: bots.enabled, bots: bots.list() })));
   app.put("/api/bots/engine", async (req, res) => { await bots.engine(req.body.enabled); res.json({ enabled: bots.enabled }); });
   app.get("/api/bots/phone", (_req, res) => res.json(bots.phoneRequest()));
+  app.post("/api/bots/phone/ready", (req, res) => { bots.armPhone(req.body.taskId); res.json({ ok: true }); });
   app.post("/api/bots", async (req, res) => res.status(201).json(await bots.create(req.body)));
   app.get("/api/bots/:id", (req, res) => res.type("json").send(redact(bots.state(req.params.id))));
   app.put("/api/bots/:id", async (req, res) => res.json(await bots.update(req.params.id, req.body)));

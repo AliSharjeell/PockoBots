@@ -18,6 +18,7 @@ export class Bots {
   enabled = false;
   private records: Bot[] = []; private jobs: BotJob[] = []; private messages: Message[] = [];
   private timer?: ReturnType<typeof setInterval>; private ticking = false; private closing = false;
+  private armed = new Set<string>();
   constructor(private store: Store, private projects: Projects, private sessions: Sessions, private mobile: MobileTasks,
     private connectors: Connectors, private publish: (value: unknown) => void, private redact: (text: string) => string) {}
   async init() {
@@ -86,6 +87,7 @@ export class Bots {
   async resume(id: string) { const bot = this.get(id); bot.enabled = true; for (const j of this.jobs.filter(j => j.botId === id && j.status === "paused")) { j.status = "queued"; j.error = undefined; } await this.changed(); }
   async cancel(id: string, jobId: string) { const bot = this.get(id); const job = this.jobs.find(j => j.id === jobId && j.botId === id); if (!job) throw Error("Task not found"); if (["completed", "failed", "cancelled"].includes(job.status)) return; job.status = "cancelled"; if (job.mobileTaskId) await this.mobile.interrupt(job.mobileTaskId, true); if (this.jobs.every(j => j.botId !== id || !["running", "waiting"].includes(j.status))) this.sessions.stop(bot.sessionId); await this.changed(); }
   phoneRequest() { if (!this.enabled) return null; const j = this.jobs.find(j => j.status === "arming" && this.get(j.botId).enabled); return j ? { taskId: j.mobileTaskId, botName: this.get(j.botId).name } : null; }
+  armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
     const tools = await this.connectors.tools(bot.connectors);
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
@@ -106,7 +108,7 @@ export class Bots {
           const task = this.mobile.state(job.mobileTaskId);
           if (["completed", "failed", "paused", "stopped"].includes(task.status) && !(job.status === "arming" && task.status === "paused")) { await this.finish(job, task.status === "completed" ? "completed" : task.status === "paused" ? "paused" : "failed", task.error || task.output); continue; }
           if (job.status === "arming") {
-            try { const health = await this.mobile.health(); if (health.ready && health.task_allowed) { await this.mobile.start(task.id, undefined, await this.profile(bot, job)); job.status = "running"; await this.changed(); } }
+            try { const health = await this.mobile.health(); if (health.ready && health.task_allowed && this.armed.has(task.id)) { await this.mobile.start(task.id, undefined, await this.profile(bot, job)); this.armed.delete(task.id); job.status = "running"; await this.changed(); } }
             catch (e) { job.error = this.redact(String(e)); }
             if (job.status === "arming" && now - job.updated > 30000) await this.finish(job, "paused", job.error || "Enable Accessibility and floating windows, then resume this bot.");
           } else if (job.status !== task.status && ["running", "waiting"].includes(task.status)) { job.status = task.status as "running" | "waiting"; await this.changed(); }
