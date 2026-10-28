@@ -16,6 +16,8 @@ import { Sessions } from "./sessions.js";
 import { Projects } from "./projects.js";
 import { Terminals } from "./terminals.js";
 import { MobileTasks } from "./mobile-tasks.js";
+import { Connectors } from "./connectors.js";
+import { Bots } from "./bots.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -40,11 +42,12 @@ export async function createApp(options: {
   const projects = new Projects(store, workspace);
   await projects.init();
   const clients = new Set<Response>();
+  const connectors = new Connectors(store); await connectors.init();
   const redact = (value: unknown) => {
     const json = JSON.stringify(value);
-    return settings.apiKey
+    return connectors.redact(settings.apiKey
       ? json.split(settings.apiKey).join("[redacted]")
-      : json;
+      : json);
   };
   const publish = (e: unknown) => {
     const data = `data: ${redact(e)}\n\n`;
@@ -63,6 +66,8 @@ export async function createApp(options: {
   await sessions.init();
   const mobile = new MobileTasks(store, () => settings, token, publish, options.mobileBridgeBase);
   await mobile.init();
+  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text));
+  await bots.init();
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -107,6 +112,7 @@ export async function createApp(options: {
       jobs: [...processes.jobs.values()],
       projects: projects.list(),
       mobileTasks: mobile.list(),
+      bots: bots.list(), botEngineEnabled: bots.enabled, connectors: connectors.list(),
     }),
   );
   app.get("/api/events", (req, res) => {
@@ -144,6 +150,21 @@ export async function createApp(options: {
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
+  app.get("/api/bots", (_req, res) => res.type("json").send(redact({ enabled: bots.enabled, bots: bots.list() })));
+  app.put("/api/bots/engine", async (req, res) => { await bots.engine(req.body.enabled); res.json({ enabled: bots.enabled }); });
+  app.get("/api/bots/phone", (_req, res) => res.json(bots.phoneRequest()));
+  app.post("/api/bots", async (req, res) => res.status(201).json(await bots.create(req.body)));
+  app.get("/api/bots/:id", (req, res) => res.type("json").send(redact(bots.state(req.params.id))));
+  app.put("/api/bots/:id", async (req, res) => res.json(await bots.update(req.params.id, req.body)));
+  app.delete("/api/bots/:id", async (req, res) => { await bots.remove(req.params.id); res.json({ ok: true }); });
+  app.post("/api/bots/:id/messages", async (req, res) => res.status(202).json(await bots.enqueue(req.params.id, req.body.text)));
+  app.post("/api/bots/:id/pause", async (req, res) => { await bots.pause(req.params.id); res.json({ ok: true }); });
+  app.post("/api/bots/:id/resume", async (req, res) => { await bots.resume(req.params.id); res.json({ ok: true }); });
+  app.post("/api/bots/:id/jobs/:job/cancel", async (req, res) => { await bots.cancel(req.params.id, req.params.job); res.json({ ok: true }); });
+  app.get("/api/connectors", (_req, res) => res.json(connectors.list()));
+  app.post("/api/connectors", async (req, res) => { if (sessions.anyBusy() || mobile.anyBusy()) throw Error("Pause agents before changing connections"); res.status(201).json(await connectors.save(req.body)); });
+  app.post("/api/connectors/:id/test", async (req, res) => res.json(await connectors.inspect(req.params.id)));
+  app.delete("/api/connectors/:id", async (req, res) => { if (sessions.anyBusy() || mobile.anyBusy()) throw Error("Pause agents before changing connections"); await connectors.remove(req.params.id); res.json({ ok: true }); });
   app.get("/api/mobile/health", async (_req, res) => res.json(await mobile.health()));
   app.get("/api/mobile/tasks", (_req, res) => res.type("json").send(redact(mobile.list())));
   app.post("/api/mobile/tasks", async (req, res) => res.status(201).json(await mobile.create(req.body.prompt)));
@@ -303,7 +324,9 @@ export async function createApp(options: {
     sessions,
     processes,
     mobile,
+    bots, connectors,
     close: () => {
+      void bots.close().finally(() => connectors.close());
       sessions.stopAll();
       processes.stopAll();
       terminals.stopAll();
