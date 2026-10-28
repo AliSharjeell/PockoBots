@@ -106,14 +106,17 @@ using a binary-safe subprocess stream. Reviewed captures are also checked into
 
 The experimental Android 17/API 37.2 ps16k x86_64 image fails with the packaged
 4 KB Linux runtime. This caused Environment stopped (255). For this existing
-Pixel AVD, start it in Android Studio, then from the repository root run:
+Pixel AVD, run this from the repository root (the script also starts it when off):
 
 ```powershell
 .\scripts\start-pixel-dev.ps1
 ```
 
-The script verifies the AVD name, restarts the same emulator with page_shift=12,
-and preserves user data. Wait for boot, then select it and Run in Android Studio.
+The script starts the selected AVD if needed, verifies its name, restarts it with
+page_shift=12 when required, and waits for Android to boot with 4096-byte pages.
+It preserves user data and leaves an already working 4 KB emulator running.
+Select that running device and Run in Android Studio. From a terminal inside
+the android directory, use `..\scripts\start-pixel-dev.ps1` instead.
 It starts without snapshots, so repeat this after launching the experimental AVD
 normally. An ordinary 4 KB x86_64 image is also suitable. The runtime now shows an
 actionable setup error for experimental 16 KB Intel images. This does not establish
