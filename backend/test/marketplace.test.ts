@@ -4,6 +4,8 @@ import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import http from 'node:http';
+import express from 'express';
+import {registerMarketplaceCallback,registerMarketplaceApi} from '../src/marketplace-routes.js';
 import {Store} from '../src/storage.js';
 import {Connectors} from '../src/connectors.js';
 import {marketplaceCatalog,installMarketplace,listMarketplace} from '../src/marketplace.js';
@@ -33,5 +35,17 @@ test('MCP OAuth performs PKCE browser handoff, stores tokens privately and rejec
  await assert.rejects(connectors.finishOAuth('wrong','owner-approved'),/state/);assert.equal(exchanges,0);const finish=await connectors.finishOAuth(state,'owner-approved');assert.equal(finish.status,'authorized');assert.equal(exchanges,1);await assert.rejects(connectors.finishOAuth(state,'owner-approved'),/state/);assert.equal(exchanges,1);
  assert.equal(JSON.stringify(connectors.list()).includes('private-access-token'),false);assert.equal(connectors.redact('private-access-token private-refresh-token'),'[redacted] [redacted]');assert.equal(connectors.list()[0].authStatus,'authorized');
  const persisted=JSON.parse(await readFile(join(directory,'connectors.json'),'utf8'));assert.equal(persisted[0].oauthData.tokens.access_token,'private-access-token');assert.equal(persisted[0].oauthData.verifier,undefined);
+ }finally{await connectors.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(directory,{recursive:true,force:true});}
+});
+
+
+test('marketplace mutations stay behind bearer auth and callback rejects foreign hosts',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pocko-market-routes-'));const store=new Store(directory);await store.init();const connectors=new Connectors(store);await connectors.init();const app=express();app.use(express.json());const server=http.createServer(app);await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const port=(server.address() as any).port;
+ registerMarketplaceCallback(app,connectors,port);app.use((req,res,next)=>{if(req.headers.authorization!=='Bearer fixture'){res.status(401).json({error:'unauthorized'});return;}next();});registerMarketplaceApi(app,connectors);app.use((error:any,_req:any,res:any,_next:any)=>res.status(400).json({error:String(error.message)}));
+ try{const base='http://127.0.0.1:'+port;
+ assert.equal((await fetch(base+'/api/marketplace')).status,401);
+ const allowed=await fetch(base+'/api/marketplace',{headers:{Authorization:'Bearer fixture'}});assert.equal(allowed.status,200);assert.equal(((await allowed.json()) as any[]).length,31);
+ const callback=await fetch(base+'/api/oauth/mcp/callback?state=bad&code=bad');assert.equal(callback.status,400);assert.match(await callback.text(),/Authorization could not/);assert.equal(callback.headers.get('cache-control'),'no-store');
+ const result=await fetch(base+'/api/marketplace/notion/install',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:'{}'});assert.equal(result.status,201);assert.equal(((await result.json()) as any).status,'configured');
  }finally{await connectors.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(directory,{recursive:true,force:true});}
 });
