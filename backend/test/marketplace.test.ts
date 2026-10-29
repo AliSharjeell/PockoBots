@@ -45,6 +45,7 @@ test('marketplace mutations stay behind bearer auth and callback rejects foreign
  try{const base='http://127.0.0.1:'+port;
  assert.equal((await fetch(base+'/api/marketplace')).status,401);
  const allowed=await fetch(base+'/api/marketplace',{headers:{Authorization:'Bearer fixture'}});assert.equal(allowed.status,200);assert.equal(((await allowed.json()) as any[]).length,31);
+ const foreignStatus=await new Promise<number>((resolve,reject)=>{const request=http.get(base+'/api/oauth/mcp/callback?state=bad&code=bad',{headers:{Host:'foreign.example'}},response=>{response.resume();resolve(response.statusCode!);});request.on('error',reject);});assert.equal(foreignStatus,403);
  const callback=await fetch(base+'/api/oauth/mcp/callback?state=bad&code=bad');assert.equal(callback.status,400);assert.match(await callback.text(),/Authorization could not/);assert.equal(callback.headers.get('cache-control'),'no-store');
  const result=await fetch(base+'/api/marketplace/notion/install',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:'{}'});assert.equal(result.status,201);assert.equal(((await result.json()) as any).status,'configured');
  }finally{await connectors.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(directory,{recursive:true,force:true});}
