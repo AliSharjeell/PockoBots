@@ -17,6 +17,9 @@ import { Projects } from "./projects.js";
 import { Terminals } from "./terminals.js";
 import { MobileTasks } from "./mobile-tasks.js";
 import { Connectors } from "./connectors.js";
+import { Groups } from "./groups.js";
+import { registerProviderRoutes } from "./providers.js";
+import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
@@ -42,7 +45,7 @@ export async function createApp(options: {
   const projects = new Projects(store, workspace);
   await projects.init();
   const clients = new Set<Response>();
-  const connectors = new Connectors(store); await connectors.init();
+  const connectors = new Connectors(store, `http://127.0.0.1:${port}/api/oauth/mcp/callback`); await connectors.init();
   const redact = (value: unknown) => {
     const json = JSON.stringify(value);
     return connectors.redact(settings.apiKey
@@ -68,6 +71,7 @@ export async function createApp(options: {
   await mobile.init();
   const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text));
   await bots.init();
+  const groups = new Groups(store,bots,publish,text=>connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)); await groups.init();
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -94,6 +98,7 @@ export async function createApp(options: {
     next();
   });
   app.use(express.json({ limit: "2mb" }));
+  registerMarketplaceCallback(app,connectors,port);
   app.use("/api", (req, res, next) => {
     const candidate = req.headers.authorization?.replace(/^Bearer /, "") || "";
     const digest = (x: string) => createHash("sha256").update(x).digest();
@@ -112,7 +117,7 @@ export async function createApp(options: {
       jobs: [...processes.jobs.values()],
       projects: projects.list(),
       mobileTasks: mobile.list(),
-      bots: bots.list(), botEngineEnabled: bots.enabled, connectors: connectors.list(),
+      groups: groups.list(), bots: bots.list(), botEngineEnabled: bots.enabled, connectors: connectors.list(),
     }),
   );
   app.get("/api/events", (req, res) => {
@@ -150,6 +155,15 @@ export async function createApp(options: {
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
+  registerProviderRoutes(app,{port,root:workspace.root,processes,terminals,token});
+  registerMarketplaceApi(app,connectors,()=>sessions.anyBusy()||mobile.anyBusy());
+  app.get("/api/groups",(_req,res)=>res.type("json").send(redact(groups.list())));
+  app.post("/api/groups",async(req,res)=>res.status(201).json(await groups.create(req.body.name,req.body.botIds)));
+  app.get("/api/groups/:id",(req,res)=>res.type("json").send(redact(groups.state(req.params.id))));
+  app.put("/api/groups/:id",async(req,res)=>res.json(await groups.update(req.params.id,req.body.name,req.body.botIds)));
+  app.delete("/api/groups/:id",async(req,res)=>{await groups.remove(req.params.id);res.json({ok:true});});
+  app.post("/api/groups/:id/messages",async(req,res)=>res.status(202).json(await groups.send(req.params.id,req.body.text,req.body.botIds)));
+  app.post("/api/groups/:id/jobs/:job/cancel",async(req,res)=>{await groups.cancel(req.params.id,req.params.job);res.json({ok:true});});
   app.get("/api/bots", (_req, res) => res.type("json").send(redact({ enabled: bots.enabled, bots: bots.list() })));
   app.put("/api/bots/engine", async (req, res) => { await bots.engine(req.body.enabled); res.json({ enabled: bots.enabled }); });
   app.get("/api/bots/phone", (_req, res) => res.json(bots.phoneRequest()));
@@ -329,9 +343,9 @@ export async function createApp(options: {
     sessions,
     processes,
     mobile,
-    bots, connectors,
+    bots, groups, connectors,
     close: async () => {
-      await bots.close(); await connectors.close();
+      await groups.close(); await bots.close(); await connectors.close();
       sessions.stopAll();
       processes.stopAll();
       terminals.stopAll();
