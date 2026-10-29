@@ -26,4 +26,24 @@ public class AgentDisplayCapabilitiesTest {
         // When it accepts this display, require actual owned marker pixels rather than a display ID alone.
         if(result[0].optBoolean("ownDisplayCreated"))assertTrue(result[0].toString(),result[0].getBoolean("ownContentVerified"));
     }
+
+    @Test public void youtubeNewTaskLaunchIsMeasuredWithoutClaimingIsolation()throws Exception{
+        Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        org.junit.Assume.assumeTrue(context.getPackageName().endsWith(".qa"));
+        android.app.UiAutomation automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        String before=shell(automation,"dumpsys activity activities");
+        org.junit.Assume.assumeFalse("Do not risk moving an existing YouTube task",before.contains("com.google.android.youtube"));
+        CountDownLatch complete=new CountDownLatch(1);JSONObject[] result={null};
+        AgentDisplayCapabilities.probeExternalAppLaunch(context,"com.google.android.youtube",value->{result[0]=value;complete.countDown();});
+        assertTrue(complete.await(12,TimeUnit.SECONDS));assertNotNull(result[0]);
+        String after=shell(automation,"dumpsys activity activities");
+        result[0].put("mainTopActivityBefore",top(before));result[0].put("mainTopActivityAfter",top(after));result[0].put("mainTopActivityUnchanged",top(before).equals(top(after)));
+        assertTrue(result[0].toString(),result[0].getBoolean("mainTopActivityUnchanged"));
+        assertFalse(result[0].getBoolean("hiddenNativeAppControl"));assertFalse(result[0].getBoolean("isolatedAppAccounts"));assertTrue(result[0].getBoolean("probeReleased"));
+        Io.write(new File(context.getFilesDir(),"youtube-display-probe.json"),result[0].toString());System.out.println("YouTube display probe: "+result[0]);
+    }
+    private static String shell(android.app.UiAutomation ui,String command)throws Exception{
+        try(android.os.ParcelFileDescriptor fd=ui.executeShellCommand(command);java.io.InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)){return new String(Io.bytes(in),java.nio.charset.StandardCharsets.UTF_8);}
+    }
+    private static String top(String dump){for(String line:dump.split("\n"))if(line.contains("topResumedActivity="))return line.trim();return "unknown";}
 }

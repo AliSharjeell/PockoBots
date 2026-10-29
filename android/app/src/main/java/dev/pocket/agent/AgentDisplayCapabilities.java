@@ -1,6 +1,7 @@
 package dev.pocket.agent;
 
 import android.app.ActivityManager;
+import android.app.ActivityOptions;
 import android.app.Presentation;
 import android.content.Context;
 import android.content.Intent;
@@ -46,15 +47,21 @@ public final class AgentDisplayCapabilities {
     /** Run from any thread; callback runs once on the main thread. All probe resources are released. */
     public static void probeOwnDisplay(Context context,String packageName,Consumer<JSONObject> callback) {
         Context application=context.getApplicationContext();
-        new Handler(Looper.getMainLooper()).post(()->new Probe(application,packageName,callback).start());
+        new Handler(Looper.getMainLooper()).post(()->new Probe(application,packageName,false,callback).start());
+    }
+
+    /** Explicit diagnostic only: attempts a new task on the private display, never a main-display fallback. */
+    public static void probeExternalAppLaunch(Context context,String packageName,Consumer<JSONObject> callback) {
+        Context application=context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).post(()->new Probe(application,packageName,true,callback).start());
     }
 
     private static final class Probe {
-        final Context context; final String target; final Consumer<JSONObject> callback;
+        final Context context; final String target; final boolean attemptLaunch; final Consumer<JSONObject> callback;
         final Handler main=new Handler(Looper.getMainLooper()); final JSONObject result;
         HandlerThread thread; ImageReader reader; VirtualDisplay display; Presentation presentation;
         boolean done;
-        Probe(Context context,String target,Consumer<JSONObject> callback){this.context=context;this.target=target;this.callback=callback;result=inspect(context);}
+        Probe(Context context,String target,boolean attemptLaunch,Consumer<JSONObject> callback){this.context=context;this.target=target;this.attemptLaunch=attemptLaunch;this.callback=callback;result=inspect(context);}
         void put(String key,Object value){try{result.put(key,value);}catch(Exception ignored){}}
         void start() {
             put("probe","app-owned-display");put("ownDisplayCreated",false);put("surfaceFrameReceived",false);put("ownContentVerified",false);put("targetActivityLaunched",false);
@@ -82,6 +89,12 @@ public final class AgentDisplayCapabilities {
                     put("targetLaunchIntentAvailable",launch!=null);
                     if(launch!=null&&Build.VERSION.SDK_INT>=29)put("targetLaunchPolicyAllows",context.getSystemService(ActivityManager.class).isActivityStartAllowedOnDisplay(context,display.getDisplay().getDisplayId(),launch));
                     put("targetLaunchPolicyMeaning","A policy check is not a verified app launch, separate login, screen capture or input route.");
+                    if(attemptLaunch&&launch!=null&&Build.VERSION.SDK_INT>=29&&!result.optBoolean("targetLaunchPolicyAllows")){
+                        put("targetLaunchAttempted",true);
+                        Intent separate=new Intent(launch).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+                        try{context.startActivity(separate,ActivityOptions.makeBasic().setLaunchDisplayId(display.getDisplay().getDisplayId()).toBundle());put("targetLaunchRequestAccepted",true);}
+                        catch(RuntimeException error){put("targetLaunchRequestAccepted",false);put("targetLaunchError",error.getClass().getSimpleName()+": "+error.getMessage());}
+                    }else if(attemptLaunch){put("targetLaunchAttempted",false);put("targetLaunchSkippedReason","An accepted external launch needs verified task cleanup and display-scoped input. This public probe will not risk moving an app onto the owner display.");}
                 }
                 presentation=new Presentation(context,display.getDisplay());
                 TextView marker=new TextView(presentation.getContext());marker.setText("PockoBots private display probe");marker.setTextColor(Color.WHITE);marker.setBackgroundColor(MARKER);marker.setGravity(Gravity.CENTER);
