@@ -66,7 +66,31 @@ installed or connected when no such companion exists.
 AgentDisplayCapabilitiesTest runs a short-lived probe and records its JSON in
 private files/display-probe.json. It checks that capability claims remain false
 for hidden arbitrary-app control, even when private app-owned rendering succeeds.
-Device execution evidence is recorded in VERIFICATION.md when the test is run.
+The test passed on the existing Pixel 10 Pro XL API 37 emulator in 4 KB mode
+on 2026-10-29 (2.128 seconds), in the isolated QA application. Its measured result:
+
+```json
+{
+  "secondaryActivityFeature": true,
+  "ownDisplayCreated": true,
+  "surfaceFrameReceived": true,
+  "ownContentVerified": true,
+  "targetPackage": "com.android.chrome",
+  "targetLaunchIntentAvailable": true,
+  "targetLaunchPolicyAllows": false,
+  "targetActivityLaunched": false,
+  "hiddenNativeAppControl": false,
+  "isolatedAppAccounts": false,
+  "agentDisplayInputVerified": false,
+  "probeReleased": true
+}
+```
+
+This confirms app-owned off-screen rendering on this emulator. Android's policy
+check rejected Chrome on that private display. No third-party app was launched,
+no input was injected, and no account/profile was cloned. The normal app's data
+and model connection were not changed by this test. Physical-device results can
+differ and require their own probe.
 
 Use the existing Pixel development launcher for the experimental Intel emulator.
 It flushes Android storage before a restart. Do not wipe the AVD or replace its
