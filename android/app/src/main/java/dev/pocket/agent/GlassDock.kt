@@ -16,6 +16,10 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
@@ -34,7 +38,7 @@ object GlassDock {
    }
    Row(Modifier.fillMaxWidth().padding(5.dp).drawBackdrop(backdrop,shape={RoundedCornerShape(32.dp)},effects={blur(8.dp.toPx());lens(18.dp.toPx(),24.dp.toPx())},onDrawSurface={drawRect(if(dark)Color.Black.copy(alpha=.28f) else Color.White.copy(alpha=.42f))}).padding(5.dp).height(54.dp),verticalAlignment=Alignment.CenterVertically) {
     listOf("Bots","Market","Terminal","Settings").forEachIndexed { index, label ->
-     Box(Modifier.weight(1f).fillMaxHeight().background(if(selected==index)if(dark)Color.White.copy(alpha=.16f)else Color.White.copy(alpha=.78f)else Color.Transparent,RoundedCornerShape(26.dp)).clickable { action.accept(index) },contentAlignment=Alignment.Center) {
+     Box(Modifier.weight(1f).fillMaxHeight().background(if(selected==index)if(dark)Color.White.copy(alpha=.16f)else Color.White.copy(alpha=.78f)else Color.Transparent,RoundedCornerShape(26.dp)).semantics { contentDescription=label; role=Role.Tab }.clickable { action.accept(index) },contentAlignment=Alignment.Center) {
       BasicText(label,style=TextStyle(color=if(selected==index)Color(0xFF4596FF) else if(dark)Color(0xFFE9ECF5)else Color(0xFF343B49),fontSize=12.sp,fontWeight=if(selected==index)FontWeight.Bold else FontWeight.Normal))
      }
     }
