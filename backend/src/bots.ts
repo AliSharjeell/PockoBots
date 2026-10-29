@@ -6,11 +6,11 @@ import type { Sessions } from "./sessions.js";
 import type { MobileTasks } from "./mobile-tasks.js";
 import type { Connectors } from "./connectors.js";
 
-export type Bot = { id: string; name: string; role: string; memory: string; kind: "unified" | "coding" | "phone" | "browser"; projectId: string; sessionId: string;
+export type Bot = { id: string; name: string; avatar: string; accent: string; personality: string; role: string; memory: string; kind: "unified" | "coding" | "phone" | "browser"; projectId: string; sessionId: string;
   enabled: boolean; allowShell: boolean; allowUrgent: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
   dailyLimit: number; day: string; runs: number; created: number };
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
-  created: number; updated: number; mobileTaskId?: string; phoneTaskId?: string; phoneArming?: boolean; error?: string; output?: string };
+  created: number; updated: number; groupId?: string; groupMessageId?: string; sourceBotId?: string; replyToJobId?: string; mobileTaskId?: string; phoneTaskId?: string; phoneArming?: boolean; error?: string; output?: string };
 type Message = { id: string; botId: string; role: "user" | "assistant" | "system"; text: string; time: number; jobId?: string };
 export type BotAlert = { id: string; botId: string; botName: string; text: string; urgent: boolean; created: number; acknowledged: boolean };
 
@@ -27,6 +27,7 @@ export class Bots {
     const data = await this.store.read<any>("bots", { schema: 2, enabled: true, bots: [], jobs: [], messages: [] });
     this.enabled = data.schema === 2 ? data.enabled : true; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
     if (data.schema !== 2) for (const bot of this.records) Object.assign(bot, { kind: "unified", allowShell: true, allowUrgent: true, dailyLimit: 0 });
+    for (const bot of this.records) { bot.avatar ??= "bot"; bot.accent ??= "#3B76FF"; bot.personality ??= ""; }
     for (const job of this.jobs) { job.phoneArming = false; }
     for (const job of this.jobs) if (["running", "arming", "waiting"].includes(job.status)) { job.status = "paused"; job.error = "Runtime restarted. Review and resume this task."; }
     await this.persist();
@@ -40,6 +41,8 @@ export class Bots {
   }
   list() { return this.records.map(bot => { const jobs = this.jobs.filter(j => j.botId === bot.id); return { ...bot, lastMessage: this.messages.filter(m => m.botId === bot.id).at(-1), active: jobs.find(j => ["arming", "running", "waiting"].includes(j.status)), queued: jobs.filter(j => j.status === "queued").length }; }); }
   get(id: string) { const bot = this.records.find(b => b.id === id); if (!bot) throw Error("Bot not found"); return bot; }
+  getJob(id: string) { return this.jobs.find(job => job.id === id); }
+  jobsForGroup(id: string) { return this.jobs.filter(job => job.groupId === id); }
   state(id: string) {
     const bot = this.get(id); const jobs = this.jobs.filter(j => j.botId === id); const active = jobs.find(j => ["running", "waiting"].includes(j.status));
     return { bot, jobs, messages: this.messages.filter(m => m.botId === id), session: ["unified", "coding"].includes(bot.kind) ? this.sessions.state(bot.sessionId) : undefined,
@@ -48,6 +51,10 @@ export class Bots {
   private input(input: any, previous?: Bot) {
     const b = { ...previous, ...input }; b.role ??= "";
     if (typeof b.name !== "string" || !b.name.trim() || b.name.length > 60) throw Error("Enter a bot name (1–60 characters)");
+    b.avatar ??= "bot"; b.accent ??= "#3B76FF"; b.personality ??= "";
+    if (typeof b.avatar !== "string" || b.avatar.length > 24 || /[\x00-\x1f]/.test(b.avatar)) throw Error("Use a short bot icon or emoji");
+    if (typeof b.accent !== "string" || !/^#[0-9a-fA-F]{6}$/.test(b.accent)) throw Error("Use a six-digit hex color");
+    if (typeof b.personality !== "string" || b.personality.length > 2000) throw Error("Personality must be at most 2000 characters");
     if (typeof b.role !== "string" || b.role.length > 8000) throw Error("Role instructions must be at most 8000 characters");
     b.kind ??= "unified"; b.role ??= "";
     if (!["unified", "coding", "phone", "browser"].includes(b.kind)) throw Error("Choose coding, phone, or browser");
@@ -61,14 +68,14 @@ export class Bots {
   async create(input: any) {
     if (this.records.length >= 12) throw Error("Bot limit reached (12)"); const b = this.input(input); const id = randomUUID();
     const project = await this.projects.create("bot-" + id.slice(0, 8)); const session = await this.sessions.create(project.id);
-    const bot: Bot = { id, name: b.name.trim(), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
+    const bot: Bot = { id, name: b.name.trim(), avatar: b.avatar, accent: b.accent, personality: this.redact(b.personality), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
       allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
       nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
     this.records.push(bot); this.message(id, "system", `${bot.name} is ready. I can code, use your phone and browser, and work in my own workspace.`); await this.changed(); return bot;
   }
   async update(id: string, input: any) {
     const bot = this.get(id); if (this.jobs.some(j => j.botId === id && ["running", "arming", "waiting"].includes(j.status))) throw Error("Pause this bot before changing its role or connections");
-    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), role: b.role, connectors: b.connectors, allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
+    const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), avatar: b.avatar, accent: b.accent, personality: this.redact(b.personality), role: b.role, connectors: b.connectors, allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
   }
   async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); this.alerts = this.alerts.filter(a => a.botId !== id); await this.changed(); }
   pendingAlerts() { return this.alerts.filter(a => !a.acknowledged); }
@@ -83,11 +90,11 @@ export class Bots {
     this.message(id, "assistant", (urgent ? "Priority alert: " : "Notification: ") + alert.text); await this.changed(); return alert;
   }
   async engine(enabled: boolean) { if (typeof enabled !== "boolean") throw Error("Invalid engine setting"); this.enabled = enabled; if (!enabled) for (const bot of this.records) await this.pause(bot.id, false); await this.changed(); }
-  async enqueue(id: string, text: unknown, source: BotJob["source"] = "user", depth = 0) {
-    this.get(id); if (typeof text !== "string" || !text.trim() || text.length > 16000) throw Error("Enter a task of at most 16000 characters");
+  async enqueue(id: string, text: unknown, source: BotJob["source"] = "user", depth = 0, delivery: Pick<BotJob, "groupId" | "groupMessageId" | "sourceBotId" | "replyToJobId"> = {}) {
+    this.get(id); if (delivery.sourceBotId) this.get(delivery.sourceBotId); if (typeof text !== "string" || !text.trim() || text.length > 16000) throw Error("Enter a task of at most 16000 characters");
     if (depth > 3) throw Error("Bot delegation chain limit reached");
     if (this.jobs.filter(j => j.botId === id && ["queued", "arming", "running", "waiting", "paused"].includes(j.status)).length >= 20) throw Error("Bot queue is full (20 tasks)");
-    const job: BotJob = { id: randomUUID(), botId: id, text: text.trim(), source, depth, status: "queued", created: Date.now(), updated: Date.now() };
+    const job: BotJob = { ...delivery, id: randomUUID(), botId: id, text: text.trim(), source, depth, status: "queued", created: Date.now(), updated: Date.now() };
     this.jobs.push(job); this.message(id, source === "user" ? "user" : "system", text, job.id);
     // Retain bounded history while never discarding unfinished work.
     const finished = this.jobs.filter(j => j.botId === id && ["completed", "failed", "cancelled"].includes(j.status));
@@ -110,7 +117,12 @@ export class Bots {
     tools.push({ name: "notify_user", label: "Notify the owner", description: "Send a bot notification. Urgent rings like a local incoming call and reads the message after the owner answers, if this bot has permission. Use urgent only for important time-sensitive issues requested by the owner; never ring repeatedly.", parameters: Type.Object({ text: Type.String({ maxLength: 4000 }), urgent: Type.Optional(Type.Boolean()) }), execute: async (_id, p: any) => { const alert = await this.alert(bot.id, p.text, p.urgent === true); return { content: [{ type: "text", text: "Alert queued on this phone: " + alert.id }], details: {} }; } });
     tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
-      if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1); return { content: [{ type: "text", text: "Queued task " + queued.id }], details: {} }; } });
+      if (p.bot_id === bot.id) throw Error("Do not delegate to yourself"); const queued = await this.enqueue(p.bot_id, p.task, "bot", job.depth + 1, { groupId: job.groupId, groupMessageId: job.groupMessageId, sourceBotId: bot.id, replyToJobId: job.id }); return { content: [{ type: "text", text: JSON.stringify({ jobId: queued.id, botId: queued.botId, status: queued.status, instruction: "Use bot_job_result to check the response. Do not send repeated acknowledgement tasks." }) }], details: {} }; } });
+    tools.push({ name: "list_bots", label: "List teammates", description: "List local bot identities and roles before delegating a specific task.", parameters: Type.Object({}), execute: async () => ({ content: [{ type: "text", text: JSON.stringify(this.records.map(b => ({ id: b.id, name: b.name, role: b.role, enabled: b.enabled }))) }], details: {} }) });
+    tools.push({ name: "bot_job_result", label: "Read teammate result", description: "Check a task you sent to a teammate. Returns its current status and verified output; do not busy-poll or send acknowledgement loops.", parameters: Type.Object({ job_id: Type.String() }), execute: async (_id, p: any) => {
+      const result = this.getJob(p.job_id); if (!result || result.botId !== bot.id && result.sourceBotId !== bot.id) throw Error("Teammate task not found for this bot");
+      return { content: [{ type: "text", text: JSON.stringify({ jobId: result.id, botId: result.botId, status: result.status, output: result.output, error: result.error }) }], details: {} };
+    } });
     tools.push({ name: "use_phone", label: "Use phone or browser", description: "Execute a concrete task using the phone's visible apps or browser through Artemis. Use for opening apps, browsing, searching or interacting with the Android screen. Coding and files use your normal tools. The phone controller appears automatically; setup permissions and an unlocked device are needed. Waits for verified results or an owner reply. Never invent screen actions.", parameters: Type.Object({ task: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any, signal) => {
       if (this.jobs.some(j => j.id !== job.id && ["arming", "running", "waiting"].includes(j.status) && (j.phoneArming || j.mobileTaskId)) || this.mobile.anyBusy()) throw Error("Another bot is using the phone. Try again after its task finishes.");
       job.phoneArming = true;
@@ -134,11 +146,12 @@ export class Bots {
         }
       } finally { job.phoneArming = false; this.armed.delete(task.id); if (!["completed", "failed", "stopped"].includes(this.mobile.state(task.id).status)) await this.mobile.interrupt(task.id); await this.changed(); }
     } });
-    return { instructions: `Your name is ${bot.name}. ${bot.role}\nYour durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nYou are a unified local assistant: choose file/shell tools for coding, use_phone for visible phone/browser work, and selected MCP tools as needed. No mode selection is needed. Provide clickable Markdown links to verified local previews and share_port tunnel URLs; never fabricate a public URL. For routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
+    return { instructions: `Your name is ${bot.name}. ${bot.role}\nPersonality and response style: ${bot.personality || "Clear and helpful"}.\nYour durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nYou are a unified local assistant: choose file/shell tools for coding, use_phone for visible phone/browser work, and selected MCP tools as needed. No mode selection is needed. Provide clickable Markdown links to verified local previews and share_port tunnel URLs; never fabricate a public URL. For routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
   }
   private async finish(job: BotJob, status: "completed" | "failed" | "paused", output: string) {
     job.status = status; job.updated = Date.now(); job.output = this.redact(output).slice(0, 24000);
     if (output.trim() !== "NO_UPDATE") this.message(job.botId, "assistant", output || (status === "completed" ? "Task finished." : "Task needs attention."), job.id);
+    if (job.sourceBotId && this.records.some(b => b.id === job.sourceBotId) && output.trim() !== "NO_UPDATE") this.message(job.sourceBotId, "system", `${this.get(job.botId).name} replied to task ${job.id} (${status}): ${job.output}`, job.replyToJobId);
     await this.changed();
   }
   async tick(now = Date.now()) {
