@@ -11,8 +11,10 @@ import android.widget.*;
 
 /** Native equivalents of form-filling-ai's zinc sidebar tokens and compact controls. */
 final class AgentStyle {
-    static final int BACK=Color.rgb(9,9,11), PANEL=Color.rgb(24,24,27), BORDER=Color.rgb(39,39,42),
+    static int BACK=Color.rgb(9,9,11), PANEL=Color.rgb(24,24,27), BORDER=Color.rgb(39,39,42),
         TEXT=Color.rgb(244,244,245), MUTED=Color.rgb(161,161,170), WHITE=Color.rgb(250,250,250), BLUE=Color.rgb(59,118,255);
+    static boolean dark=true;
+    static void applyTheme(Context context){String choice=context.getSharedPreferences("appearance",0).getString("theme","system");dark=choice.equals("dark")||choice.equals("system")&&(context.getResources().getConfiguration().uiMode&48)==32;BACK=dark?0xff09090b:0xfff4f6fa;PANEL=dark?0xff18181b:0xffffffff;BORDER=dark?0xff27272a:0xffdde2eb;TEXT=dark?0xfff4f4f5:0xff161b26;MUTED=dark?0xffa1a1aa:0xff657087;WHITE=dark?0xfffafafa:0xff202a3c;}
     static int dp(Context context,int value){return Math.round(value*context.getResources().getDisplayMetrics().density);}
     static GradientDrawable surface(Context context,int color,int radius,boolean border){
         GradientDrawable shape=new GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(context,radius));
