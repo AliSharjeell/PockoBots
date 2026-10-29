@@ -564,7 +564,7 @@ export const marketplaceCatalog = [
 
 export function listMarketplace(connectors: Connectors) {
  const configured=connectors.list();
- return marketplaceCatalog.map(entry=>({...entry,connection:configured.find(c=>c.name===entry.name),status:configured.some(c=>c.name===entry.name)?"configured":"not_configured"}));
+ return marketplaceCatalog.map(entry=>({...entry,connection:configured.find(c=>c.marketplaceId===entry.id),status:configured.some(c=>c.marketplaceId===entry.id)?"configured":"not_configured"}));
 }
 export async function installMarketplace(connectors: Connectors,id: string,input: any={}) {
  const entry=marketplaceCatalog.find(e=>e.id===id);if(!entry)throw Error("Marketplace item not found");
@@ -575,7 +575,7 @@ export async function installMarketplace(connectors: Connectors,id: string,input
   const value=secrets[field.id];if(typeof value!=="string"||!value.trim())throw Error("Enter "+field.label);
   if(field.url)url=value;else if(field.env)env[field.env]=value;else if(field.header)headers[field.header]=(field.prefix||"")+value;
  }
- const existing=connectors.list().find(c=>c.name===entry.name);
- const connection=await connectors.save({id:existing?.id,name:entry.name,transport:entry.transport,url,command:entry.command,args:[...entry.args],env,headers,oauth:entry.oauth});
+ const existing=connectors.list().find(c=>c.marketplaceId===entry.id);
+ const connection=await connectors.save({id:existing?.id,marketplaceId:entry.id,name:entry.name,transport:entry.transport,url,command:entry.command,args:[...entry.args],env,headers,oauth:entry.oauth});
  return {connection,status:"configured",setup:entry.setup,needsSignIn:entry.oauth};
 }

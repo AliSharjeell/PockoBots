@@ -7,7 +7,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Store } from "./storage.js";
 
 export type Connector = { id: string; name: string; transport: "http" | "stdio"; url: string;
-  command: string; args: string[]; token: string; enabled: boolean; env?: Record<string,string>; headers?: Record<string,string>; oauth?: boolean; oauthData?: { tokens?: any; client?: any; verifier?: string }; };
+  command: string; args: string[]; token: string; enabled: boolean; marketplaceId?: string; env?: Record<string,string>; headers?: Record<string,string>; oauth?: boolean; oauthData?: { tokens?: any; client?: any; verifier?: string }; };
 
 /** Private MCP configurations; official SDK transports run on the phone's Node runtime. */
 export class Connectors {
@@ -28,7 +28,8 @@ export class Connectors {
     const sameTarget = !previous || previous.transport === input.transport && (input.transport === "http" ? previous.url === input.url : previous.command === input.command);
     const c: Connector = { id: previous?.id || randomUUID(), name: input.name.trim(), transport: input.transport,
       url: input.url || "", command: input.command || "", args: input.args || [],
-      token: input.clearToken ? "" : input.token || (sameTarget ? previous?.token : "") || "", enabled: input.enabled !== false, env: this.secretMap(input.env, sameTarget ? previous?.env : undefined), headers: this.secretMap(input.headers, sameTarget ? previous?.headers : undefined, true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
+      token: input.clearToken ? "" : input.token || (sameTarget ? previous?.token : "") || "", enabled: input.enabled !== false, marketplaceId: input.marketplaceId ?? previous?.marketplaceId, env: this.secretMap(input.env, sameTarget ? previous?.env : undefined), headers: this.secretMap(input.headers, sameTarget ? previous?.headers : undefined, true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
+    if (c.marketplaceId !== undefined && (typeof c.marketplaceId !== "string" || !/^[a-z0-9-]{1,60}$/.test(c.marketplaceId))) throw Error("Invalid marketplace identity");
     if (typeof c.token !== "string" || c.token.length > 8000 || /[\r\n]/.test(c.token)) throw Error("Invalid bearer token");
     if (c.transport === "http") {
       const url = new URL(c.url);
