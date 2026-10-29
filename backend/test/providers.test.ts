@@ -1,13 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp,rm } from "node:fs/promises";
+import { Workspace } from "../src/workspace.js";
+import { Sessions } from "../src/sessions.js";
+import { Processes } from "../src/processes.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Type } from "typebox";
 import { SubscriptionProviders, executeProvider, providerCatalog, providerText } from "../src/providers.js";
-import { defaults, validateSettings } from "../src/storage.js";
+import { Store, defaults, validateSettings } from "../src/storage.js";
 
 test("subscription provider uses a real process and MCP bridge without importing credentials",async()=>{
  const root=await mkdtemp(join(tmpdir(),"pocko-provider-test-"));const runtime=new SubscriptionProviders(()=>({command:process.execPath,args:[fileURLToPath(new URL('./fixtures/provider-cli.mjs',import.meta.url))]}));
@@ -24,4 +27,20 @@ test("subscription process cancellation stops the child and reports cancellation
 
 test("provider settings keep BYOK and distinguish unsupported subscriptions",()=>{
  assert.equal(validateSettings({},defaults).executionProvider,'byok');const selected=validateSettings({executionProvider:'codex',providerModel:'default'},defaults);assert.equal(selected.executionProvider,'codex');assert.equal(selected.apiKey,'');assert.throws(()=>validateSettings({executionProvider:'made-up'},defaults),/Invalid execution/);assert.equal(providerCatalog.find(p=>p.id==='freebuff')?.supported,false);
+});
+
+
+test("Gemini text deltas assemble and provider-reported failures stay failures",async()=>{
+ const script='console.log(JSON.stringify({type:"message",role:"assistant",content:"Hello",delta:true}));console.log(JSON.stringify({type:"message",role:"assistant",content:" world",delta:true}));';
+ assert.equal(await executeProvider(process.execPath,['-e',script],{cwd:tmpdir(),env:process.env,signal:new AbortController().signal}),"Hello world");
+ await assert.rejects(executeProvider(process.execPath,['-e','console.log(JSON.stringify({type:"result",is_error:true,result:"Account unavailable"}))'],{cwd:tmpdir(),env:process.env,signal:new AbortController().signal}),/successful text/);
+});
+
+
+test("subscription sessions run without BYOK, require shell consent and persist the same chat",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"pocko-subscription-session-"));const store=new Store(join(root,"state"));await store.init();const workspace=new Workspace(join(root,"project"));await workspace.init();let received="";
+ const runtime={run:async(_id:string,options:any)=>{received=options.prompt;assert.ok(options.tools.some((t:any)=>t.name==="write_file"));return "Saved with subscription credentials owned by the vendor CLI";}} as unknown as SubscriptionProviders;
+ const settings=validateSettings({executionProvider:"codex"},defaults);const sessions=new Sessions(store,workspace,new Processes(()=>{}),()=>settings,()=>{},undefined,runtime);await sessions.init();const session=await sessions.create();
+ try{await assert.rejects(sessions.prompt(session.id,"Remember my project"),/shell access/);sessions.setTrust(session.id,true);await sessions.prompt(session.id,"Remember my project");for(let i=0;sessions.state(session.id).busy&&i<100;i++)await new Promise(r=>setTimeout(r,5));assert.equal(sessions.state(session.id).busy,false);assert.match(received,/Remember my project/);assert.equal(settings.apiKey,"");assert.equal(sessions.state(session.id).messages.length,2);await sessions.persist();const reopened=new Sessions(store,workspace,new Processes(()=>{}),()=>settings,()=>{});await reopened.init();assert.equal(reopened.state(session.id).messages.length,2);assert.equal((reopened.state(session.id).messages.at(-1) as any).stopReason,"stop");}
+ finally{sessions.stopAll();await rm(root,{recursive:true,force:true});}
 });
