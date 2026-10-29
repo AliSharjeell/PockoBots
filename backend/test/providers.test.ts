@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp,rm } from "node:fs/promises";
+import { MobileTasks } from "../src/mobile-tasks.js";
+import http from "node:http";
 import { Workspace } from "../src/workspace.js";
 import { Sessions } from "../src/sessions.js";
 import { Processes } from "../src/processes.js";
@@ -43,4 +45,15 @@ test("subscription sessions run without BYOK, require shell consent and persist 
  const settings=validateSettings({executionProvider:"codex"},defaults);const sessions=new Sessions(store,workspace,new Processes(()=>{}),()=>settings,()=>{},undefined,runtime);await sessions.init();const session=await sessions.create();
  try{await assert.rejects(sessions.prompt(session.id,"Remember my project"),/shell access/);sessions.setTrust(session.id,true);await sessions.prompt(session.id,"Remember my project");for(let i=0;sessions.state(session.id).busy&&i<100;i++)await new Promise(r=>setTimeout(r,5));assert.equal(sessions.state(session.id).busy,false);assert.match(received,/Remember my project/);assert.equal(settings.apiKey,"");assert.equal(sessions.state(session.id).messages.length,2);await sessions.persist();const reopened=new Sessions(store,workspace,new Processes(()=>{}),()=>settings,()=>{});await reopened.init();assert.equal(reopened.state(session.id).messages.length,2);assert.equal((reopened.state(session.id).messages.at(-1) as any).stopReason,"stop");}
  finally{sessions.stopAll();await rm(root,{recursive:true,force:true});}
+});
+
+
+test("subscription phone task observes and verifies through the same guarded MCP bridge without BYOK",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"pocko-subscription-phone-"));const store=new Store(root);await store.init();let observations=0;
+ const native=http.createServer((req,res)=>{assert.equal(req.headers["x-artemis-token"],"phone-token");res.setHeader("Content-Type","application/json");if(req.url?.startsWith("/ping"))res.end(JSON.stringify({success:true,authenticated:true,task_allowed:true}));else{observations++;res.end(JSON.stringify({success:true,width:1000,height:2000,package:"com.android.settings",elements:[{text:"Battery",enabled:true,bounds:"[0,0][100,100]"}],has_screenshot:false}));}});
+ await new Promise<void>(r=>native.listen(0,"127.0.0.1",r));const runtime=new SubscriptionProviders(()=>({command:process.execPath,args:[fileURLToPath(new URL("./fixtures/provider-cli.mjs",import.meta.url))]}));
+ const app=express();app.use(express.json());app.post("/api/provider-tools/:run/:operation",async(req,res)=>{try{assert.equal(req.headers.authorization,"Bearer owner-token");res.json(await runtime.bridge(req.params.run,String(req.headers["x-provider-bridge-token"]),req.params.operation,req.body));}catch(e:any){res.status(400).json({error:e.message});}});const server=app.listen(0,"127.0.0.1");await new Promise<void>(r=>server.on("listening",r));runtime.configure("http://127.0.0.1:"+(server.address() as any).port,"owner-token");
+ const mobile=new MobileTasks(store,()=>validateSettings({executionProvider:"codex"},defaults),"phone-token",()=>{},"http://127.0.0.1:"+(native.address() as any).port,runtime);await mobile.init();
+ try{const task=await mobile.create("Verify the Battery screen");await mobile.start(task.id);for(let i=0;mobile.anyBusy()&&i<200;i++)await new Promise(r=>setTimeout(r,10));assert.equal(mobile.anyBusy(),false);assert.equal(mobile.state(task.id).status,"completed");assert.equal(observations,1);assert.match(mobile.state(task.id).output,/subscription phone tools/);assert.equal(mobile.state(task.id).steps,2);}
+ finally{mobile.stopAll();await new Promise<void>(r=>server.close(()=>r()));await new Promise<void>(r=>native.close(()=>r()));await rm(root,{recursive:true,force:true});}
 });

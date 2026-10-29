@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ArtemisBridge } from "./artemis.js";
 import { artemisPrompt } from "./artemis-prompt.js";
 import { mobileTools } from "./mobile-tools.js";
-import { subscriptions } from "./providers.js";
+import { subscriptions, type SubscriptionProviders } from "./providers.js";
 import { connection } from "./models.js";
 import type { Settings, Store } from "./storage.js";
 
@@ -20,7 +20,7 @@ export class MobileTasks {
   private questions = new Map<string, { resolve: (value: string) => void; reject: (e: Error) => void }>();
   private launching = false;
   constructor(private store: Store, private settings: () => Settings, private token: string,
-    private publish: (event: unknown) => void, private bridgeBase?: string) {}
+    private publish: (event: unknown) => void, private bridgeBase?: string, private subscriptionRuntime: SubscriptionProviders = subscriptions) {}
   async init() {
     for (const task of await this.store.read<MobileTask[]>("mobile-tasks", [])) {
       if (["running", "waiting"].includes(task.status)) { task.status = "paused"; task.error = "Runtime restarted. Review the current app, then resume."; }
@@ -37,7 +37,7 @@ export class MobileTasks {
   async create(prompt: unknown, ownerBotId?: string) {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 16000) throw Error("Enter a mobile task of at most 16000 characters");
     if (this.records.size >= 30) {
-      const archived = [...this.records.values()].filter(t => t.ownerBotId && ["completed", "failed", "stopped"].includes(t.status) && !this.agents.has(t.id)).sort((a,b) => a.updated-b.updated)[0];
+      const archived = [...this.records.values()].filter(t => t.ownerBotId && ["completed", "failed", "stopped"].includes(t.status) && !this.agents.has(t.id) && !this.cliRuns.has(t.id)).sort((a,b) => a.updated-b.updated)[0];
       if (!archived) throw Error("Delete an old mobile task before creating another");
       this.records.delete(archived.id);
     }
@@ -96,10 +96,10 @@ export class MobileTasks {
       const controller = new AbortController(); this.cliRuns.set(id, controller); await this.changed(task);
       const wrapped = tools.map(tool => ({ ...tool, execute: async (...params: Parameters<typeof tool.execute>) => {
         const blocked = await guard(tool.name, params[1]); if (blocked) throw Error(blocked.reason);
-        if (task.steps > 120) { task.status = "paused"; task.error = "Reached 120 phone actions. Review and resume."; controller.abort(); throw Error(task.error); }
+        if (++turns > 120) { task.status = "paused"; task.error = "Reached 120 phone actions. Review and resume."; controller.abort(); throw Error(task.error); }
         return tool.execute(...params);
       } }));
-      void subscriptions.run(settings.executionProvider, {cwd:process.env.HOME || process.cwd(),prompt:instructions+"\nTask: "+task.prompt+"\nObserve the current screen first. Use the supplied MCP phone tools and finish with report_task_status. Stop after reporting.",model:settings.providerModel,tools:wrapped,signal:controller.signal,onText:value=>{if(task.status==="running"){task.output=safe(value).slice(0,6000);void this.changed(task).catch(()=>{});}}})
+      void this.subscriptionRuntime.run(settings.executionProvider, {cwd:process.env.HOME || process.cwd(),prompt:instructions+"\nTask: "+task.prompt+"\nObserve the current screen first. Use the supplied MCP phone tools and finish with report_task_status. Stop after reporting.",model:settings.providerModel,tools:wrapped,signal:controller.signal,onText:value=>{if(task.status==="running"){task.output=safe(value).slice(0,6000);void this.changed(task).catch(()=>{});}}})
       .then(()=>{if(task.status==="running"){task.status="paused";task.error="Provider ended without a verified phone result. Review and resume.";}})
       .catch(error=>{if(task.status==="running"||task.status==="waiting"){task.status="paused";task.error=safe(String(error.message||error));}})
       .finally(async()=>{this.cliRuns.delete(id);this.questions.delete(id);await this.changed(task).catch(()=>{});});

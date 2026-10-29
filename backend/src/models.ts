@@ -7,6 +7,7 @@ import {
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
+import { subscriptions } from "./providers.js";
 import type { Settings } from "./storage.js";
 export function connection(settings: Settings, vision = false) {
   const model: Model<Api> = {
@@ -46,6 +47,13 @@ export function connection(settings: Settings, vision = false) {
   return { model, models };
 }
 export async function testConnection(settings: Settings) {
+  if (settings.executionProvider && settings.executionProvider !== "byok") {
+    const started=Date.now();const status=(await subscriptions.status()).find(p=>p.id===settings.executionProvider);
+    if (!status?.supported || !status.installed) throw Error("Install the selected provider CLI before checking its account");
+    if (status.authenticated === false) throw Error("Sign in through the selected provider's terminal login first");
+    if (status.authenticated === null) throw Error("This provider does not expose a verified login-status command. Complete its terminal login and send a task to check model access.");
+    return {ok:true,latencyMs:Date.now()-started,text:"The vendor CLI reports a signed-in account. Model entitlement and inference were not tested."};
+  }
   const { models, model } = connection(settings);
   const started = Date.now();
   const result = await models.completeSimple(

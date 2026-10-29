@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomUUID, randomBytes, timingSafeEqual, createHash } from "node:crypto";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -31,7 +31,7 @@ export class SubscriptionProviders {
  private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal}>();
  configure(base:string,token:string){this.base=base;this.apiToken=token;}
  async status(){return Promise.all(providerCatalog.map(async p=>{if(!p.supported)return {...p,installed:false,authenticated:false};const version=await probe(p.command,["--version"]);let authenticated:boolean|null=null;if(version.code===0&&(p.id==="codex"||p.id==="claude")){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}return {...p,installed:version.code===0,authenticated,version:version.code===0?version.text.trim().slice(0,100):"",note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};}));}
- async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||secret.length!==run.secret.length||!timingSafeEqual(Buffer.from(secret),Buffer.from(run.secret)))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");return tool.execute(randomUUID(),input.arguments||{},run.signal);}
+ async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");return tool.execute(randomUUID(),input.arguments||{},run.signal);}
  async run(id:string,options:{cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void}){
   const p=provider(id);if(!p.supported)throw Error(p.reason);if(options.signal.aborted)throw Error("Cancelled");
   const runId=randomUUID(),secret=randomBytes(32).toString("hex"),directory=join(tmpdir(),"pockobots-provider-"+runId);await mkdir(directory,{recursive:true,mode:0o700});
@@ -60,15 +60,15 @@ export function providerText(event:any):string|undefined {
  return undefined;
 }
 export function executeProvider(command:string,args:string[],options:{cwd:string;env:NodeJS.ProcessEnv;prompt?:string;signal:AbortSignal;onText?:(text:string)=>void}):Promise<string>{
- return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:options.cwd,env:options.env,detached:process.platform!=="win32",stdio:["pipe","pipe","pipe"]});let pending="",answer="",providerFailed=false,settled=false;let force:ReturnType<typeof setTimeout>|undefined;
- const kill=()=>{try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGTERM");else child.kill();}catch{}if(!force){force=setTimeout(()=>{try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGKILL");else child.kill("SIGKILL");}catch{}},3000);force.unref();}};
+ return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:options.cwd,env:options.env,detached:process.platform!=="win32",stdio:["pipe","pipe","pipe"]});let pending="",answer="",providerFailed=false,settled=false,stopped=false;let force:ReturnType<typeof setTimeout>|undefined;
+ const kill=()=>{stopped=true;try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGTERM");else child.kill();}catch{}if(!force){force=setTimeout(()=>{try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGKILL");else child.kill("SIGKILL");}catch{}},2000);force.unref();}};
  const abort=()=>kill();const timer=setTimeout(kill,3600000);timer.unref();options.signal.addEventListener("abort",abort,{once:true});
  const accept=(line:string)=>{try{const event=JSON.parse(line);if(event.type==="turn.failed"||event.type==="result"&&(event.is_error===true||event.status==="error"))providerFailed=true;const text=providerText(event);if(text){answer=(event.type==="message"&&event.delta===true?answer+text:text).slice(-30000);options.onText?.(answer);}}catch{}};
  child.stdout.on("data",b=>{pending+=b.toString();if(pending.length>2000000){pending="";kill();return;}let newline;while((newline=pending.indexOf("\n"))>=0){accept(pending.slice(0,newline));pending=pending.slice(newline+1);}});
  child.stderr.on("data",()=>{});
- const finish=(failure?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(force)clearTimeout(force);options.signal.removeEventListener("abort",abort);if(failure)reject(failure);else if(!answer||providerFailed)reject(Error("Provider ended without a successful text result. Check its account and project activity."));else resolve(answer);};
+ const finish=(failure?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(force&&!stopped)clearTimeout(force);options.signal.removeEventListener("abort",abort);if(failure)reject(failure);else if(!answer||providerFailed)reject(Error("Provider ended without a successful text result. Check its account and project activity."));else resolve(answer);};
  child.once("error",()=>finish(Error("Provider executable is unavailable. Install it in Main terminal and sign in first.")));
- child.once("close",code=>{if(pending)accept(pending);if(options.signal.aborted)return finish(Error("Provider task cancelled"));if(code!==0)return finish(Error("Provider CLI stopped ("+code+"). Open its login in Settings and check its account or platform compatibility."));finish();});
+ child.once("close",code=>{if(pending)accept(pending);if(options.signal.aborted)return finish(Error("Provider task cancelled"));if(stopped)return finish(Error("Provider task exceeded its time or output limit"));if(code!==0)return finish(Error("Provider CLI stopped ("+code+"). Open its login in Settings and check its account or platform compatibility."));finish();});
  child.stdin.on("error",()=>{});child.stdin.end(options.prompt||"");if(options.signal.aborted)abort();
  });
 }
