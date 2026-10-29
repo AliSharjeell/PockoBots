@@ -80,7 +80,7 @@ public final class AgentDisplayCapabilities {
                     put("targetPackage",target);
                     Intent launch=context.getPackageManager().getLaunchIntentForPackage(target);
                     put("targetLaunchIntentAvailable",launch!=null);
-                    if(launch!=null&&Build.VERSION.SDK_INT>=29)put("targetLaunchPolicyAllows",ActivityManager.isActivityStartAllowedOnDisplay(context,display.getDisplay().getDisplayId(),launch));
+                    if(launch!=null&&Build.VERSION.SDK_INT>=29)put("targetLaunchPolicyAllows",context.getSystemService(ActivityManager.class).isActivityStartAllowedOnDisplay(context,display.getDisplay().getDisplayId(),launch));
                     put("targetLaunchPolicyMeaning","A policy check is not a verified app launch, separate login, screen capture or input route.");
                 }
                 presentation=new Presentation(context,display.getDisplay());
