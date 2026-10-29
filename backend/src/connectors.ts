@@ -35,6 +35,7 @@ export class Connectors {
       const url = new URL(c.url);
       if (url.username || url.password || url.search || url.hash || (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))) throw Error("Use HTTPS, or loopback HTTP, without URL credentials/query parameters");
     } else if (typeof c.command !== "string" || !c.command.trim() || c.command.length > 500 || !Array.isArray(c.args) || c.args.length > 40 || c.args.some(a => typeof a !== "string" || a.length > 2000)) throw Error("Enter an executable and JSON array of arguments");
+    for (const [state, pending] of this.pending) if (pending.id === c.id) this.pending.delete(state);
     await this.disconnect(c.id); this.records.set(c.id, c); await this.persist(); return this.list().find(item => item.id === c.id)!;
   }
   private secretMap(input: unknown, previous?: Record<string,string>, headers=false) {
