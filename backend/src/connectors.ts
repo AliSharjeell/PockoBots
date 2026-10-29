@@ -25,9 +25,10 @@ export class Connectors {
     if (!previous && this.records.size >= 64) throw Error("Connection limit reached");
     if (typeof input.name !== "string" || !input.name.trim() || input.name.length > 80) throw Error("Enter a connection name (1–80 characters)");
     if (!["http", "stdio"].includes(input.transport)) throw Error("Choose HTTP or stdio transport");
+    const sameTarget = !previous || previous.transport === input.transport && (input.transport === "http" ? previous.url === input.url : previous.command === input.command);
     const c: Connector = { id: previous?.id || randomUUID(), name: input.name.trim(), transport: input.transport,
       url: input.url || "", command: input.command || "", args: input.args || [],
-      token: input.clearToken ? "" : input.token || previous?.token || "", enabled: input.enabled !== false, env: this.secretMap(input.env, previous?.env), headers: this.secretMap(input.headers, previous?.headers, true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
+      token: input.clearToken ? "" : input.token || (sameTarget ? previous?.token : "") || "", enabled: input.enabled !== false, env: this.secretMap(input.env, sameTarget ? previous?.env : undefined), headers: this.secretMap(input.headers, sameTarget ? previous?.headers : undefined, true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
     if (typeof c.token !== "string" || c.token.length > 8000 || /[\r\n]/.test(c.token)) throw Error("Invalid bearer token");
     if (c.transport === "http") {
       const url = new URL(c.url);
@@ -66,7 +67,7 @@ export class Connectors {
     const pending=[...this.pending.values()].find(p=>p.id===id&&p.url);if(!pending)throw Error("OAuth server did not supply an authorization URL");return {status:"authorization_required",authorizationUrl:pending.url};
   }
   async finishOAuth(state: unknown, code: unknown) {
-    if(typeof state!=="string"||typeof code!=="string"||code.length>8000)throw Error("Invalid OAuth callback");const pending=this.pending.get(state);this.pending.delete(state);
+    if(typeof state!=="string"||typeof code!=="string"||!code||code.length>8000)throw Error("Invalid OAuth callback");const pending=this.pending.get(state);this.pending.delete(state);
     if(!pending||pending.expires<Date.now())throw Error("OAuth login expired or state does not match");
     const c=this.records.get(pending.id);if(!c?.oauth)throw Error("OAuth connection was removed");
     const result=await auth(this.oauthProvider(c),{serverUrl:c.url,authorizationCode:code,fetchFn:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(20000)})});

@@ -557,7 +557,7 @@ export const marketplaceCatalog = [
       }
     ],
     "availability": "setup-required",
-    "setup": "Install uv first in the main terminal. Create a Google Cloud OAuth client, enable the APIs, and add your account as a test user. Enter client credentials here. The server returns a Google sign-in link through its authentication tool; open the link in your phone browser and approve scopes. This is a third-party MIT Workspace MCP server, not a Google-supported product.",
+    "setup": "Install uv first in the main terminal, then ensure uvx is in /usr/local/bin (the packaged runtime PATH). Create a Google Cloud OAuth client, enable the APIs, and add your account as a test user. Enter client credentials here. The server returns a Google sign-in link through its authentication tool; open the link in your phone browser and approve scopes. This is a third-party MIT Workspace MCP server, not a Google-supported product.",
     "setupUrl": "https://workspacemcp.com/quick-start"
   }
 ] as const;
