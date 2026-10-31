@@ -97,3 +97,46 @@ It flushes Android storage before a restart. Do not wipe the AVD or replace its
 snapshot to test this feature. The project already records an earlier emulator
 snapshot/data limitation in VERIFICATION.md; a display probe does not restore or
 establish preservation of older emulator data.
+
+## Pixel YouTube companion experiment - 2026-10-31
+
+A shell-assisted experiment passed on the existing Pixel 10 Pro XL API 37
+emulator in 4 KB mode. Official scrcpy 5.0.1 created a 720x1280/240 virtual
+display and launched the installed YouTube app. Its capture stream was recorded
+without opening a desktop playback window. The QA instrumentation found a
+YouTube accessibility window on display 3 and injected display-targeted keyboard
+input. The secondary UI changed while Android Settings stayed on display 0.
+The test passed in 1.675 seconds with these measured fields:
+
+```json
+{"mode":"adb-shell-companion-prototype","displayId":3,
+ "youtubeWindowVerified":true,"inputChangedSecondaryUi":true,
+ "mainApplicationBefore":"[com.android.settings]",
+ "mainApplicationAfter":"[com.android.settings]",
+ "mainApplicationUnchanged":true,"separateAccountVerified":false,
+ "standaloneApkHiddenControl":false}
+```
+
+Reproduce only with an authorized development device and scrcpy installed:
+
+```powershell
+scrcpy --serial=emulator-5554 --new-display=720x1280/240 --start-app=com.google.android.youtube --no-audio --no-window --display-ime-policy=local --record=youtube-secondary.mkv --time-limit=180
+```
+
+Read the created display ID from scrcpy's output, then in another terminal:
+
+```powershell
+adb shell am start --display 0 -a android.settings.SETTINGS
+adb shell am instrument -w -e class dev.pocket.agent.ShellYouTubeDisplayTest -e companionDisplayId 3 dev.pocket.agent.qa.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Replace 3 with the actual ID. The QA APK and instrumentation APK must first be
+installed. Do not use the display ID after scrcpy releases it. Its default
+destroy-content-on-removal behavior avoids moving the agent's app to the main
+screen. Do not add --no-vd-destroy-content for this experiment.
+
+This verifies a privileged development transport, not a shipped phone-only
+companion. It does not demonstrate a second logged-in YouTube account, arbitrary
+LinkedIn/Instagram compatibility, a model-driven lead-search task, or operation
+through the app's current Artemis transport. Those remain separate integration
+work. No sign-in or account action was performed.
