@@ -14,6 +14,7 @@ async function fixture() {
   const sessions = new Map<string, any>(); const profiles = new Map<string, any>();
   let onPrompt: ((id: string, text: string, profile: any) => Promise<void>) | undefined;
   const adapter: any = {
+    progress: () => undefined,
     create: async () => { const id = randomUUID(); sessions.set(id, { busy: false, approvals: [], messages: [] }); return { id }; },
     state: (id: string) => sessions.get(id), stop: () => {}, setTrust: () => {},
     prompt: async (id: string, text: string, profile: any) => { profiles.set(id, profile); if (onPrompt) await onPrompt(id, text, profile); sessions.set(id, { busy: false, approvals: [], messages: [{ role: "assistant", content: [{ type: "text", text: "Verified reply for " + id }] }] }); },

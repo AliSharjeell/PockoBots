@@ -8,7 +8,7 @@ import { Store } from "../src/storage.js";
 
 const bot=(id:string)=>({id,name:id,avatar:"A",accent:"#007AFF",personality:"",enabled:true,intervalMinutes:0,lastReadMessageId:""});
 const message=(id:string,botId:string,role:string)=>({id,botId,role,text:id,time:1});
-const runtime=(store:Store)=>new Bots(store,{} as any,{} as any,{} as any,{} as any,()=>{},text=>text);
+const runtime=(store:Store)=>new Bots(store,{} as any,{progress:()=>undefined} as any,{} as any,{} as any,()=>{},text=>text);
 
 test("unread counts exclude own messages and read markers never clear newer replies",async()=>{
  const root=await mkdtemp(join(tmpdir(),"pocko-unread-"));const store=new Store(root);await store.init();
