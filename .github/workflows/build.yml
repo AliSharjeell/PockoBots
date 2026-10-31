@@ -58,8 +58,8 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          gradle-version: "8.13"
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - uses: docker/setup-qemu-action@v3
       - run: sudo apt-get update && sudo apt-get install -y patchelf
       - run: python3 runtime/package.py ${{ matrix.arch }}

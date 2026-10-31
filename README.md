@@ -164,8 +164,8 @@ npm run check
 npm run build:android
 ```
 
-Use Node.js **22.19+**, JDK **17**, Android SDK **35** and NDK **27.2.12479018**.
-The Gradle wrapper selects Gradle 8.11.1. A fresh checkout also needs the packaged
+Use Node.js **22.19+**, JDK **17**, Android SDK **36** and NDK **27.2.12479018**.
+The Gradle wrapper selects Gradle 8.13. A fresh checkout also needs the packaged
 Linux runtime; generate it on Linux/WSL with Docker, Python 3, curl, dpkg-deb and
 patchelf:
 
