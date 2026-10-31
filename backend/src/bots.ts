@@ -196,7 +196,7 @@ export class Bots {
         } else {
           const state = this.sessions.state(bot.sessionId);
           if (state.busy) { const next = state.approvals.length || job.phoneTaskId && this.mobile.state(job.phoneTaskId).status === "waiting" ? "waiting" : "running"; if (job.status !== next) { job.status = next; await this.changed(); } }
-          else { const last: any = [...state.messages].reverse().find(m => m.role === "assistant"); const output = last?.errorMessage || (last?.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n"); await this.finish(job, last?.stopReason === "error" || last?.stopReason === "aborted" ? "failed" : "completed", output || "Task ended without a text response. Check the workspace and tool activity."); }
+          else { const last: any = [...state.messages].reverse().find(m => m.role === "assistant"); const output = state.runError || last?.errorMessage || (last?.content || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n"); await this.finish(job, state.runError || last?.stopReason === "error" || last?.stopReason === "aborted" || !output?.trim() ? "failed" : "completed", output || "The model returned no final answer. Progress is saved; send Continue to retry."); }
         }
       }
       for (const bot of this.records.filter(b => b.enabled)) {

@@ -14,6 +14,7 @@ type Session = {
   messages: AgentMessage[];
   created: number;
   projectId?: string;
+  runError?: string;
   progress?: RunProgress;
   progressHistory?: RunProgress[];
 };
@@ -155,7 +156,7 @@ export class Sessions {
     if (this.busy.has(id)) throw Error("Agent is already running");
     if (typeof text !== "string" || !text.trim() || text.length > 32000)
       throw Error("Enter a prompt of at most 32000 characters");
-    const settings = { ...this.settings() };
+    record.runError=undefined;const settings = { ...this.settings() };
     const workspace = this.projects ? await this.projects.workspace(record.projectId) : this.workspace;
     if (settings.executionProvider && settings.executionProvider !== "byok") {
       if (!this.trusted.has(id)) throw Error("Subscription agents require shell access. Enable it in this bot's preferences before starting.");
@@ -196,11 +197,17 @@ export class Sessions {
             return { block: true, reason: "Command not approved or cancelled" };
         }
       },
-      finishTurn: () => {
-        if (++turns >= 40) return { action: "end" };
+      finishTurn: (turn) => {
+        if (++turns >= 120) throw Error("Reached 120 model turns. Progress is saved; send Continue to resume.");
+        const message=turn.message;const prose=message.content.filter(p=>p.type==="text").map((p:any)=>p.text).join("").trim();
+        if(!prose&&!message.content.some(p=>p.type==="toolCall")&&message.stopReason!=="error"&&message.stopReason!=="aborted"){
+          if(++emptyTurns>3)throw Error("The model repeatedly ended with no user-facing response. Progress is saved; retry or choose another model.");
+          agent.steer({role:"user",content:"Your last turn ended without a user-facing answer. Continue the original task using tools where needed. Finish the work and report the verified result, or clearly explain the blocker. Do not end with thinking alone.",timestamp:Date.now()});return {action:"continue"};
+        }
+        if(prose)emptyTurns=0;
       },
     });
-    let turns = 0;
+    let turns = 0,emptyTurns=0;
     // Replay conversation without the prior baseline so current tool declarations take effect.
     if (record.messages.length)
       agent.state.messages = [
@@ -220,13 +227,7 @@ export class Sessions {
     // Prompt executes in the background; HTTP immediately returns and SSE carries progress.
     void agent
       .prompt(text)
-      .catch((e) =>
-        this.publish({
-          type: "error",
-          sessionId: id,
-          error: String(e.message || e),
-        }),
-      )
+      .catch((e) => {record.runError=String(e.message||e).split(settings.apiKey||"\u0000").join("[redacted]");if(record.progress)interruptProgress(record.progress,"failed");this.publish({type:"error",sessionId:id,error:record.runError});})
       .finally(async () => {
         this.busy.delete(id);
         if(record.progress?.status==="working"){const last:any=agent.state.messages.at(-1);if(last?.stopReason==="error")interruptProgress(record.progress,"failed");else if(last?.stopReason==="aborted")interruptProgress(record.progress,"stopped");else record.progress.status="completed";}
