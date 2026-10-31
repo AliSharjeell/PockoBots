@@ -36,14 +36,14 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
         drawRect(Brush.linearGradient(when {
             primary -> listOf(Color(0xFF005DD6), Color(0xFF168CFF), Color(0xFF0063DE))
             dark -> listOf(Color(0xFF171719), Color(0xFF202022), Color(0xFF141416))
-            else -> listOf(Color(0xFFF4F4F5), Color(0xFFFFFFFF), Color(0xFFE4E4E7))
+            else -> listOf(Color(0xFFE4E4E7), Color(0xFFEEEEF0), Color(0xFFD4D4D8))
         }))
     }
     this.clip(RoundedCornerShape(corner)).drawBackdrop(
         backdrop = backdrop,
         shape = { RoundedCornerShape(corner) },
         effects = { blur(10.dp.toPx()); lens((if (dark) 18.dp else 8.dp).toPx(), (if (dark) 26.dp else 12.dp).toPx()) },
-        onDrawSurface = { drawRect(Color.White.copy(alpha = (if (dark) .035f else .12f) + highlight)) }
+        onDrawSurface = { drawRect(Color.White.copy(alpha = (if (dark) .035f else .04f) + highlight)) }
     ).border(
         1.dp,
         Brush.verticalGradient(if (dark) listOf(Color.White.copy(alpha = .06f), Color.White.copy(alpha = .02f))
