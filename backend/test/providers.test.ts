@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Type } from "typebox";
-import { SubscriptionProviders, executeProvider, providerCatalog, providerText } from "../src/providers.js";
+import { SubscriptionProviders, executeProvider, providerCatalog, providerText, registerProviderRoutes } from "../src/providers.js";
 import { Store, defaults, validateSettings } from "../src/storage.js";
 
 test("subscription provider uses a real process and MCP bridge without importing credentials",async()=>{
@@ -56,4 +56,21 @@ test("subscription phone task observes and verifies through the same guarded MCP
  const mobile=new MobileTasks(store,()=>validateSettings({executionProvider:"codex"},defaults),"phone-token",()=>{},"http://127.0.0.1:"+(native.address() as any).port,runtime);await mobile.init();
  try{const task=await mobile.create("Verify the Battery screen");await mobile.start(task.id);const deadline=Date.now()+15000;while(mobile.anyBusy()&&Date.now()<deadline)await new Promise(r=>setTimeout(r,25));assert.equal(mobile.anyBusy(),false);assert.equal(mobile.state(task.id).status,"completed");assert.equal(observations,1);assert.match(mobile.state(task.id).output,/subscription phone tools/);assert.equal(mobile.state(task.id).steps,2);}
  finally{mobile.stopAll();await new Promise<void>(r=>server.close(()=>r()));await new Promise<void>(r=>native.close(()=>r()));await rm(root,{recursive:true,force:true});}
+});
+
+
+test("CLI installation deduplicates running installs and scopes progress to its provider",async()=>{
+ const jobs=new Map<string,any>();let starts=0;
+ const processes={jobs,start:(command:string)=>{starts++;const job={id:"install-"+starts,status:"running",exitCode:null,output:"Downloading packages",command};jobs.set(job.id,job);return job;}} as unknown as Processes;
+ const app=express();app.use(express.json());registerProviderRoutes(app,{port:8787,root:tmpdir(),processes,terminals:{} as any,token:"test"});
+ const server=app.listen(0,"127.0.0.1");await new Promise<void>(r=>server.on("listening",r));const base="http://127.0.0.1:"+(server.address() as any).port;
+ try{
+  const first=await (await fetch(base+"/api/providers/codex/install",{method:"POST"})).json() as any;
+  const second=await (await fetch(base+"/api/providers/codex/install",{method:"POST"})).json() as any;
+  assert.equal(first.id,second.id);assert.equal(starts,1);assert.match(first.command,/--no-fund --no-audit/);
+  assert.equal((await fetch(base+"/api/providers/claude/install/"+first.id)).status,404);
+  jobs.get(first.id).status="exited";jobs.get(first.id).exitCode=1;jobs.get(first.id).output="npm error: network unavailable";
+  const failure=await (await fetch(base+"/api/providers/codex/install/"+first.id)).json() as any;assert.equal(failure.exitCode,1);assert.match(failure.output,/network unavailable/);
+  await fetch(base+"/api/providers/codex/install",{method:"POST"});assert.equal(starts,2);
+ }finally{await new Promise<void>(r=>server.close(()=>r()));}
 });

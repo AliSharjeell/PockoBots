@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID, randomBytes, timingSafeEqual, createHash } from "node:crypto";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import type { Express } from "express";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Processes } from "./processes.js";
@@ -21,7 +21,7 @@ export const providerCatalog = [
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
 export function provider(id: string) {const p=providerCatalog.find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
 
-async function probe(command:string,args:string[],timeout=4000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
+async function probe(command:string,args:string[],timeout=15000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
 
 /** The vendor CLI owns login and token refresh. No vendor credentials are imported. */
 export class SubscriptionProviders {
@@ -30,7 +30,7 @@ export class SubscriptionProviders {
  private apiToken="";
  private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal}>();
  configure(base:string,token:string){this.base=base;this.apiToken=token;}
- async status(){return Promise.all(providerCatalog.map(async p=>{if(!p.supported)return {...p,installed:false,authenticated:false};const version=await probe(p.command,["--version"]);let authenticated:boolean|null=null;if(version.code===0&&(p.id==="codex"||p.id==="claude")){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}return {...p,installed:version.code===0,authenticated,version:version.code===0?version.text.trim().slice(0,100):"",note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};}));}
+ async status(){return Promise.all(providerCatalog.map(async p=>{if(!p.supported)return {...p,installed:false,authenticated:false};const version=await probe(p.command,["--version"]);let authenticated:boolean|null=null;if(version.code===0&&(p.id==="codex"||p.id==="claude")){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}else if(version.code===0){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}return {...p,installed:version.code===0,authenticated,version:version.code===0?version.text.trim().slice(0,100):"",note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};}));}
  async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");return tool.execute(randomUUID(),input.arguments||{},run.signal);}
  async run(id:string,options:{cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void}){
   const p=provider(id);if(!p.supported)throw Error(p.reason);if(options.signal.aborted)throw Error("Cancelled");
@@ -76,8 +76,10 @@ export const subscriptions=new SubscriptionProviders();
 /** Register after the app's existing bearer authentication middleware. */
 export function registerProviderRoutes(app:Express,options:{port:number;root:string;processes:Processes;terminals:Terminals;token:string}){
  subscriptions.configure("http://127.0.0.1:"+options.port,options.token);
- app.get("/api/providers",async(_req,res)=>res.json(await subscriptions.status()));
- app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.status(201).json(options.processes.start(p.install,options.root,"command",undefined,"Install "+p.name));});
+ const installations=new Map<string,string>();
+ app.get("/api/providers",async(_req,res)=>res.json((await subscriptions.status()).map(p=>({...p,installation:options.processes.jobs.get(installations.get(p.id)||"")||null}))));
+ app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(p.install+" --no-fund --no-audit --loglevel=notice",options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
+ app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}res.json(job);});
  app.post("/api/providers/:id/login",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const terminal=options.terminals.start(options.root);options.terminals.input(terminal.id,p.login+"\n");res.status(201).json({...terminal,provider:p.id,instruction:"Complete the vendor's login in this terminal. Credentials stay in the vendor CLI's phone-owned account directory."});});
  app.post("/api/provider-tools/:run/:operation",async(req,res)=>res.json(await subscriptions.bridge(req.params.run,String(req.headers["x-provider-bridge-token"]||""),req.params.operation,req.body)));
 }
