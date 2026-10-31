@@ -131,9 +131,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 chip.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),10,false));avatar=chip;
             }
             identity.addView(avatar,new LinearLayout.LayoutParams(dp(28),dp(28)));
-            TextView name=text(bot.optString("name"),17);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
+            TextView name=text(bot.optString("name"),17);name.setTextColor(0xffffffff);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            identity.addView(name);header.addView(identity,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
+            identity.addView(name);header.addView(GlassControls.wrap(identity,24f,false),new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         }else{
             String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen;
             TextView name=text(title,settingsChild()?22:28);
