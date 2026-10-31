@@ -26,7 +26,6 @@ final class BotWorkspace {
     private String scope(){return project.isEmpty()?"root":project;}
     private void terminal(){
         final int epoch=generation;final String key="shell-"+scope();terminalId=app.getSharedPreferences("bot-tools",0).getString(key,"");
-        body.addView(app.muted(project.isEmpty()?"Terminal /workspace - installed tools are shared by every bot":"Bot project terminal",12));
         LinearLayout keys=row();HorizontalScrollView strip=new HorizontalScrollView(app);strip.addView(keys);body.addView(strip);
         String[] names={"Esc","Tab","Ctrl-C","Ctrl-D","Up","Down"};String[] values={"\u001b","\t","\u0003","\u0004","\u001b[A","\u001b[B"};for(int i=0;i<values.length;i++){String value=values[i];button(keys,names[i],()->send(app.json("data",value)));}
         button(keys,"Paste",()->{if(terminal!=null)terminal.paste();});button(keys,"New shell",()->{if(!terminalId.isEmpty())app.request("DELETE","/terminals/"+terminalId,null,v->{});app.getSharedPreferences("bot-tools",0).edit().remove(key).apply();show(body,"Terminal",project);});

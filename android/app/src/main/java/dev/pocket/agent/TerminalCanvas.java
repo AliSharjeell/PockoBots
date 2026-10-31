@@ -23,8 +23,12 @@ final class TerminalCanvas extends View {
     private boolean control;
     TerminalCanvas(Context context, Input input) {
         super(context); this.input = input;
-        setFocusable(true); setFocusableInTouchMode(true); setBackgroundColor(Color.BLACK);
-        int size = Math.round(12 * getResources().getDisplayMetrics().scaledDensity);
+        setFocusable(true); setFocusableInTouchMode(true); setBackground(AgentStyle.surface(context,AgentStyle.BACK,18,false));setClipToOutline(true);setPadding(AgentStyle.dp(context,12),AgentStyle.dp(context,12),AgentStyle.dp(context,12),AgentStyle.dp(context,12));
+        TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND]=AgentStyle.BACK;
+        TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_FOREGROUND]=AgentStyle.TEXT;
+        TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_CURSOR]=AgentStyle.TEXT;
+        TerminalColors.COLOR_SCHEME.mDefaultColors[0]=AgentStyle.BACK;
+        int size = Math.round(14 * getResources().getDisplayMetrics().scaledDensity);
         Paint paint = new Paint(); paint.setTypeface(Typeface.MONOSPACE); paint.setTextSize(size);
         cellWidth = paint.measureText("X"); cellHeight = (int)Math.ceil(paint.getFontSpacing());
         renderer = new TerminalRenderer(size, Typeface.MONOSPACE);
@@ -63,13 +67,13 @@ final class TerminalCanvas extends View {
         input.send(text);
     }
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        int cols = Math.max(10, Math.min(500, (int)(w / cellWidth)));
-        int rows = Math.max(2, Math.min(200, h / cellHeight - 1));
+        int cols = Math.max(10, Math.min(500, (int)((w-getPaddingLeft()-getPaddingRight()) / cellWidth)));
+        int rows = Math.max(2, Math.min(200, (h-getPaddingTop()-getPaddingBottom()) / cellHeight - 1));
         emulator.resize(cols, rows, Math.round(cellWidth), cellHeight);
         input.resize(cols, rows);
     }
     @Override protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas); renderer.render(emulator, canvas, topRow, -1, -1, -1, -1);
+        super.onDraw(canvas);canvas.save();canvas.clipRect(getPaddingLeft(),getPaddingTop(),getWidth()-getPaddingRight(),getHeight()-getPaddingBottom());canvas.translate(getPaddingLeft(),getPaddingTop());renderer.render(emulator, canvas, topRow, -1, -1, -1, -1);canvas.restore();
     }
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) { touchY = event.getY(); dragged = false; }
