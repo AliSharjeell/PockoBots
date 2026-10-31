@@ -15,6 +15,7 @@ final class BotWorkspace {
     private final BotsActivity app;private final Handler main=new Handler(Looper.getMainLooper());
     private LinearLayout body;private String project="",directory=".",screen="",terminalId="";private int generation;private TerminalCanvas terminal;private TextView terminalStatus;
     BotWorkspace(BotsActivity app){this.app=app;}
+    void resetDirectory(){directory=".";}
     void stop(){generation++;main.removeCallbacksAndMessages(null);terminal=null;}
     private int dp(int n){return app.dp(n);}
     private LinearLayout column(){return app.column();}
@@ -22,7 +23,7 @@ final class BotWorkspace {
     private TextView text(String s,int n){return app.text(s,n);}
     private Button button(LinearLayout p,String s,Runnable click){return app.button(p,s,click,false);}
     private LinearLayout scrolling(){ScrollView scroll=new ScrollView(app);scroll.setClipToPadding(false);if(project.isEmpty())scroll.setPadding(0,0,0,dp(96));LinearLayout content=column();content.setPadding(dp(4),dp(12),dp(4),dp(16));scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return content;}
-    void show(LinearLayout parent,String tab,String id){stop();body=parent;body.removeAllViews();project=id;screen=tab;if(tab.equals("Terminal"))terminal();else if(tab.equals("Files"))files();else if(tab.equals("Settings"))settingsHome();else if(tab.equals("BYOK"))settings();else if(tab.equals("Subscriptions"))subscriptions();else if(tab.equals("Connections"))connectionsPage();else if(tab.equals("Permissions"))app.permissionSettings(scrolling());else if(tab.equals("Servers"))servers();}
+    void show(LinearLayout parent,String tab,String id){stop();body=parent;body.removeAllViews();if(!project.equals(id))directory=".";project=id;screen=tab;if(tab.equals("Terminal"))terminal();else if(tab.equals("Files"))files();else if(tab.equals("Settings"))settingsHome();else if(tab.equals("BYOK"))settings();else if(tab.equals("Subscriptions"))subscriptions();else if(tab.equals("Connections"))connectionsPage();else if(tab.equals("Permissions"))app.permissionSettings(scrolling());else if(tab.equals("Servers"))servers();}
     private String scope(){return project.isEmpty()?"root":project;}
     private void glassButton(LinearLayout parent,String label,Runnable action,boolean primary){
         Button key=app.button(parent,label,action,primary);key.setTextColor(primary?0xffffffff:AgentStyle.TEXT);parent.removeView(key);parent.addView(GlassControls.wrap(key,22f,primary));
@@ -51,7 +52,7 @@ final class BotWorkspace {
         });
     }
     private void files(){
-        final int epoch=generation;LinearLayout content=scrolling();LinearLayout bar=row();content.addView(bar);TextView path=text(directory.equals(".")?"Project files":directory,16);path.setTypeface(AgentStyle.font(app),Typeface.BOLD);bar.addView(path,new LinearLayout.LayoutParams(0,-2,1));glassButton(bar,"Up",()->{int slash=directory.lastIndexOf('/');directory=slash<0?".":directory.substring(0,slash);show(body,"Files",project);},false);glassButton(bar,"New",this::newFile,true);
+        final int epoch=generation;LinearLayout content=scrolling();LinearLayout bar=row();content.addView(bar);TextView path=text(directory.equals(".")?app.workspaceFilesTitle():directory,16);path.setTypeface(AgentStyle.font(app),Typeface.BOLD);bar.addView(path,new LinearLayout.LayoutParams(0,-2,1));glassButton(bar,"Up",()->{int slash=directory.lastIndexOf('/');directory=slash<0?".":directory.substring(0,slash);show(body,"Files",project);},false);glassButton(bar,"New",this::newFile,true);
 
         content.addView(app.muted("Tap a file to edit. Folders open here.",12));
         app.request("GET","/files?projectId="+AgentApi.encode(project)+"&path="+AgentApi.encode(directory),null,v->{if(epoch!=generation)return;JSONArray entries=(JSONArray)v;if(entries.length()==0)content.addView(app.muted("This folder is empty.",14));for(int i=0;i<entries.length();i++){JSONObject entry=entries.optJSONObject(i);String pathName=(directory.equals(".")?"":directory+"/")+entry.optString("name");LinearLayout item=row();item.setPadding(dp(10),dp(12),dp(10),dp(12));TextView icon=text(entry.optBoolean("directory")?"DIR":"FILE",10);icon.setTextColor(AgentStyle.MUTED);item.addView(icon,new LinearLayout.LayoutParams(dp(48),-2));TextView name=text(entry.optString("name"),14);name.setTypeface(AgentStyle.font(app));item.addView(name,new LinearLayout.LayoutParams(0,-2,1));item.addView(app.muted(entry.optBoolean("directory")?">":entry.optLong("size")+" B",11));content.addView(item);View line=new View(app);line.setBackgroundColor(AgentStyle.BORDER);content.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));item.setOnClickListener(w->{if(entry.optBoolean("directory")){directory=pathName;show(body,"Files",project);}else app.request("GET","/file?projectId="+AgentApi.encode(project)+"&path="+AgentApi.encode(pathName),null,result->editFile(pathName,((JSONObject)result).optString("content")));});}});

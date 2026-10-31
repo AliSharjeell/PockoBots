@@ -96,7 +96,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
-    private void open(String id){saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
+    private void open(String id){workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
@@ -491,6 +491,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);if(follow)markChatRead();});
     }
+    String workspaceFilesTitle(){JSONObject bot=detail==null?null:detail.optJSONObject("bot");return (bot==null?"Workspace":bot.optString("name","Bot"))+" files";}
     private String toolLabel(JSONObject tool){
         String name=tool.optString("name").replace('_',' '),detail="";try{JSONObject args=new JSONObject(tool.optString("input","{}"));detail=args.optString("command",args.optString("path",args.optString("query",args.optString("url",""))));}catch(Exception ignored){}return detail.isEmpty()?name:detail.replaceAll("\\s+"," ").trim();
     }
