@@ -59,9 +59,9 @@ fun GlassDockBar(
         drawRect(
             Brush.linearGradient(
                 listOf(
-                    if (dark) Color(0xFF1E2433) else Color(0xFFE2ECFF),
-                    if (dark) Color(0xFF2E2442) else Color(0xFFF2E6FA),
-                    if (dark) Color(0xFF142B30) else Color(0xFFD7F0ED)
+                    if (dark) Color(0xFF454547) else Color(0xFF6B6B6E),
+                    if (dark) Color(0xFF38383A) else Color(0xFF555558),
+                    if (dark) Color(0xFF404042) else Color(0xFF626265)
                 )
             )
         )
@@ -90,8 +90,8 @@ fun GlassDockBar(
                     },
                     onDrawSurface = {
                         drawRect(
-                            if (dark) Color(0xFF12151F).copy(alpha = 0.78f)
-                            else Color(0xFFFFFFFF).copy(alpha = 0.82f)
+                            if (dark) Color.White.copy(alpha = 0.08f)
+                            else Color.White.copy(alpha = 0.12f)
                         )
                     }
                 )
@@ -100,8 +100,8 @@ fun GlassDockBar(
                     brush = if (dark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFF384055).copy(alpha = 0.6f),
-                                Color(0xFF1F2432).copy(alpha = 0.4f)
+                                Color.White.copy(alpha = 0.35f),
+                                Color.White.copy(alpha = 0.12f)
                             )
                         )
                     } else {
@@ -122,8 +122,8 @@ fun GlassDockBar(
                 val selected = selectedIndex == index
                 val tabActiveBg by animateColorAsState(
                     targetValue = when {
-                        selected && dark -> Color(0xFF3B82F6).copy(alpha = 0.18f)
-                        selected && !dark -> Color(0xFFFFFFFF).copy(alpha = 0.92f)
+                        selected && dark -> Color.White.copy(alpha = 0.12f)
+                        selected && !dark -> Color.White.copy(alpha = 0.18f)
                         else -> Color.Transparent
                     },
                     animationSpec = tween(durationMillis = 200),
@@ -132,9 +132,9 @@ fun GlassDockBar(
 
                 val contentTint by animateColorAsState(
                     targetValue = when {
-                        selected -> Color(0xFF3B82F6)
-                        dark -> Color(0xFF94A3B8)
-                        else -> Color(0xFF64748B)
+                        selected -> Color(0xFF007AFF)
+                        dark -> Color.White
+                        else -> Color.White
                     },
                     animationSpec = tween(durationMillis = 200),
                     label = "tabTint"
@@ -150,7 +150,7 @@ fun GlassDockBar(
                             if (selected && dark) {
                                 Modifier.border(
                                     width = 1.dp,
-                                    color = Color(0xFF3B82F6).copy(alpha = 0.35f),
+                                    color = Color.White.copy(alpha = 0.25f),
                                     shape = RoundedCornerShape(26.dp)
                                 )
                             } else Modifier
