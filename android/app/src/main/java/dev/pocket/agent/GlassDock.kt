@@ -166,14 +166,14 @@ fun GlassDockBar(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Box(
-                            modifier = if (index == 3) Modifier.size(24.dp).border(1.3.dp, contentTint, CircleShape) else Modifier.size(24.dp),
+                            modifier = Modifier.size(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 painter = painterResource(if (selected) tab.selectedIcon else tab.icon),
                                 contentDescription = null,
                                 tint = contentTint,
-                                modifier = Modifier.size(if (index == 3) 17.dp else 24.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
