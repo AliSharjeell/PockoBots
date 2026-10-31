@@ -79,7 +79,7 @@ export class Sessions {
       ...s,
       busy: this.busy.has(id),
       trusted: this.trusted.has(id),
-      streaming: this.cliStreaming.get(id) || this.agents.get(id)?.state.streamingMessage || (s.progress?.status==="paused"&&s.progress.text?{role:"assistant",content:[{type:"text",text:s.progress.text}]}:undefined),
+      streaming: this.cliStreaming.get(id) || this.agents.get(id)?.state.streamingMessage || (s.progress&&["paused","stopped","failed"].includes(s.progress.status)&&s.progress.text?{role:"assistant",content:[{type:"text",text:s.progress.text}]}:undefined),
       approvals: [...this.approvals.values()]
         .filter((a) => a.sessionId === id)
         .map(({ resolve, ...a }) => a),
