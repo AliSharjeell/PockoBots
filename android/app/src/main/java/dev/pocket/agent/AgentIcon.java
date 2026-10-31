@@ -7,10 +7,16 @@ import android.view.View;
 
 /** Licensed Lucide outline icons shared with the Compose navigation dock. */
 final class AgentIcon extends View {
-    private final Drawable icon;private int iconTint;
+    private Drawable icon;private int iconTint;private String symbol="";
     void setIconTint(int color){iconTint=color;invalidate();}
     AgentIcon(Context context,String name,String description,Runnable action){
         super(context);
+        setSymbol(name);
+        setContentDescription(description);setFocusable(true);setClickable(true);
+        setBackground(AgentStyle.surface(context,AgentStyle.PANEL,28,true));
+        setOnClickListener(v->action.run());
+    }
+    void setSymbol(String name){if(name.equals(symbol))return;symbol=name;
         int resource;
         switch(name){
             case "menu":resource=R.drawable.lucide_menu;break;
@@ -25,10 +31,7 @@ final class AgentIcon extends View {
             case "close":resource=R.drawable.lucide_x;break;
             default:resource=R.drawable.lucide_settings_2;
         }
-        icon=context.getDrawable(resource).mutate();
-        setContentDescription(description);setFocusable(true);setClickable(true);
-        setBackground(AgentStyle.surface(context,AgentStyle.PANEL,28,true));
-        setOnClickListener(v->action.run());
+        icon=getContext().getDrawable(resource).mutate();invalidate();
     }
     @Override protected void onDraw(Canvas canvas){
         super.onDraw(canvas);int size=AgentStyle.dp(getContext(),21);

@@ -19,7 +19,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="",pendingRead="";
-    private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;
+    private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;private AgentIcon composerAction;private boolean chatBusy;private JSONObject currentJob;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
     void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
@@ -106,7 +106,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
     private void showScreen(String next){if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
-        workspace.stop();dockOverlay=null;headerAvatar=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
+        workspace.stop();dockOverlay=null;headerAvatar=null;composerAction=null;chatBusy=false;currentJob=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
         page.setOnApplyWindowInsetsListener((v,insets)->{int navigation=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();int bottom=selected.isEmpty()?Math.max(0,insets.getSystemWindowInsetBottom()-navigation):dp(8)+insets.getSystemWindowInsetBottom();v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),bottom);positionDock(navigation);return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
@@ -200,7 +200,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         bottomRow.addView(space2,new LinearLayout.LayoutParams(dp(8),dp(1)));
 
         // Right: Cupertino Telegram Send Button
-        AgentIcon send=new AgentIcon(this,"send","Send to bot",this::send);
+        AgentIcon send=new AgentIcon(this,"send","Send to bot",this::handleComposerAction);composerAction=send;
+        composer.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){updateComposerAction();}public void afterTextChanged(android.text.Editable text){}});
         bottomRow.addView(GlassControls.wrap(send,22f,true),new LinearLayout.LayoutParams(dp(42),dp(42)));
 
         bottomBarContainer.addView(bottomRow,new LinearLayout.LayoutParams(-1,-2));
@@ -465,14 +466,14 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 main.postDelayed(()->request("POST","/mobile/tasks/"+phone.optString("id")+"/answer",json("questionId",question.optString("id"),"text",answer),v->refresh(false)),400);
             },true);
         }
-        JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false,needsPhoneAccess=false;
+        JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false,needsPhoneAccess=false;currentJob=null;
         if(jobs!=null)for(int i=0;i<jobs.length();i++){
             JSONObject job=jobs.optJSONObject(i);String status=job.optString("status");
             if(Arrays.asList("completed","cancelled","failed").contains(status))continue;
-            busy|=Arrays.asList("running","arming","waiting").contains(status);paused|=status.equals("paused");
+            busy|=Arrays.asList("running","arming","waiting").contains(status);if(currentJob==null&&Arrays.asList("running","arming","waiting").contains(status))currentJob=job;paused|=status.equals("paused");
             needsPhoneAccess|=job.optBoolean("phoneArming");
         }
-        if(headerAvatar!=null)headerAvatar.setWorking(busy);
+        chatBusy=busy;updateComposerAction();if(headerAvatar!=null)headerAvatar.setWorking(busy);
         if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
             LinearLayout thinking=row();WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
@@ -487,6 +488,12 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);if(follow)markChatRead();});
+    }
+    private void updateComposerAction(){
+        if(composerAction==null||composer==null)return;boolean text=!composer.getText().toString().trim().isEmpty(),stop=chatBusy&&!text;composerAction.setSymbol(stop?"stop":"send");composerAction.setContentDescription(stop?"Stop current task":"Send to bot");composerAction.setEnabled(stop||text);
+    }
+    private void handleComposerAction(){
+        if(chatBusy&&composer!=null&&composer.getText().toString().trim().isEmpty()){if(currentJob!=null)request("POST","/bots/"+selected+"/jobs/"+currentJob.optString("id")+"/cancel",json(),value->refresh(false));}else send();
     }
     private void markChatRead(){
         if(!visible||!screen.equals("Chat")||selected.isEmpty()||detail==null||!follow||!pendingRead.isEmpty())return;
