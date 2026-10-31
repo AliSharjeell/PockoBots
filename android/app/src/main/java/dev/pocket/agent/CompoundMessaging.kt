@@ -29,7 +29,7 @@ import java.util.Locale
  * modeled directly after 6xingyv/compound:
  * - Continuous curved tails and grouped bubbles (BubbleContinuousShape)
  * - Bot avatars alongside incoming messages
- * - Timestamp and delivery checkmarks
+ * - Message timestamps
  * - Cupertino floating reaction bar (👍, ❤️, 🔥, 😂, 💡, 👏) on tap / long press
  * - Cupertino reply preview quoting
  * - Cupertino glass '+' attachment menu & pill composer
@@ -189,7 +189,7 @@ object CompoundMessaging {
         }
         bubbleLayout.addView(messageText)
 
-        // Bottom metadata row: Timestamp + Receipts
+        // Bottom metadata row: Timestamp
         val metaRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
@@ -209,18 +209,6 @@ object CompoundMessaging {
             }
         }
         metaRow.addView(timeView)
-
-        if (isUser) {
-            val checkView = TextView(ctx).apply {
-                letterSpacing = -0.06f
-                typeface = AgentStyle.font(ctx)
-                this.text = " ✓✓"
-                textSize = 10f
-                setTextColor(0xCCFFFFFF.toInt())
-                typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
-            }
-            metaRow.addView(checkView)
-        }
 
         bubbleLayout.addView(metaRow)
         bubbleFrame.addView(bubbleLayout)
