@@ -1,3 +1,5 @@
+import { GitHubLogin } from "./github-login.js";
+import { join } from "node:path";
 import { randomUUID, randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -14,7 +16,13 @@ export class Connectors {
   private records = new Map<string, Connector>();
   private clients = new Map<string, Promise<Client>>();
   private pending = new Map<string, { id: string; expires: number; url?: string }>();
-  constructor(private store: Store, private oauthRedirect = "http://127.0.0.1:8787/api/oauth/mcp/callback") {}
+  private github: GitHubLogin;
+  constructor(private store: Store, private oauthRedirect = "http://127.0.0.1:8787/api/oauth/mcp/callback") {
+    this.github=new GitHubLogin(join(store.dir,"github-cli"),async(id,token)=>{const c=this.records.get(id);if(!c||!this.githubTarget(c)||!c.enabled||!c.oauth)throw Error("GitHub connection changed during sign-in");c.token=token;c.oauthData={tokens:{access_token:token,token_type:"Bearer"}};await this.persist();});
+  }
+  private githubTarget(c:Connector){return c.marketplaceId==="github"&&c.transport==="http"&&c.url==="https://api.githubcopilot.com/mcp/";}
+  githubStatus(id:string){this.require([id]);const c=this.records.get(id)!;if(!this.githubTarget(c))throw Error("This connection does not use GitHub device sign-in");return this.github.status(id);}
+  cancelGitHub(id:string){this.require([id]);this.github.cancel(id);return {status:"cancelled"};}
   async init() { for (const c of await this.store.read<Connector[]>("connectors", [])) this.records.set(c.id, c); }
   list() { return [...this.records.values()].map(({ token, env, headers, oauthData, ...c }) => ({ ...c, hasToken: !!token, envKeys: Object.keys(env || {}), headerKeys: Object.keys(headers || {}), authStatus: c.oauth ? oauthData?.tokens ? "authorized" : "sign_in_required" : "configured" })); }
   redact(text: string) { for (const c of this.records.values()) for (const secret of [c.token, ...Object.values(c.env || {}), ...Object.values(c.headers || {}), c.oauthData?.tokens?.access_token, c.oauthData?.tokens?.refresh_token, c.oauthData?.client?.client_secret, c.oauthData?.verifier]) if (typeof secret === "string" && secret) text = text.split(secret).join("[redacted]"); return text; }
@@ -36,7 +44,7 @@ export class Connectors {
       if (url.username || url.password || url.search || url.hash || (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))) throw Error("Use HTTPS, or loopback HTTP, without URL credentials/query parameters");
     } else if (typeof c.command !== "string" || !c.command.trim() || c.command.length > 500 || !Array.isArray(c.args) || c.args.length > 40 || c.args.some(a => typeof a !== "string" || a.length > 2000)) throw Error("Enter an executable and JSON array of arguments");
     for (const [state, pending] of this.pending) if (pending.id === c.id) this.pending.delete(state);
-    await this.disconnect(c.id); this.records.set(c.id, c); await this.persist(); return this.list().find(item => item.id === c.id)!;
+    this.github.cancel(c.id); await this.disconnect(c.id); this.records.set(c.id, c); await this.persist(); return this.list().find(item => item.id === c.id)!;
   }
   private secretMap(input: unknown, previous?: Record<string,string>, headers=false, merge=false) {
     if(input === undefined) return previous || {};
@@ -63,6 +71,7 @@ export class Connectors {
   }
   async startOAuth(id: string) {
     this.require([id]);const c=this.records.get(id)!;if(c.transport!=="http"||!c.oauth)throw Error("This connection does not use MCP OAuth");
+    if(this.githubTarget(c)){await this.disconnect(id);return this.github.start(id);}
     for(const [state,p] of this.pending)if(p.id===id||p.expires<Date.now())this.pending.delete(state);
     await this.disconnect(id); const result=await auth(this.oauthProvider(c),{serverUrl:c.url,fetchFn:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(20000)})});
     if(result==="AUTHORIZED")return {status:"authorized"};
@@ -76,7 +85,7 @@ export class Connectors {
     if(result!=="AUTHORIZED")throw Error("OAuth authorization did not finish");if(c.oauthData)delete c.oauthData.verifier;await this.persist();return {id:c.id,status:"authorized"};
   }
   private persist() { return this.store.write("connectors", [...this.records.values()]); }
-  async remove(id: string) { await this.disconnect(id); this.records.delete(id); await this.persist(); }
+  async remove(id: string) { this.github.cancel(id); await this.disconnect(id); this.records.delete(id); await this.persist(); }
   private async disconnect(id: string) { const client = this.clients.get(id); this.clients.delete(id); if (client) try { await (await client).close(); } catch {} }
   private client(id: string): Promise<Client> {
     this.require([id]); const existing = this.clients.get(id); if (existing) return existing;
@@ -113,5 +122,5 @@ export class Connectors {
     }
     return tools;
   }
-  async close() { await Promise.all([...this.clients.keys()].map(id => this.disconnect(id))); }
+  async close() { this.github.close(); await Promise.all([...this.clients.keys()].map(id => this.disconnect(id))); }
 }

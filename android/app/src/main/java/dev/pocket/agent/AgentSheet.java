@@ -20,7 +20,7 @@ class AgentSheet {
         dialog.setContentView(panel);dialog.setCanceledOnTouchOutside(true);
     }
     private int dp(int value){return app.dp(value);}
-    void action(String label,Runnable action,boolean primary){Button button=app.button(content,label,action,primary);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(48));params.topMargin=dp(10);button.setLayoutParams(params);}
+    Button action(String label,Runnable action,boolean primary){Button button=app.button(content,label,action,primary);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(48));params.topMargin=dp(10);button.setLayoutParams(params);return button;}
     void show(){dialog.show();Window window=dialog.getWindow();if(window!=null){window.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));window.setLayout(-1,-2);window.setGravity(Gravity.BOTTOM);window.setDimAmount(.45f);window.setWindowAnimations(android.R.style.Animation_InputMethod);}}
     static void message(BotsActivity app,String title,String detail){AgentSheet sheet=new AgentSheet(app,title);sheet.content.addView(app.muted(detail==null?"Please try again.":detail,13));sheet.action("Done",sheet.dialog::dismiss,true);sheet.show();}
 }

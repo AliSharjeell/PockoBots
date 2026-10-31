@@ -100,8 +100,22 @@ final class MarketplaceUi {
         pending.add(item.optString("id"));show(body);
         request("POST","/connectors/"+c.optString("id")+"/oauth/start",app.json(),result->{
             pending.remove(item.optString("id"));show(body);JSONObject auth=(JSONObject)result;String url=auth.optString("authorizationUrl");
-            if(!url.isEmpty())app.openUrl(url);else if(auth.optString("status").equals("authorized"))check(item,c);else message("Sign-in unavailable","Open Configure to review this app's connection settings.");
+            if(auth.optString("mode").equals("github_device"))githubSignIn(item,c);else if(!url.isEmpty())app.openUrl(url);else if(auth.optString("status").equals("authorized"))check(item,c);else message("Sign-in unavailable","Open Configure to review this app's connection settings.");
         });
+    }
+    private void githubSignIn(JSONObject item,JSONObject connection){
+        Sheet sheet=new Sheet("Sign in to GitHub");TextView status=muted("Preparing GitHub's official sign-in tool...",13),code=text("",26);code.setTypeface(AgentStyle.font(app),Typeface.BOLD);code.setGravity(Gravity.CENTER);sheet.content.addView(status);sheet.content.addView(code);ProgressBar progress=new ProgressBar(app);sheet.content.addView(progress,new LinearLayout.LayoutParams(-1,dp(32)));
+        Button open=sheet.action("Copy code & open GitHub",()->{String value=code.getText().toString();if(value.isEmpty())return;android.content.ClipboardManager clipboard=(android.content.ClipboardManager)app.getSystemService(android.content.Context.CLIPBOARD_SERVICE);clipboard.setPrimaryClip(android.content.ClipData.newPlainText("GitHub verification code",value));app.openUrl("https://github.com/login/device");},true);open.setEnabled(false);
+        boolean[] finished={false};String path="/connectors/"+connection.optString("id")+"/oauth";sheet.dialog.setOnDismissListener(v->{if(!finished[0])app.marketplaceRequest("POST",path+"/cancel",app.json(),r->{},error->{});});sheet.action("Cancel",sheet.dialog::dismiss,false);sheet.show();pollGitHub(item,connection,sheet,status,code,progress,open,finished);
+    }
+    private void pollGitHub(JSONObject item,JSONObject connection,Sheet sheet,TextView status,TextView code,ProgressBar progress,Button open,boolean[] finished){
+        if(!sheet.dialog.isShowing())return;app.marketplaceRequest("GET","/connectors/"+connection.optString("id")+"/oauth/status",null,value->{
+            if(!sheet.dialog.isShowing())return;JSONObject auth=(JSONObject)value;String state=auth.optString("status");
+            if(state.equals("authorized")){finished[0]=true;sheet.dialog.dismiss();show(body);check(item,connection);return;}
+            if(state.equals("waiting")){progress.setVisibility(View.GONE);code.setText(auth.optString("userCode"));status.setText("Copy this one-time code, then authorize GitHub CLI on GitHub's own page. Return here after signing in.");open.setEnabled(true);}
+            if(state.equals("failed")||state.equals("cancelled")){progress.setVisibility(View.GONE);status.setText(auth.optString("message","Sign-in cancelled. Close and retry when ready."));open.setEnabled(false);finished[0]=true;return;}
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->pollGitHub(item,connection,sheet,status,code,progress,open,finished),1500);
+        },error->{if(sheet.dialog.isShowing()){status.setText("Reconnecting to sign-in...");new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->pollGitHub(item,connection,sheet,status,code,progress,open,finished),2500);}});
     }
     private void check(JSONObject item,JSONObject c){
         pending.add(item.optString("id"));show(body);

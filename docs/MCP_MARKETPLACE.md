@@ -1,7 +1,7 @@
 # MCP marketplace and sign-in
 
 The marketplace includes factual connection definitions for all 30 vendors in
-C:/AppsNew/openbot/marketplace/plugin-catalog/plugins plus Google Workspace.
+C:/AppsNew/openbot/marketplace/plugin-catalog/plugins plus Google Workspace and GitHub.
 The inspected local source has no .git metadata, so no commit identity could
 be established. Its plugin catalog declares version v1 dated 2026-09-30.
 OpenBot uses PolyForm Noncommercial; PockoBots does not copy its implementation,
@@ -12,12 +12,12 @@ Included vendors: Aave, Airtable, Apple apps, Atlassian, Brave Search, Canva,
 Cloudflare, Cobrain, Composio, Context7, Figma, Firecrawl, Hugging Face, Linear,
 Neon, Netlify, Notion, Obsidian, Paper, PostHog, Prisma, Railway, Render, Resend,
 Sentry, Stripe, Supabase, Todoist, Trello and Vercel. Google Workspace is added
-as a separate entry. A catalog listing is not proof that an external service is
+with GitHub as additional entries. A catalog listing is not proof that an external service is
 reachable, free, or compatible with this Android runtime. Test each connection.
 
-The native directory groups flat app rows under category headings. App logos
+The native directory starts with a four-column Essentials grid, then groups flat app rows under category headings. App logos
 are bundled, with provenance in third_party/marketplace-icons/sources.json.
-There are no category badges or per-app cards. Tap + to connect; a saved entry
+There are no category badges or per-app cards. Tap Add to connect; a saved entry
 shows Added and a three-dot menu for sign-in, configuration, connection checks,
 help or removal. Added means a configuration exists, not that account access
 has been granted. The separate sign-in caption reflects authorization state.
@@ -102,7 +102,7 @@ production account is represented as connected by these tests.
 
 ## Browser sign-in coverage and reference research - 2026-10-31
 
-The catalogue now marks 22 of 31 entries for direct MCP OAuth. This is protocol
+The catalogue now marks 22 of 32 entries for direct MCP OAuth, plus GitHub device authorization. This is protocol
 configuration, not a claim that all 22 accounts or vendor client policies have
 been exercised. No production account consent was automated during development.
 Airtable, Figma, PostHog, Resend, Render and Hugging Face now prefer their remote
@@ -143,3 +143,34 @@ Five scoped backend checks cover catalogue coverage, PKCE/state replay guards,
 private token storage, blank-field credential retention, bearer-key fallback,
 authenticated mutation routes and the token-free app return page. They use
 local fixtures, not real vendor accounts. Visual review is left to the user.
+
+## GitHub device sign-in
+
+GitHub does not support dynamic client registration for its hosted MCP server.
+The GitHub entry therefore uses the official GitHub CLI's browser/device flow,
+not the generic MCP registration flow. Its consent page identifies **GitHub CLI**.
+The native sheet shows the one-time code and a Copy code & open GitHub button.
+After approval, the app checks MCP connectivity. Access and organization policy
+are still determined by GitHub; a sign-in does not bypass those policies.
+
+On first use, the private Linux runtime downloads GitHub CLI **2.103.3** from
+[its official release](https://github.com/cli/cli/releases/tag/v2.103.3), supporting
+Linux amd64 and arm64. Downloads are limited to 64 MiB and checked against the
+[published SHA-256 checksums](https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_checksums.txt):
+
+- amd64: `4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d`
+- arm64: `ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63`
+
+Each attempt uses an isolated private CLI account directory, excludes inherited
+GitHub tokens, expires after 15 minutes, and is cancelled when dismissed or the
+connection changes. Temporary account files are removed after the access token
+is saved to that exact GitHub connection's private state. The owner-only polling
+endpoint exposes status/code, never the token or raw CLI output. Reauthorize if
+the token is revoked. This does not sign in the global terminal's gh account.
+
+Implementation references: [GitHub host integration](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md)
+and [gh auth login](https://cli.github.com/manual/gh_auth_login).
+Tests exercise real child-process device-code parsing, private token transfer,
+cancellation and cleanup using a local fake CLI. They do not authorize a real
+GitHub account. GET /api/connectors/:id/oauth/status and POST to the same base
+path /cancel require the normal owner bearer authentication.

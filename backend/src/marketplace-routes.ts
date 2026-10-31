@@ -20,5 +20,7 @@ export function registerMarketplaceApi(app:Express,connectors:Connectors,busy:()
  const idle=()=>{if(busy())throw Error('Pause agents before changing integrations');};
  app.get('/api/marketplace',(_req,res)=>res.json(listMarketplace(connectors)));
  app.post('/api/marketplace/:id/install',async(req,res)=>{idle();res.status(201).json(await installMarketplace(connectors,String(req.params.id),req.body));});
+ app.get('/api/connectors/:id/oauth/status',(req,res)=>res.json(connectors.githubStatus(String(req.params.id))));
+ app.post('/api/connectors/:id/oauth/cancel',(req,res)=>res.json(connectors.cancelGitHub(String(req.params.id))));
  app.post('/api/connectors/:id/oauth/start',async(req,res)=>{idle();res.json(await connectors.startOAuth(String(req.params.id)));});
 }

@@ -12,8 +12,8 @@ import {marketplaceCatalog,installMarketplace,listMarketplace} from '../src/mark
 
 test('marketplace contains all 30 reference vendors and Google Workspace with honest setup states',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'pocko-market-'));const store=new Store(directory);await store.init();const connectors=new Connectors(store);await connectors.init();
- try{assert.equal(marketplaceCatalog.length,31);assert.equal(new Set(marketplaceCatalog.map(e=>e.id)).size,31);assert.equal(listMarketplace(connectors).every(e=>e.status==='not_configured'),true);
- assert.equal(marketplaceCatalog.filter(item=>item.oauth).length,22);
+ try{assert.equal(marketplaceCatalog.length,32);assert.equal(new Set(marketplaceCatalog.map(e=>e.id)).size,32);assert.equal(listMarketplace(connectors).every(e=>e.status==='not_configured'),true);
+ assert.equal(marketplaceCatalog.filter(item=>item.oauth).length,23);
  for(const id of ['airtable','figma','posthog','resend','render','huggingface']){const entry=marketplaceCatalog.find(item=>item.id===id)!;assert.equal(entry.transport,'http');assert.equal(entry.oauth,true);assert.equal(entry.fields.length,0);assert.equal(entry.availability,'setup-required');}
  await assert.rejects(installMarketplace(connectors,'paper'),/desktop host/);
  await assert.rejects(installMarketplace(connectors,'google-workspace'),/OAuth client ID/);
@@ -47,7 +47,7 @@ test('marketplace mutations stay behind bearer auth and callback rejects foreign
  registerMarketplaceCallback(app,connectors,port);app.use((req,res,next)=>{if(req.headers.authorization!=='Bearer fixture'){res.status(401).json({error:'unauthorized'});return;}next();});registerMarketplaceApi(app,connectors);app.use((error:any,_req:any,res:any,_next:any)=>res.status(400).json({error:String(error.message)}));
  try{const base='http://127.0.0.1:'+port;
  assert.equal((await fetch(base+'/api/marketplace')).status,401);
- const allowed=await fetch(base+'/api/marketplace',{headers:{Authorization:'Bearer fixture'}});assert.equal(allowed.status,200);assert.equal(((await allowed.json()) as any[]).length,31);
+ const allowed=await fetch(base+'/api/marketplace',{headers:{Authorization:'Bearer fixture'}});assert.equal(allowed.status,200);assert.equal(((await allowed.json()) as any[]).length,32);
  const foreignStatus=await new Promise<number>((resolve,reject)=>{const request=http.get(base+'/api/oauth/mcp/callback?state=bad&code=bad',{headers:{Host:'foreign.example'}},response=>{response.resume();resolve(response.statusCode!);});request.on('error',reject);});assert.equal(foreignStatus,403);
  const callback=await fetch(base+'/api/oauth/mcp/callback?state=bad&code=bad');assert.equal(callback.status,400);assert.match(await callback.text(),/Authorization could not/);assert.equal(callback.headers.get('cache-control'),'no-store');
  const result=await fetch(base+'/api/marketplace/notion/install',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:'{}'});assert.equal(result.status,201);assert.equal(((await result.json()) as any).status,'configured');
