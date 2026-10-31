@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
+import type {FileChange} from './file-changes.js';
 
-export type ToolProgress={id:string;name:string;input:string;output:string;status:'running'|'done'|'error'|'interrupted'};
+export type ToolProgress={id:string;name:string;input:string;output:string;changes?:FileChange[];status:'running'|'done'|'error'|'interrupted'};
 export type RunProgress={id:string;status:'working'|'completed'|'paused'|'stopped'|'failed';started?:number;updated:number;text:string;thinking:string;thoughts:Record<string,string>;tools:ToolProgress[]};
 export function newProgress():RunProgress{return {id:randomUUID(),status:'working',started:Date.now(),updated:Date.now(),text:'',thinking:'',thoughts:{},tools:[]};}
 export function updateProgress(progress:RunProgress,event:any,redact:(text:string)=>string,message?:any){
@@ -19,6 +20,7 @@ export function updateProgress(progress:RunProgress,event:any,redact:(text:strin
   if(!tool){tool={id,name:String(event.toolName||'Tool'),input:'',output:'',status:'running'};progress.tools.push(tool);}
   if(event.args!==undefined)tool.input=safe(event.args,6000);
   const result=event.result??event.partialResult;if(result!==undefined)tool.output=safe(result,12000);
+  if(Array.isArray(result?.details?.changes))tool.changes=result.details.changes.slice(0,12).map((change:FileChange)=>({...change,path:safe(change.path,1000),diff:safe(change.diff,24000)}));
   if(event.type==='tool_execution_end')tool.status=event.isError?'error':'done';
  }
  if(event.type==='thinking'&&typeof event.text==='string'){progress.thoughts??={};progress.thoughts[String(event.id||'provider')]=safe(event.text,64000);progress.thinking=Object.values(progress.thoughts).join('\n\n');}

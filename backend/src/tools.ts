@@ -3,6 +3,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Workspace } from "./workspace.js";
 import type { Processes } from "./processes.js";
 import { validPort, tunnelCommand } from "./processes.js";
+import {fileChange,snapshotFiles,snapshotChanges} from './file-changes.js';
 function define<T extends TSchema>(tool: AgentTool<T>): AgentTool<T> {
   return tool;
 }
@@ -38,8 +39,10 @@ export function agentTools(
         "Create or replace a UTF-8 workspace file. Creates parent directories.",
       parameters: Type.Object({ path: Type.String(), content: Type.String() }),
       execute: async (_id, p) => {
+        let before='';try{before=await workspace.read(p.path);}catch(error:any){if(error.code!=='ENOENT')throw error;}
         await workspace.write(p.path, p.content);
-        return output("Saved " + p.path);
+        const change=fileChange(p.path,before,p.content);
+        return {...output("Saved " + p.path),details:{changes:change?[change]:[]}};
       },
     }),
     define({
@@ -52,12 +55,14 @@ export function agentTools(
         cwd: Type.Optional(Type.String()),
       }),
       execute: async (_id, p, signal) => {
+        const before=await snapshotFiles(workspace.root);
         const result = await processes.run(
           p.command,
           await workspace.path(p.cwd),
           signal,
         );
-        return output(JSON.stringify(result));
+        const changes=snapshotChanges(before,await snapshotFiles(workspace.root));
+        return {...output(JSON.stringify(result)),details:{changes}};
       },
     }),
     define({
