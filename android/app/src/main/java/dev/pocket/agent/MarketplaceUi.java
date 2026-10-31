@@ -67,14 +67,13 @@ final class MarketplaceUi {
         LinearLayout copy=app.column();copy.setPadding(dp(10),0,dp(6),0);
         TextView name=text(item.optString("name"),16);name.setTypeface(AgentStyle.font(app),Typeface.BOLD);copy.addView(name);
         TextView description=muted(item.optString("description"),12);description.setMaxLines(2);description.setEllipsize(android.text.TextUtils.TruncateAt.END);copy.addView(description);copy.addView(muted(status(item),11));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
-        boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));row.addView(addControl(item),new LinearLayout.LayoutParams(added?dp(56):dp(64),dp(36)));
+        boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));row.addView(addControl(item),new LinearLayout.LayoutParams(dp(64),dp(36)));
         AgentIcon more=new AgentIcon(app,"more","Configure "+item.optString("name"),()->options(item));more.setBackground(null);more.setEnabled(!busy);row.addView(more,new LinearLayout.LayoutParams(dp(30),dp(44)));list.addView(row);
         View rule=new View(app);rule.setBackgroundColor(AgentStyle.BORDER);LinearLayout.LayoutParams line=new LinearLayout.LayoutParams(-1,dp(1));line.setMargins(dp(60),0,dp(8),0);list.addView(rule,line);
     }
     private View addControl(JSONObject item){
         boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
-        if(added){TextView value=text("Added",12);value.setGravity(Gravity.CENTER);value.setOnClickListener(v->options(item));return value;}
-        Button button=new Button(app);button.setText(busy?"...":"Add");AgentStyle.button(button,true);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription("Add "+item.optString("name"));button.setOnClickListener(v->connect(item));return button;
+        Button button=new Button(app);button.setText(busy?"...":added?"Added":"Add");AgentStyle.button(button,!added);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription((added?"Configure ":"Add ")+item.optString("name"));if(added){button.setBackground(AgentStyle.surface(app,0xff27272a,22,false));button.setTextColor(0xffffffff);}button.setOnClickListener(v->{if(added)options(item);else connect(item);});return button;
     }
     private void connect(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
