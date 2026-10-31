@@ -18,7 +18,7 @@ final class MarketplaceUi {
     private TextView text(String value,int size){return app.text(value,size);}
     private TextView muted(String value,int size){return app.muted(value,size);}
     private void request(String method,String path,JSONObject data,BotsActivity.Result done){
-        app.marketplaceRequest(method,path,data,done,error->{pending.clear();if(body.isAttachedToWindow()){show(body);message("Couldn't connect",error==null?"Please try again.":error);}});
+        app.marketplaceRequest(method,path,data,done,error->{pending.clear();if(body.isAttachedToWindow()){if(!method.equals("GET"))show(body);message("Couldn't connect",error==null?"Please try again.":error);}});
     }
     void show(LinearLayout parent){
         body=parent;parent.removeAllViews();
@@ -63,7 +63,7 @@ final class MarketplaceUi {
         save(item,new JSONObject(),false,"",null);
     }
     private void save(JSONObject item,JSONObject credentials,boolean apiKey,String token,Dialog form){
-        String itemId=item.optString("id");if(!pending.add(itemId))return;
+        String itemId=item.optString("id");if(!pending.add(itemId))return;show(body);
         JSONObject input=app.json("credentials",credentials,"useApiKey",apiKey);if(apiKey&&!token.isEmpty())try{input.put("token",token);}catch(JSONException ignored){}
         request("POST","/marketplace/"+itemId+"/install",input,result->{
             if(form!=null)form.dismiss();JSONObject c=((JSONObject)result).getJSONObject("connection");
@@ -71,14 +71,14 @@ final class MarketplaceUi {
         });
     }
     private void signIn(JSONObject item,JSONObject c){
-        pending.add(item.optString("id"));
+        pending.add(item.optString("id"));show(body);
         request("POST","/connectors/"+c.optString("id")+"/oauth/start",app.json(),result->{
             pending.remove(item.optString("id"));show(body);JSONObject auth=(JSONObject)result;String url=auth.optString("authorizationUrl");
             if(!url.isEmpty())app.openUrl(url);else if(auth.optString("status").equals("authorized"))check(item,c);else message("Sign-in unavailable","Open Configure to review this app's connection settings.");
         });
     }
     private void check(JSONObject item,JSONObject c){
-        pending.add(item.optString("id"));
+        pending.add(item.optString("id"));show(body);
         request("POST","/connectors/"+c.optString("id")+"/test",app.json(),result->{pending.remove(item.optString("id"));show(body);JSONObject checked=(JSONObject)result;JSONArray tools=checked.optJSONArray("tools");message("Connected to "+item.optString("name"),(tools==null?0:tools.length())+" tools are available. Choose this connection in your bot's profile to let it use this app.");});
     }
     private void configure(JSONObject item){
