@@ -617,24 +617,12 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             expRow.addView(chip,lp);
         }
 
-        // Section 4: Identity & Instructions (Only 2 EditTexts in creation mode!)
         EditText role=field(form,"Instructions",create?"":bot.optString("role"),false);
         role.setSingleLine(false);
         role.setMinLines(3);
         role.setGravity(Gravity.TOP);
         role.setHint("What should this bot help you with?");
 
-        EditText avatar=null,accent=null,personality=null;
-        if(!create){
-            avatar=field(form,"Custom emoji or initials (optional override)","",false);
-            accent=field(form,"Custom color (optional override)","",false);
-            personality=field(form,"Personality",bot.optString("personality"),false);
-            personality.setSingleLine(false);
-            button(form,"Tools, alerts & routines",()->botOptions(bot),false);
-            button(form,"Select MCP connections",this::selectConnections,false);
-        }
-
-        final EditText fAvatar=avatar,fAccent=accent,fPersonality=personality;
         final boolean[] submitted={false};
         final Dialog[] dialogRef={sheet.dialog};
 
@@ -643,24 +631,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(name.getText().toString().trim().isEmpty()){name.setError("Enter a bot name");return;}
             submitted[0]=true;
             String avatarStr=!create&&!appearanceChanged[0]?bot.optString("avatar"):"bloub:"+selectedShape[0]+":"+selectedExpression[0];
-            if(!create&&fAvatar!=null&&!fAvatar.getText().toString().isEmpty()){
-                avatarStr=fAvatar.getText().toString();
-            }
             String accentStr=selectedColor[0];
-            if(!create&&fAccent!=null&&!fAccent.getText().toString().isEmpty()){
-                accentStr=fAccent.getText().toString();
-            }
-            String personalityStr=selectedExpression[0];
-            if(!create&&fPersonality!=null&&!fPersonality.getText().toString().isEmpty()){
-                personalityStr=fPersonality.getText().toString();
-            }
 
             marketplaceRequest(create?"POST":"PUT",create?"/bots":"/bots/"+bot.optString("id"),
                 json("name",name.getText().toString().trim(),
                      "role",role.getText().toString().trim(),
                      "avatar",avatarStr,
                      "accent",accentStr,
-                     "personality",personalityStr,
                      "kind","unified",
                      "allowShell",create||bot.optBoolean("allowShell",true),
                      "allowUrgent",create||bot.optBoolean("allowUrgent",true),
