@@ -39,14 +39,15 @@ import java.util.function.IntConsumer
 
 data class DockTabItem(
     val label: String,
-    val icon: Int
+    val icon: Int,
+    val selectedIcon: Int
 )
 
 val DockTabs = listOf(
-    DockTabItem("Home", R.drawable.lucide_house),
-    DockTabItem("Marketplace", R.drawable.lucide_store),
-    DockTabItem("Terminal", R.drawable.lucide_square_terminal),
-    DockTabItem("Settings", R.drawable.lucide_settings_2)
+    DockTabItem("Home", R.drawable.phosphor_house_regular, R.drawable.phosphor_house_fill),
+    DockTabItem("Marketplace", R.drawable.phosphor_storefront_regular, R.drawable.phosphor_storefront_fill),
+    DockTabItem("Terminal", R.drawable.phosphor_terminal_window_regular, R.drawable.phosphor_terminal_window_fill),
+    DockTabItem("Settings", R.drawable.phosphor_gear_six_regular, R.drawable.phosphor_gear_six_fill)
 )
 
 @Composable
@@ -59,9 +60,9 @@ fun GlassDockBar(
         drawRect(
             Brush.linearGradient(
                 listOf(
-                    if (dark) Color(0xFF454547) else Color(0xFF6B6B6E),
-                    if (dark) Color(0xFF38383A) else Color(0xFF555558),
-                    if (dark) Color(0xFF404042) else Color(0xFF626265)
+                    if (dark) Color(0xFF171719) else Color(0xFF6B6B6E),
+                    if (dark) Color(0xFF202022) else Color(0xFF555558),
+                    if (dark) Color(0xFF141416) else Color(0xFF626265)
                 )
             )
         )
@@ -90,7 +91,7 @@ fun GlassDockBar(
                     },
                     onDrawSurface = {
                         drawRect(
-                            if (dark) Color.White.copy(alpha = 0.08f)
+                            if (dark) Color.White.copy(alpha = 0.035f)
                             else Color.White.copy(alpha = 0.12f)
                         )
                     }
@@ -122,7 +123,7 @@ fun GlassDockBar(
                 val selected = selectedIndex == index
                 val tabActiveBg by animateColorAsState(
                     targetValue = when {
-                        selected && dark -> Color.White.copy(alpha = 0.12f)
+                        selected && dark -> Color.White.copy(alpha = 0.09f)
                         selected && !dark -> Color.White.copy(alpha = 0.18f)
                         else -> Color.Transparent
                     },
@@ -130,15 +131,7 @@ fun GlassDockBar(
                     label = "tabBg"
                 )
 
-                val contentTint by animateColorAsState(
-                    targetValue = when {
-                        selected -> Color(0xFF007AFF)
-                        dark -> Color.White
-                        else -> Color.White
-                    },
-                    animationSpec = tween(durationMillis = 200),
-                    label = "tabTint"
-                )
+                val contentTint = Color.White
 
                 Box(
                     modifier = Modifier
@@ -171,12 +164,17 @@ fun GlassDockBar(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            painter = painterResource(tab.icon),
-                            contentDescription = null,
-                            tint = contentTint,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = if (index == 3) Modifier.size(24.dp).border(1.3.dp, contentTint, CircleShape) else Modifier.size(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(if (selected) tab.selectedIcon else tab.icon),
+                                contentDescription = null,
+                                tint = contentTint,
+                                modifier = Modifier.size(if (index == 3) 17.dp else 24.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = tab.label,
