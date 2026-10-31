@@ -18,7 +18,8 @@ final class TerminalCanvas extends View {
     private final int cellHeight;
     private int topRow;
     private float touchY;
-    private boolean dragged;
+    private boolean dragged,longPressed;
+    private float touchX;
     private long offset;
     private boolean control;
     TerminalCanvas(Context context, Input input) {
@@ -40,7 +41,7 @@ final class TerminalCanvas extends View {
             @Override public void onBell() { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); }
             @Override public void onColorsChanged() { invalidate(); }
         }, 80, 24, Math.round(cellWidth), cellHeight, 5000, null);
-        setOnLongClickListener(v -> { copy(emulator.getScreen().getTranscriptText()); return true; });
+        setOnLongClickListener(v -> { longPressed=true;copy(emulator.getScreen().getTranscriptText()); return true; });
     }
     void append(String base64, long start) {
         byte[] bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
@@ -76,8 +77,10 @@ final class TerminalCanvas extends View {
         super.onDraw(canvas);canvas.save();canvas.clipRect(getPaddingLeft(),getPaddingTop(),getWidth()-getPaddingRight(),getHeight()-getPaddingBottom());canvas.translate(getPaddingLeft(),getPaddingTop());renderer.render(emulator, canvas, topRow, -1, -1, -1, -1);canvas.restore();
     }
     @Override public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_DOWN) { touchY = event.getY(); dragged = false; }
+        if (event.getAction() == MotionEvent.ACTION_DOWN) { touchX=event.getX();touchY = event.getY(); dragged = false;longPressed=false; }
+        if(event.getAction()==MotionEvent.ACTION_UP&&!dragged&&!longPressed&&openLink(event.getX(),event.getY())){cancelLongPress();setPressed(false);return true;}
         if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            if(Math.abs(event.getX()-touchX)>ViewConfiguration.get(getContext()).getScaledTouchSlop())dragged=true;
             int delta = (int)((touchY - event.getY()) / cellHeight);
             if (delta != 0) {
                 topRow = Math.max(-emulator.getScreen().getActiveTranscriptRows(), Math.min(0, topRow + delta));
@@ -87,6 +90,16 @@ final class TerminalCanvas extends View {
         // Let View dispatch taps and long presses, including transcript copying.
         super.onTouchEvent(event);
         return true;
+    }
+    private boolean openLink(float x,float y){
+        int col=(int)((x-getPaddingLeft())/cellWidth),row=topRow+(int)((y-getPaddingTop())/cellHeight);
+        if(col<0||col>=emulator.mColumns||row< -emulator.getScreen().getActiveTranscriptRows()||row>=emulator.mRows)return false;
+        try{TerminalBuffer screen=emulator.getScreen();int first=row,last=row;while(first> -screen.getActiveTranscriptRows()&&screen.getLineWrap(first-1))first--;while(last<emulator.mRows-1&&screen.getLineWrap(last))last++;
+            String line=screen.getSelectedText(0,first,emulator.mColumns,last,true,true);int index=screen.getSelectedText(0,first,col,row,true,true).length()-1;
+            java.util.regex.Matcher links=java.util.regex.Pattern.compile("https?://[^\\s<>\\\"\\u001b]+").matcher(line);
+            while(links.find()){if(index<links.start()||index>=links.end())continue;String url=links.group().replaceAll("[.,;]+$","");for(String pair:new String[]{"()","[]","{}"})while(url.endsWith(pair.substring(1))&&url.chars().filter(c->c==pair.charAt(1)).count()>url.chars().filter(c->c==pair.charAt(0)).count())url=url.substring(0,url.length()-1);
+                android.net.Uri uri=android.net.Uri.parse(url);if(uri.getHost()==null)return false;getContext().startActivity(new Intent(Intent.ACTION_VIEW,uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);return true;}
+        }catch(Exception ignored){}return false;
     }
     @Override public boolean performClick() {
         super.performClick(); requestFocus();
