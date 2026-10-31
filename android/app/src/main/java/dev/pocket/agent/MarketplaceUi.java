@@ -115,15 +115,7 @@ final class MarketplaceUi {
         if(item.optString("transport").equals("stdio"))sheet.action("Open Terminal",()->{sheet.dialog.dismiss();app.openMainTerminal();},false);sheet.show();
     }
     private void message(String title,String detail){Sheet sheet=new Sheet(title);sheet.content.addView(muted(detail,13));sheet.action("Done",sheet.dialog::dismiss,true);sheet.show();}
-    private final class Sheet {
-        final Dialog dialog=new Dialog(app);final LinearLayout content=app.column();
-        Sheet(String title){
-            LinearLayout panel=app.column();panel.setPadding(dp(16),dp(12),dp(16),dp(20));panel.setBackground(AgentStyle.surface(app,AgentStyle.PANEL,28,true));
-            View handle=new View(app);handle.setBackground(AgentStyle.surface(app,AgentStyle.MUTED,2,false));LinearLayout.LayoutParams grip=new LinearLayout.LayoutParams(dp(38),dp(4));grip.gravity=Gravity.CENTER_HORIZONTAL;grip.bottomMargin=dp(14);panel.addView(handle,grip);
-            ScrollView scroll=new ScrollView(app){@Override protected void onMeasure(int width,int height){super.onMeasure(width,View.MeasureSpec.makeMeasureSpec((int)(getResources().getDisplayMetrics().heightPixels*.72f),View.MeasureSpec.AT_MOST));}};scroll.addView(content);panel.addView(scroll);
-            TextView heading=text(title,23);heading.setTypeface(AgentStyle.font(app),Typeface.BOLD);content.addView(heading);dialog.setContentView(panel);dialog.setCanceledOnTouchOutside(true);
-        }
-        void action(String label,Runnable action,boolean primary){Button button=app.button(content,label,action,primary);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(48));params.topMargin=dp(10);button.setLayoutParams(params);}
-        void show(){dialog.show();Window window=dialog.getWindow();if(window!=null){window.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));window.setLayout(-1,-2);window.setGravity(Gravity.BOTTOM);window.setDimAmount(.45f);window.setWindowAnimations(android.R.style.Animation_InputMethod);}}
+    private final class Sheet extends AgentSheet {
+        Sheet(String title){super(MarketplaceUi.this.app,title);}
     }
 }
