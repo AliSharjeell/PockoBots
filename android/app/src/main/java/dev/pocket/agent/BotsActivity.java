@@ -78,7 +78,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         slp.bottomMargin=dp(32);
         center.addView(sub,slp);
         
-        center.addView(new LoadingSkeleton(this,"bots",3),new LinearLayout.LayoutParams(-1,dp(230)));
 
         loading.addView(center,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         setContentView(loading);
