@@ -98,6 +98,16 @@ snapshot to test this feature. The project already records an earlier emulator
 snapshot/data limitation in VERIFICATION.md; a display probe does not restore or
 establish preservation of older emulator data.
 
+## Standalone YouTube launch check - 2026-10-31
+
+The QA-only `probeExternalAppLaunch` test also attempted a new YouTube task on
+its app-owned private display after checking no YouTube task already existed.
+Android rejected it with SecurityException / Permission Denial for launchDisplayId.
+The main Settings activity was unchanged and the probe released its display.
+This confirms why a shell-assisted result must not be advertised as a capability
+of the standalone APK. The ordinary Settings capability probe still only checks
+policy and renders app-owned content; it never launches another app.
+
 ## Pixel YouTube companion experiment - 2026-10-31
 
 A shell-assisted experiment passed on the existing Pixel 10 Pro XL API 37

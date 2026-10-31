@@ -1,5 +1,29 @@
 # Verification
 
+## Messaging, subscriptions and connectors v0.6.0 - 2026-10-31
+
+The updated Java/Compose messaging UI builds with JDK 17, Gradle 8.13 and SDK 36.
+Android lint passes. All 33 backend integration tests pass under Linux Node
+22.23.3, including groups/delegation, MCP OAuth PKCE and callback guards,
+subscription CLI subprocesses/MCP tools, cancellation, and protected chat clearing.
+Provider tests use a local fake vendor executable, not paid account inference.
+
+The isolated QA installation on the existing Pixel 10 Pro XL API 37 emulator
+(4 KB mode) passed MessagingShellSmokeTest and both AgentDisplayCapabilitiesTest checks
+together in 26.299 seconds. The messaging journey exercised the
+glass dock, 31 marketplace entries, subscription settings, theme recreation,
+group replies, Markdown/table/link chat output, a reply quote sent through the
+real backend, clipboard copying and native structured result cards. No real
+model credentials were used or written into the normal installation.
+
+A separate YouTube shell-companion display test passed in 1.675 seconds.
+YouTube was observable and accepted display-scoped input on display 3 while
+Settings remained on display 0. See [measured limits](BACKGROUND_DISPLAYS.md):
+this is an ADB/scrcpy prototype, not standalone hidden app control or a cloned
+account. Live subscription logins, Google Workspace OAuth, arbitrary hidden
+LinkedIn/Instagram sessions and physical ARM64 devices remain unverified.
+
+
 ## Unified bots v0.5.0 - 2026-10-28
 
 All 20 backend tests pass under Linux Node 22.23.3. New coverage verifies one
