@@ -13,6 +13,8 @@ import {marketplaceCatalog,installMarketplace,listMarketplace} from '../src/mark
 test('marketplace contains all 30 reference vendors and Google Workspace with honest setup states',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'pocko-market-'));const store=new Store(directory);await store.init();const connectors=new Connectors(store);await connectors.init();
  try{assert.equal(marketplaceCatalog.length,31);assert.equal(new Set(marketplaceCatalog.map(e=>e.id)).size,31);assert.equal(listMarketplace(connectors).every(e=>e.status==='not_configured'),true);
+ assert.equal(marketplaceCatalog.filter(item=>item.oauth).length,22);
+ for(const id of ['airtable','figma','posthog','resend','render','huggingface']){const entry=marketplaceCatalog.find(item=>item.id===id)!;assert.equal(entry.transport,'http');assert.equal(entry.oauth,true);assert.equal(entry.fields.length,0);assert.equal(entry.availability,'setup-required');}
  await assert.rejects(installMarketplace(connectors,'paper'),/desktop host/);
  await assert.rejects(installMarketplace(connectors,'google-workspace'),/OAuth client ID/);
  await connectors.save({name:'Google Workspace',transport:'http',url:'https://custom.example/mcp'});
@@ -50,4 +52,25 @@ test('marketplace mutations stay behind bearer auth and callback rejects foreign
  const callback=await fetch(base+'/api/oauth/mcp/callback?state=bad&code=bad');assert.equal(callback.status,400);assert.match(await callback.text(),/Authorization could not/);assert.equal(callback.headers.get('cache-control'),'no-store');
  const result=await fetch(base+'/api/marketplace/notion/install',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:'{}'});assert.equal(result.status,201);assert.equal(((await result.json()) as any).status,'configured');
  }finally{await connectors.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(directory,{recursive:true,force:true});}
+});
+
+
+test('marketplace credential edits retain saved private fields and support a bearer-key fallback',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pocko-market-edit-'));const store=new Store(directory);await store.init();const connectors=new Connectors(store);await connectors.init();
+ try{
+  const first=await installMarketplace(connectors,'google-workspace',{credentials:{'google-client-id':'keep-client','google-client-secret':'old-secret'}});
+  const edited=await installMarketplace(connectors,'google-workspace',{credentials:{'google-client-id':'','google-client-secret':'new-secret'}});assert.equal(edited.connection.id,first.connection.id);
+  const values=JSON.parse(await readFile(join(directory,'connectors.json'),'utf8'));assert.deepEqual(values[0].env,{GOOGLE_OAUTH_CLIENT_ID:'keep-client',GOOGLE_OAUTH_CLIENT_SECRET:'new-secret'});assert.equal(JSON.stringify(listMarketplace(connectors)).includes('new-secret'),false);
+  await assert.rejects(installMarketplace(connectors,'render',{useApiKey:true}),/Enter an API key/);
+  const key=await installMarketplace(connectors,'render',{useApiKey:true,token:'private-render-key'});assert.equal(key.connection.oauth,false);assert.equal(key.connection.hasToken,true);assert.equal(key.needsSignIn,false);
+  const retained=await installMarketplace(connectors,'render',{useApiKey:true});assert.equal(retained.connection.id,key.connection.id);assert.equal(retained.connection.hasToken,true);assert.equal(connectors.redact('private-render-key'),'[redacted]');
+  await assert.rejects(installMarketplace(connectors,'google-workspace',{useApiKey:true}),/alternate bearer/);
+ }finally{await connectors.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('OAuth callback checks the connection and returns a safe app handoff',async()=>{
+ const app=express();let checked=false;const server=http.createServer(app);await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const port=(server.address() as any).port;
+ const connectors={finishOAuth:async(state:unknown,code:unknown)=>{assert.equal(state,'owner-state');assert.equal(code,'owner-code');return {id:'saved-connection',status:'authorized'};},inspect:async(id:string)=>{assert.equal(id,'saved-connection');checked=true;return {connected:true,tools:[]};}} as unknown as Connectors;registerMarketplaceCallback(app,connectors,port);
+ try{const response=await fetch('http://127.0.0.1:'+port+'/api/oauth/mcp/callback?state=owner-state&code=owner-code');assert.equal(response.status,200);assert.equal(checked,true);const html=await response.text();assert.match(html,/pockobots:\/\/oauth\/complete/);assert.match(html,/connection is ready/);assert.doesNotMatch(html,/owner-state|owner-code|saved-connection/);assert.equal(response.headers.get('cache-control'),'no-store');}
+ finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
 });
