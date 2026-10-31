@@ -129,7 +129,7 @@ export class Bots {
   }
   status(id:string){
     const bot=this.get(id),jobs=this.jobs.filter(job=>job.botId===id),active=jobs.find(job=>["arming","running","waiting"].includes(job.status)),latest=active||jobs.at(-1),progress=this.sessions.progress(bot.sessionId);
-    return {id:bot.id,name:bot.name,enabled:bot.enabled,status:active?.status||latest?.status||"ready",task:latest?.text,queued:jobs.filter(job=>job.status==="queued").length,started:progress?.started,updated:progress?.updated||latest?.updated,thinking:progress?.thinking.slice(-700),currentTool:progress?.tools.find(tool=>tool.status==="running")?.name,lastResponse:progress?.text.slice(-1400)||latest?.output};
+    return {id:bot.id,name:bot.name,enabled:bot.enabled,status:active?.status||latest?.status||"ready",task:latest?.text,queued:jobs.filter(job=>job.status==="queued").length,started:progress?.started,updated:progress?.updated||latest?.updated,thinking:!!progress?.thinking,currentTool:progress?.tools.find(tool=>tool.status==="running")?.name,lastResponse:progress?.text.slice(-1400)||latest?.output};
   }
   async sendOwnerMessage(id:string,text:unknown){
     const bot=this.get(id);if(typeof text!=="string"||!text.trim()||text.length>16000)throw Error("Enter a message of at most 16000 characters");const active=this.jobs.find(job=>job.botId===id&&["running","waiting"].includes(job.status));
