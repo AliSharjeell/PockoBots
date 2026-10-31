@@ -1,6 +1,6 @@
 ---
 name: emulatortrick
-description: Open and foreground PockoBots' existing Pixel Android emulator in a standalone floating Windows window, preserving app data and the required 4 KB runtime mode.
+description: Open PockoBots' existing Pixel Android emulator in a standalone floating Windows window, preserving app data and the required 4 KB runtime mode.
 ---
 
 # Open the floating emulator
@@ -33,13 +33,11 @@ $pixelAdb = Join-Path $pixelSdk 'platform-tools\adb.exe'
 
 If a different AVD/port is requested, pass `-Avd` and `-Serial` to the helper and use that same serial for ADB. Do not assume port 5554 belongs to the intended AVD without the helper's identity check.
 
-## Bring the window to the foreground
+## Leave desktop control to the user
 
-Use the available Computer Use skill for Windows window selection and activation. Discover current windows and select the unique returned Android Emulator window for this Pixel. Activate that returned window; never reuse a window ID from a previous session.
+Launching with `-Visible` opened the standalone floating Pixel window successfully on this PC; the user confirmed they could see it. The working flow is the PowerShell helper followed by the ADB app-launch command above.
 
-If Android Studio owns an embedded emulator, use its observed Running Devices UI to open it in a separate window. Prefer reusing a healthy running device over restarting it. If the device is absent, the helper above launches the standalone emulator without requiring Android Studio to remain open.
-
-Confirm that the emulator window is visible. This is window-opening verification, not permission to inspect private apps, operate accounts, or run phone-agent tasks.
+Do not use Windows Computer Use, desktop screenshots, mouse/keyboard injection, or window activation to inspect, move, resize or foreground the emulator. The user handles its window and checks the UI. If it is behind another app, tell the user it is running and let them select it from the taskbar. Starting the emulator is not authorization to operate other desktop apps or phone accounts.
 
 ## UI iteration in this repository
 
