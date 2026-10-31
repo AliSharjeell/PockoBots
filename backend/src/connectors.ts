@@ -28,7 +28,7 @@ export class Connectors {
     const sameTarget = !previous || previous.transport === input.transport && (input.transport === "http" ? previous.url === input.url : previous.command === input.command);
     const c: Connector = { id: previous?.id || randomUUID(), name: input.name.trim(), transport: input.transport,
       url: input.url || "", command: input.command || "", args: input.args || [],
-      token: input.clearToken ? "" : input.token || (sameTarget ? previous?.token : "") || "", enabled: input.enabled !== false, marketplaceId: input.marketplaceId ?? previous?.marketplaceId, env: this.secretMap(input.env, sameTarget ? previous?.env : undefined), headers: this.secretMap(input.headers, sameTarget ? previous?.headers : undefined, true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
+      token: input.clearToken ? "" : input.token || (sameTarget ? previous?.token : "") || "", enabled: input.enabled !== false, marketplaceId: input.marketplaceId ?? previous?.marketplaceId, env: this.secretMap(input.env, sameTarget ? previous?.env : undefined, false, input.preserveSecrets === true), headers: this.secretMap(input.headers, sameTarget ? previous?.headers : undefined, true, input.preserveSecrets === true), oauth: input.oauth === undefined ? previous?.oauth : input.oauth === true, oauthData: previous?.url === input.url ? previous?.oauthData : undefined };
     if (c.marketplaceId !== undefined && (typeof c.marketplaceId !== "string" || !/^[a-z0-9-]{1,60}$/.test(c.marketplaceId))) throw Error("Invalid marketplace identity");
     if (typeof c.token !== "string" || c.token.length > 8000 || /[\r\n]/.test(c.token)) throw Error("Invalid bearer token");
     if (c.transport === "http") {
@@ -38,14 +38,14 @@ export class Connectors {
     for (const [state, pending] of this.pending) if (pending.id === c.id) this.pending.delete(state);
     await this.disconnect(c.id); this.records.set(c.id, c); await this.persist(); return this.list().find(item => item.id === c.id)!;
   }
-  private secretMap(input: unknown, previous?: Record<string,string>, headers=false) {
+  private secretMap(input: unknown, previous?: Record<string,string>, headers=false, merge=false) {
     if(input === undefined) return previous || {};
     if(!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length>32) throw Error("Use an object of at most 32 secret values");
-    const result: Record<string,string>={};
+    const result: Record<string,string>=merge?{...previous}:{};
     for(const [name,value] of Object.entries(input)) {
       if(!(headers ? /^[A-Za-z][A-Za-z0-9-]{0,79}$/ : /^[A-Za-z_][A-Za-z0-9_]{0,79}$/).test(name) || typeof value!=="string" || value.length>8000 || /[\r\n\0]/.test(value) || headers && /^(host|content-length|connection|cookie)$/i.test(name)) throw Error("Invalid secret variable or header");
       result[name]=value;
-    } return result;
+    } if(Object.keys(result).length>32)throw Error("Use at most 32 secret values");return result;
   }
   private oauthProvider(c: Connector): OAuthClientProvider {
     c.oauthData ??= {};

@@ -538,13 +538,23 @@ export function listMarketplace(connectors: Connectors) {
 export async function installMarketplace(connectors: Connectors,id: string,input: any={}) {
  const entry=marketplaceCatalog.find(e=>e.id===id);if(!entry)throw Error("Marketplace item not found");
  if(entry.availability==="external-host-required")throw Error("This integration needs a compatible desktop host. Add its reachable MCP endpoint as a custom connection.");
+ const existing=connectors.list().find(c=>c.marketplaceId===entry.id);
  const secrets=input.credentials || {};if(typeof secrets!=="object"||Array.isArray(secrets))throw Error("Invalid connection credentials");
- const env:Record<string,string>={},headers:Record<string,string>={};let url:string=entry.url;
- for(const field of entry.fields as readonly {id:string;label:string;env?:string;header?:string;url?:boolean;prefix?:string}[]) {
-  const value=secrets[field.id];if(typeof value!=="string"||!value.trim())throw Error("Enter "+field.label);
+ const fields=entry.fields as readonly {id:string;label:string;env?:string;header?:string;url?:boolean;prefix?:string}[];
+ const env:Record<string,string>={},headers:Record<string,string>={};let url:string=fields.some(f=>f.url)&&existing?existing.url:entry.url;
+ const sameTarget=existing?.transport===entry.transport&&(entry.transport==="http"?existing.url===url:existing.command===entry.command);
+ for(const field of fields) {
+  const value=secrets[field.id];
+  if(value===undefined||value===""){
+   if(sameTarget&&(field.url||field.env&&existing?.envKeys.includes(field.env)||field.header&&existing?.headerKeys.includes(field.header)))continue;
+   throw Error("Enter "+field.label);
+  }
+  if(typeof value!=="string"||!value.trim())throw Error("Enter "+field.label);
   if(field.url)url=value;else if(field.env)env[field.env]=value;else if(field.header)headers[field.header]=(field.prefix||"")+value;
  }
- const existing=connectors.list().find(c=>c.marketplaceId===entry.id);
- const connection=await connectors.save({id:existing?.id,marketplaceId:entry.id,name:entry.name,transport:entry.transport,url,command:entry.command,args:[...entry.args],env,headers,oauth:entry.oauth});
- return {connection,status:"configured",setup:entry.setup,needsSignIn:entry.oauth};
+ const useApiKey=input.useApiKey===true;
+ if(useApiKey&&(!entry.oauth||entry.transport!=="http"))throw Error("This app does not support an alternate bearer API key");
+ if(useApiKey&&!(typeof input.token==="string"&&input.token.trim())&&!(sameTarget&&existing?.hasToken))throw Error("Enter an API key");
+ const connection=await connectors.save({id:existing?.id,marketplaceId:entry.id,name:entry.name,transport:entry.transport,url,command:entry.command,args:[...entry.args],env,headers,preserveSecrets:true,token:useApiKey?input.token:undefined,oauth:entry.oauth&&!useApiKey});
+ return {connection,status:"configured",setup:entry.setup,needsSignIn:connection.oauth&&connection.authStatus!=="authorized"};
 }

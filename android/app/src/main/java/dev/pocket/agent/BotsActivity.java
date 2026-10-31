@@ -21,6 +21,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private String replyQuote="";
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
+    void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
+        if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){failed.accept(e.getMessage());}});}catch(Exception e){main.post(()->{if(!isDestroyed())failed.accept(e.getMessage());});}});
+    }
+    private boolean oauthReturn(Intent intent){Uri data=intent.getData();return data!=null&&"pockobots".equals(data.getScheme())&&"oauth".equals(data.getHost())&&"/complete".equals(data.getPath());}
+
     int dp(int n){return AgentStyle.dp(this,n);}
     JSONObject json(Object...pairs){JSONObject value=new JSONObject();try{for(int i=0;i<pairs.length;i+=2)value.put((String)pairs[i],pairs[i+1]);}catch(Exception e){throw new IllegalArgumentException(e);}return value;}
     JSONObject currentState(){return state;}
@@ -81,9 +86,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         loading.addView(center,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         setContentView(loading);
     }
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Settings";if(screen.equals("Setup"))screen="Settings";showLoadingScreen("Starting your local bots...");}
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Settings";if(screen.equals("Setup"))screen="Settings";if(oauthReturn(getIntent())){selected="";screen="Marketplace";}showLoadingScreen("Starting your local bots...");}
     @Override protected void onSaveInstanceState(Bundle out){out.putString("bot",selected);out.putString("screen",screen);super.onSaveInstanceState(out);}
-    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);String id=intent.getStringExtra("botId");if(id!=null&&id.matches("[0-9a-f-]{36}")){if(api==null)selected=id;else open(id);}}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(oauthReturn(intent)){selected="";screen="Marketplace";if(api!=null)showScreen("Marketplace");return;}String id=intent.getStringExtra("botId");if(id!=null&&id.matches("[0-9a-f-]{36}")){if(api==null)selected=id;else open(id);}}
     @Override protected void onResume(){super.onResume();visible=true;getSharedPreferences("bot-runtime",0).edit().putBoolean("enabled",true).apply();startForegroundService(new Intent(this,RuntimeService.class).putExtra("botsEnabled",true));connect();}
     private void connect(){if(!visible)return;if(!RuntimeService.ready){showLoadingScreen(RuntimeService.status);main.postDelayed(this::connect,1000);return;}try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());refresh(true);}catch(Exception e){error(e);}}
     @Override protected void onPause(){saveDraft();visible=false;main.removeCallbacks(poll);workspace.stop();super.onPause();}

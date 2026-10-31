@@ -5,9 +5,13 @@ import {installMarketplace,listMarketplace} from "./marketplace.js";
 /** Register before the bearer-auth middleware. One-time OAuth state authenticates this callback. */
 export function registerMarketplaceCallback(app:Express,connectors:Connectors,port:number){
  app.get('/api/oauth/mcp/callback',async(req,res)=>{
-  res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'none'");
+  res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
   if(![`127.0.0.1:${port}`,`localhost:${port}`].includes(req.headers.host||'')){res.status(403).type('text').send('Invalid callback host');return;}
-  try{await connectors.finishOAuth(req.query.state,req.query.code);res.type('text').send('Authorization complete. Return to PockoBots and test this connection.');}
+  try{
+   const result=await connectors.finishOAuth(req.query.state,req.query.code);
+   let ready=false;try{await connectors.inspect(result.id);ready=true;}catch{}
+   res.type('html').send(`<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PockoBots</title><style>body{margin:0;background:#090a0f;color:#fff;font:16px system-ui;letter-spacing:-.06em;display:grid;place-items:center;min-height:100vh}main{padding:32px;max-width:420px}h1{font-size:32px;margin:0 0 12px}p{color:#a1a1aa;line-height:1.5}a{display:block;margin-top:28px;padding:16px 24px;background:#fff;color:#090a0f;text-align:center;border-radius:28px;text-decoration:none;font-weight:700}</style><main><h1>You're signed in.</h1><p>${ready?"Your connection is ready for your bots.":"Your account is authorized. Open the app to finish connecting or review its settings."}</p><a href="pockobots://oauth/complete">Return to PockoBots</a></main></html>`);
+  }
   catch{res.status(400).type('text').send('Authorization could not be completed. Return to PockoBots and start sign-in again.');}
  });
 }
