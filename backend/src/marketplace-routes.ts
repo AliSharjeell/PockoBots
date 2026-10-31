@@ -18,6 +18,7 @@ export function registerMarketplaceCallback(app:Express,connectors:Connectors,po
 /** Register after the existing bearer-auth middleware. Installing config does not claim tool connectivity. */
 export function registerMarketplaceApi(app:Express,connectors:Connectors,busy:()=>boolean=()=>false){
  const idle=()=>{if(busy())throw Error('Pause agents before changing integrations');};
+ app.post('/api/github/cli/setup',async(_req,res)=>{idle();res.json(await connectors.prepareGitHubCli());});
  app.get('/api/marketplace',(_req,res)=>res.json(listMarketplace(connectors)));
  app.post('/api/marketplace/:id/install',async(req,res)=>{idle();res.status(201).json(await installMarketplace(connectors,String(req.params.id),req.body));});
  app.get('/api/connectors/:id/oauth/status',(req,res)=>res.json(connectors.githubStatus(String(req.params.id))));

@@ -23,9 +23,13 @@ export class Connectors {
   private githubTarget(c:Connector){return c.marketplaceId==="github"&&c.transport==="http"&&c.url==="https://api.githubcopilot.com/mcp/";}
   githubStatus(id:string){this.require([id]);const c=this.records.get(id)!;if(!this.githubTarget(c))throw Error("This connection does not use GitHub device sign-in");return this.github.status(id);}
   cancelGitHub(id:string){this.require([id]);this.github.cancel(id);return {status:"cancelled"};}
-  async init() { for (const c of await this.store.read<Connector[]>("connectors", [])) this.records.set(c.id, c); }
-  list() { return [...this.records.values()].map(({ token, env, headers, oauthData, ...c }) => ({ ...c, hasToken: !!token, envKeys: Object.keys(env || {}), headerKeys: Object.keys(headers || {}), authStatus: c.oauth ? oauthData?.tokens ? "authorized" : "sign_in_required" : "configured" })); }
-  redact(text: string) { for (const c of this.records.values()) for (const secret of [c.token, ...Object.values(c.env || {}), ...Object.values(c.headers || {}), c.oauthData?.tokens?.access_token, c.oauthData?.tokens?.refresh_token, c.oauthData?.client?.client_secret, c.oauthData?.verifier]) if (typeof secret === "string" && secret) text = text.split(secret).join("[redacted]"); return text; }
+  async init() { for (const c of await this.store.read<Connector[]>("connectors", [])) this.records.set(c.id, c); await this.github.initCliPath(); }
+  private githubAccount(){const c=[...this.records.values()].find(c=>this.githubTarget(c)&&c.enabled&&!!c.token);if(!c)throw Error('Add GitHub and finish signing in through Marketplace first.');return c;}
+  async prepareGitHubCli(){const c=this.githubAccount();await this.github.ensureCli(c.token);return {ready:true,command:'gh',note:'Restart existing terminals to refresh their environment. GitHub authorization is shared across bot workspaces.'};}
+  async githubCommand(args:string[],signal?:AbortSignal){const c=this.githubAccount();const result=await this.github.command(c.token,args,signal);return {...result,stdout:this.redact(result.stdout),stderr:this.redact(result.stderr)};}
+  private argumentSecrets(c:Connector){return c.args.flatMap((arg,i)=>{if(i>0&&/^--?[\w-]*(?:token|secret|password|api[-_]?key)$/i.test(c.args[i-1]))return [arg];const inline=arg.match(/^--?[\w-]*(?:token|secret|password|api[-_]?key)=(.+)$/i);return inline?[inline[1]]:[];});}
+  list() { return [...this.records.values()].map(({ token, env, headers, oauthData, ...c }) => ({ ...c,args:c.args.map(arg=>this.redact(arg)), hasToken: !!token, envKeys: Object.keys(env || {}), headerKeys: Object.keys(headers || {}), authStatus: c.oauth ? oauthData?.tokens ? "authorized" : "sign_in_required" : "configured" })); }
+  redact(text: string) { for (const c of this.records.values()) for (const secret of [c.token, ...this.argumentSecrets(c), ...Object.values(c.env || {}), ...Object.values(c.headers || {}), c.oauthData?.tokens?.access_token, c.oauthData?.tokens?.refresh_token, c.oauthData?.client?.client_secret, c.oauthData?.verifier]) if (typeof secret === "string" && secret) text = text.split(secret).join("[redacted]"); return text; }
   require(ids: string[]) { for (const id of ids) { const c = this.records.get(id); if (!c?.enabled) throw Error("A selected MCP connection is missing or disabled"); } }
   async save(input: any) {
     const previous = input.id ? this.records.get(input.id) : undefined;
@@ -41,7 +45,7 @@ export class Connectors {
     if (typeof c.token !== "string" || c.token.length > 8000 || /[\r\n]/.test(c.token)) throw Error("Invalid bearer token");
     if (c.transport === "http") {
       const url = new URL(c.url);
-      if (url.username || url.password || url.search || url.hash || (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))) throw Error("Use HTTPS, or loopback HTTP, without URL credentials/query parameters");
+      if (url.username || url.password || [...url.searchParams.keys()].some(key=>/token|secret|password|api[_-]?key|authorization/i.test(key)) || url.hash || (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))) throw Error("Use HTTPS, or loopback HTTP, without URL credentials, secret query parameters or fragments");
     } else if (typeof c.command !== "string" || !c.command.trim() || c.command.length > 500 || !Array.isArray(c.args) || c.args.length > 40 || c.args.some(a => typeof a !== "string" || a.length > 2000)) throw Error("Enter an executable and JSON array of arguments");
     for (const [state, pending] of this.pending) if (pending.id === c.id) this.pending.delete(state);
     this.github.cancel(c.id); await this.disconnect(c.id); this.records.set(c.id, c); await this.persist(); return this.list().find(item => item.id === c.id)!;
@@ -101,6 +105,18 @@ export class Connectors {
     })(); this.clients.set(id, pending); return pending;
   }
   async inspect(id: string) { const client = await this.client(id); const result = await client.listTools({}, { timeout: 20000 }); return { tools: result.tools.map(t => ({ name: t.name, description: t.description })), connected: true }; }
+  async discover(id:string,query=''){
+    this.require([id]);const c=this.records.get(id)!;if(c.oauth&&!c.oauthData?.tokens)throw Error('Sign in to '+c.name+' in Marketplace first.');
+    const client=await this.client(id),tools:any[]=[];let cursor:string|undefined;
+    for(let page=0;page<10;page++){const result=await client.listTools({cursor},{timeout:20000});tools.push(...result.tools);cursor=result.nextCursor;if(!cursor)break;}
+    const terms=String(query).toLowerCase().split(/\s+/).filter(Boolean);const matches=tools.filter(t=>terms.every(term=>(t.name+' '+(t.description||'')).toLowerCase().includes(term)));
+    return {connection:c.name,tools:matches.slice(0,20),more:matches.length>20||!!cursor,note:'Use call_integration_tool with the tool name and its inputSchema. Narrow the query if more is true.'};
+  }
+  async call(id:string,name:string,args:Record<string,unknown>,signal?:AbortSignal){
+    this.require([id]);const c=this.records.get(id)!;if(c.oauth&&!c.oauthData?.tokens)throw Error('Sign in to '+c.name+' in Marketplace first.');
+    if(typeof name!=='string'||!name||name.length>200||!args||typeof args!=='object'||Array.isArray(args))throw Error('Invalid integration tool call');
+    const client=await this.client(id);return client.callTool({name,arguments:args},undefined,{signal,timeout:30000});
+  }
   async tools(ids: string[]): Promise<AgentTool<any>[]> {
     this.require(ids); const tools: AgentTool<any>[] = [];
     for (const id of ids) {

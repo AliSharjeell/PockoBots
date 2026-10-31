@@ -1,7 +1,7 @@
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile, chmod, rename, rm, access } from "node:fs/promises";
+import { mkdir, writeFile, chmod, rename, rm, access,readFile,copyFile,symlink } from "node:fs/promises";
 import { join } from "node:path";
 
 const execute = promisify(execFile);
@@ -17,6 +17,7 @@ type Attempt = { public: Status; abort: AbortController; child?: ChildProcess; t
 export class GitHubLogin {
   private attempts = new Map<string, Attempt>();
   private installing?: Promise<string>;
+  private sharing?:Promise<void>;
   constructor(private root: string, private saveToken: (id: string, token: string) => Promise<void>, private fixture?: { command: string; args: string[] }) {}
   status(id: string): Status { return this.attempts.get(id)?.public || { mode: "github_device", status: "cancelled" }; }
   start(id: string) {
@@ -35,6 +36,42 @@ export class GitHubLogin {
     attempt.public = { mode: "github_device", status: "cancelled" };
   }
   close() { for (const id of this.attempts.keys()) this.cancel(id); }
+  async initCliPath(){
+    if(process.platform!=='linux'||!process.env.POCKET_STATE||this.fixture)return;
+    const bin=join(this.root,'bin');await mkdir(bin,{recursive:true,mode:0o700});
+    process.env.PATH=bin+':'+process.env.PATH;process.env.GH_CONFIG_DIR=join(this.root,'account');
+    try{await access(join(this.root,'gh-'+version));await this.publishCli();}catch{}
+  }
+  private async publishCli(){
+    const bin=join(this.root,'bin');await mkdir(bin,{recursive:true,mode:0o700});
+    const quote=(s:string)=>"'"+s.replaceAll("'","'\\''")+"'";
+    const wrapper=join(bin,'gh');await writeFile(wrapper,'#!/bin/sh\n# PockoBots managed GitHub CLI\nexport GH_CONFIG_DIR='+quote(join(this.root,'account'))+'\nexec '+quote(join(this.root,'gh-'+version))+' "$@"\n',{mode:0o700});
+    if(process.platform==='linux'&&process.env.POCKET_STATE&&!this.fixture){try{await symlink(wrapper,'/usr/local/bin/gh');}catch(error:any){if(error.code!=='EEXIST')throw error;}}
+  }
+  /** Reuse an existing owner-authorized connector without exposing its token to the model. */
+  async ensureCli(token:string){
+    if(!this.sharing)this.sharing=(async()=>{
+      const binary=await this.binary(),directory=join(this.root,'account'),fingerprint=createHash('sha256').update(token).digest('hex');
+      await mkdir(directory,{recursive:true,mode:0o700});
+      let saved='';try{saved=await readFile(join(directory,'credential-version'),'utf8');await access(join(directory,'hosts.yml'));}catch{saved='';}
+      if(saved!==fingerprint){
+        const env={...process.env,GH_CONFIG_DIR:directory,GH_PROMPT_DISABLED:'1',NO_COLOR:'1'};
+        for(const name of ['GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN'])delete (env as NodeJS.ProcessEnv)[name];
+        await new Promise<void>((resolve,reject)=>{const child=spawn(binary,[...(this.fixture?.args||[]),'auth','login','--hostname','github.com','--git-protocol','https','--with-token','--insecure-storage'],{env,stdio:['pipe','pipe','pipe']});child.stdout.on('data',()=>{});child.stderr.on('data',()=>{});child.stdin.on('error',()=>{});child.stdin.end(token+'\n');const timer=setTimeout(()=>{child.kill();reject(Error('GitHub CLI setup timed out'));},30000);child.once('error',error=>{clearTimeout(timer);reject(error);});child.once('close',code=>{clearTimeout(timer);code===0?resolve():reject(Error('GitHub CLI could not use this authorization. Sign in again in Marketplace to grant repository access.'));});});
+        await writeFile(join(directory,'credential-version'),fingerprint,{mode:0o600});
+      }
+      if(!this.fixture)await this.publishCli();
+    })().finally(()=>{this.sharing=undefined;});
+    await this.sharing;
+  }
+  async command(token:string,args:string[],signal?:AbortSignal){
+    if(!Array.isArray(args)||!args.length||args.length>60||args.some(a=>typeof a!=='string'||a.length>8000)||args.includes('--show-token')||(args[0]==='auth'&&args[1]!=='status'))throw Error('Use GitHub task commands, not credential export or login commands. Sign in through Marketplace.');
+    await this.ensureCli(token);const binary=await this.binary();
+    const env={...process.env,GH_CONFIG_DIR:join(this.root,'account'),GH_PROMPT_DISABLED:'1',NO_COLOR:'1'};
+    for(const name of ['GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN'])delete (env as NodeJS.ProcessEnv)[name];
+    try{const result=await execute(binary,[...(this.fixture?.args||[]),...args],{env,signal,timeout:120000,maxBuffer:256000});return {stdout:result.stdout.slice(-30000),stderr:result.stderr.slice(-4000),exitCode:0};}
+    catch(error:any){if(signal?.aborted)throw Error('GitHub command cancelled');return {stdout:String(error.stdout||'').slice(-30000),stderr:String(error.stderr||'GitHub command failed').slice(-4000),exitCode:typeof error.code==='number'?error.code:1};}
+  }
   private async binary() {
     if (this.fixture) return this.fixture.command;
     if (process.platform !== "linux" || !(process.arch in hashes)) throw Error("Unsupported phone runtime");
@@ -70,7 +107,7 @@ export class GitHubLogin {
       for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]) delete (env as NodeJS.ProcessEnv)[name];
       const prefix = this.fixture?.args || [];
       await new Promise<void>((resolve, reject) => {
-        const child = spawn(binary, [...prefix, "auth", "login", "--web", "--hostname", "github.com", "--git-protocol", "https", "--insecure-storage"], { env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+        const child = spawn(binary, [...prefix, "auth", "login", "--web", "--hostname", "github.com", "--git-protocol", "https", "--scopes", "repo,read:org", "--insecure-storage"], { env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
         attempt.child = child; let output = "";
         const append = (chunk: Buffer) => {
           output = (output + chunk.toString()).slice(-12000).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
@@ -85,6 +122,7 @@ export class GitHubLogin {
       const token = tokenResult.stdout.trim(); if (!token || token.length > 8000 || /\s/.test(token)) throw Error("Invalid GitHub token");
       if (!active()) return;
       await this.saveToken(id, token);
+      if(active()&&!this.fixture){const account=join(this.root,'account');await mkdir(account,{recursive:true,mode:0o700});await copyFile(join(directory,'hosts.yml'),join(account,'hosts.yml'));await chmod(join(account,'hosts.yml'),0o600);await writeFile(join(account,'credential-version'),createHash('sha256').update(token).digest('hex'),{mode:0o600});await this.publishCli();}
       if (active()) attempt.public = { mode: "github_device", status: "authorized" };
     } catch {
       if (active()) attempt.public = { mode: "github_device", status: "failed", message: "GitHub sign-in could not finish. Check connectivity or retry. You can also use a token in Configure." };
