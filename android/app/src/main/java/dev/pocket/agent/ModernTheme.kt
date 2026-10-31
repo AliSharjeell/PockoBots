@@ -16,12 +16,12 @@ import androidx.compose.ui.unit.em
 
 object PockoColors {
     // Dark Theme - Deep Obsidian & Sleek Slates
-    val DarkBackground = Color(0xFF090A0F)
-    val DarkSurface = Color(0xFF12141C)
-    val DarkSurfaceElevated = Color(0xFF181B26)
-    val DarkSurfaceHighlight = Color(0xFF222636)
-    val DarkBorder = Color(0xFF242838)
-    val DarkBorderSubtle = Color(0xFF1E212E)
+    val DarkBackground = Color(0xFF09090B)
+    val DarkSurface = Color(0xFF18181B)
+    val DarkSurfaceElevated = Color(0xFF202023)
+    val DarkSurfaceHighlight = Color(0xFF27272A)
+    val DarkBorder = Color(0xFF27272A)
+    val DarkBorderSubtle = Color(0xFF242427)
 
     // Light Theme - Crisp Porcelain & Soft Slates
     val LightBackground = Color(0xFFF8FAFC)
@@ -43,20 +43,20 @@ object PockoColors {
     )
 
     val GlassSurfaceGradient = Brush.linearGradient(
-        listOf(Color(0xFF181B26).copy(alpha = 0.85f), Color(0xFF12141C).copy(alpha = 0.75f))
+        listOf(Color(0xFF202023).copy(alpha = 0.85f), Color(0xFF18181B).copy(alpha = 0.75f))
     )
 
     val GlassBorderGradient = Brush.linearGradient(
-        listOf(Color(0xFF3B82F6).copy(alpha = 0.35f), Color(0xFF8B5CF6).copy(alpha = 0.15f), Color(0xFF242838))
+        listOf(Color(0xFF3B82F6).copy(alpha = 0.35f), Color(0xFF8B5CF6).copy(alpha = 0.15f), Color(0xFF27272A))
     )
 
     // Text Colors
     val TextPrimaryDark = Color(0xFFF8FAFC)
-    val TextSecondaryDark = Color(0xFF94A3B8)
-    val TextTertiaryDark = Color(0xFF64748B)
+    val TextSecondaryDark = Color(0xFFA1A1AA)
+    val TextTertiaryDark = Color(0xFF71717A)
 
     val TextPrimaryLight = Color(0xFF0F172A)
-    val TextSecondaryLight = Color(0xFF64748B)
+    val TextSecondaryLight = Color(0xFF71717A)
 }
 
 val PockoCardShape = RoundedCornerShape(18.dp)

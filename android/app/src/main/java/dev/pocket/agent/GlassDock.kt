@@ -176,14 +176,6 @@ fun GlassDockBar(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = tab.label,
-                            color = contentTint,
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            letterSpacing = (-0.06).em
-                        )
                     }
                 }
             }

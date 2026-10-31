@@ -12,19 +12,19 @@ import android.widget.*;
 /** Elevated modern zinc & obsidian design tokens and smooth rounded controls. */
 final class AgentStyle {
     // Deep obsidian dark tokens and clean minimal porcelain light tokens
-    static int BACK=Color.rgb(9,10,15), PANEL=Color.rgb(18,20,28), BORDER=Color.rgb(36,40,56),
-        TEXT=Color.rgb(248,250,252), MUTED=Color.rgb(148,163,184), WHITE=Color.rgb(255,255,255),
+    static int BACK=Color.rgb(9,9,11), PANEL=Color.rgb(24,24,27), BORDER=Color.rgb(39,39,42),
+        TEXT=Color.rgb(248,250,252), MUTED=Color.rgb(161,161,170), WHITE=Color.rgb(255,255,255),
         BLUE=Color.rgb(79,70,229), ACCENT=Color.rgb(6,182,212);
     static boolean dark=true;
 
     static void applyTheme(Context context){
         String choice=context.getSharedPreferences("appearance",0).getString("theme","system");
         dark=choice.equals("dark")||choice.equals("system")&&(context.getResources().getConfiguration().uiMode&48)==32;
-        BACK=dark?0xff090A0F:0xffF8FAFC;
-        PANEL=dark?0xff12141C:0xffFFFFFF;
-        BORDER=dark?0xff242838:0xffE2E8F0;
+        BACK=dark?0xff09090B:0xffF8FAFC;
+        PANEL=dark?0xff18181B:0xffFFFFFF;
+        BORDER=dark?0xff27272A:0xffE2E8F0;
         TEXT=dark?0xffF8FAFC:0xff0F172A;
-        MUTED=dark?0xff94A3B8:0xff64748B;
+        MUTED=dark?0xffA1A1AA:0xff64748B;
         WHITE=dark?0xffFFFFFF:0xff0F172A;
         BLUE=dark?0xff4F46E5:0xff4338CA;
     }
@@ -95,7 +95,7 @@ final class AgentStyle {
     static void card(View view){view.setBackground(surface(view.getContext(),PANEL,18,true));}
 
     static void selected(Button view,boolean selected){
-        view.setTextColor(selected?(dark?0xff090A0F:0xffFFFFFF):MUTED);
+        view.setTextColor(selected?(dark?0xff09090B:0xffFFFFFF):MUTED);
         view.setBackground(surface(view.getContext(),selected?WHITE:Color.TRANSPARENT,22,false));
     }
 

@@ -130,7 +130,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }else{
             String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen;
             TextView name=text(title,28);
-            name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),900,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
+            name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),800,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
             titlePosition.leftMargin=selected.isEmpty()?dp(4):dp(50);header.addView(name,titlePosition);
             if(selected.isEmpty()&&screen.equals("Chat")){
@@ -153,7 +153,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
-        if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));dock();return;}
+        if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));if(selected.isEmpty())dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
         chatScroll=new ScrollView(this);thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
