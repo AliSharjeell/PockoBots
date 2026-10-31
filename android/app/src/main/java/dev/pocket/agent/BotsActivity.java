@@ -113,7 +113,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
         if(!selected.isEmpty()||settingsChild()){
             AgentIcon back=new AgentIcon(this,"back",settingsChild()?"Back to Settings":"Back to messages",()->{if(settingsChild())showScreen("Settings");else open("");});
-            header.addView(back,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.START|Gravity.CENTER_VERTICAL));
+            header.addView(GlassControls.wrap(back,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.START|Gravity.CENTER_VERTICAL));
         }
         if(botHeader){
             JSONObject bot=detail.optJSONObject("bot");
@@ -140,10 +140,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),800,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
             titlePosition.leftMargin=selected.isEmpty()&&!settingsChild()?dp(4):dp(50);header.addView(name,titlePosition);
-            if(screen.equals("Settings")){AgentIcon appearance=new AgentIcon(this,AgentStyle.dark?"sun":"moon",AgentStyle.dark?"Use light mode":"Use dark mode",this::toggleAppearance);header.addView(appearance,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));}
+            if(screen.equals("Settings")){AgentIcon appearance=new AgentIcon(this,AgentStyle.dark?"sun":"moon",AgentStyle.dark?"Use light mode":"Use dark mode",this::toggleAppearance);header.addView(GlassControls.wrap(appearance,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));}
             if(selected.isEmpty()&&screen.equals("Chat")){
                 AgentIcon create=new AgentIcon(this,"plus","New conversation",this::newConversation);
-                header.addView(create,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
+                header.addView(GlassControls.wrap(create,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
             }
         }
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
