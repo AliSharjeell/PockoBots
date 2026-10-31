@@ -46,10 +46,14 @@ a failed/paused task; it is not presented as successful completion.
 
 ## Explicit limits
 
-Antigravity desktop, Freebuff and CommandCode are shown as unavailable until a
-supported CLI/protocol is verified. Gemini CLI is not presented as an Antigravity
-subscription adapter. Installed vendor binaries still need compatibility with
-the device's packaged Linux runtime and architecture.
+Antigravity desktop has no verified adapter here. Gemini CLI is not presented
+as an Antigravity subscription adapter. Freebuff and CommandCode have official
+CLIs, but their PockoBots headless tool adapters remain unavailable. You can
+manually install them in Main terminal with `npm install -g freebuff` or
+`npm install -g command-code`; CommandCode documents `cmd login` and `cmd -p`.
+This is terminal access, not integrated bot-chat or phone-control support.
+Installed vendor binaries still need compatibility with the device's packaged
+Linux runtime and architecture.
 
 Automated checks use a local fake vendor process and the real stdio/HTTP MCP
 bridge. They verify tool dispatch, bridge expiry, argument checks, cancellation,
@@ -59,6 +63,9 @@ fixtures. Do not treat fixture success as evidence that every subscription or
 Android CPU architecture is supported.
 
 ## Official references
+
+- [Freebuff official CLI installation](https://github.com/CodebuffAI/freebuff)
+- [CommandCode headless execution](https://commandcode.ai/docs/headless)
 
 - [Codex CLI commands and login](https://developers.openai.com/codex/cli/reference)
 - [Claude Code programmatic execution](https://code.claude.com/docs/en/headless)

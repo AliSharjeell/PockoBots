@@ -15,8 +15,8 @@ export const providerCatalog = [
  { id:"opencode", name:"OpenCode", command:"opencode", install:"npm install -g opencode-ai", login:"opencode auth login", docs:"https://opencode.ai/docs/cli/", supported:true },
  { id:"gemini", name:"Gemini CLI", command:"gemini", install:"npm install -g @google/gemini-cli", login:"gemini", docs:"https://geminicli.com/docs/get-started/authentication/", supported:true },
  { id:"antigravity", name:"Antigravity", command:"", install:"", login:"", docs:"https://antigravity.google/", supported:false, reason:"Antigravity desktop is not an Android/Linux subscription CLI adapter. Gemini CLI is a separate supported integration; its account eligibility is decided by Google." },
- { id:"freebuff", name:"Freebuff", command:"", install:"", login:"", docs:"", supported:false, reason:"No supported vendor CLI and subscription protocol has been verified. No credentials are requested." },
- { id:"commandcode", name:"CommandCode", command:"", install:"", login:"", docs:"", supported:false, reason:"No supported vendor CLI and subscription protocol has been verified. No credentials are requested." },
+ { id:"freebuff", name:"Freebuff", command:"", install:"", login:"", docs:"https://github.com/CodebuffAI/freebuff", supported:false, reason:"The official freebuff CLI can be installed manually with npm install -g freebuff in Main terminal. Its headless PockoBots phone-tool adapter has not been verified, so it cannot yet power bot chats." },
+ { id:"commandcode", name:"CommandCode", command:"", install:"", login:"", docs:"https://commandcode.ai/docs/headless", supported:false, reason:"The official command-code CLI supports cmd login and headless execution. Install manually with npm install -g command-code in Main terminal. A run-scoped PockoBots MCP adapter has not been verified, so it cannot yet power bot chats." },
 ] as const;
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
 export function provider(id: string) {const p=providerCatalog.find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
