@@ -2,6 +2,7 @@ package dev.pocket.agent;
 final class MarketplaceIcons {
     static int resource(String id) {
         switch(id) {
+            case "github": return R.drawable.brand_github;
             case "aave": return R.drawable.brand_aave;
             case "airtable": return R.drawable.brand_airtable;
             case "apple-apps": return R.drawable.brand_apple_apps;

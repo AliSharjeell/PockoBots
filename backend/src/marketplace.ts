@@ -3,6 +3,22 @@ import type { Connectors } from "./connectors.js";
 /** Original presentation of factual vendor connection metadata. No OpenBot code or descriptions copied. */
 export const marketplaceCatalog = [
   {
+    "id": "github",
+    "name": "GitHub",
+    "category": "coding",
+    "website": "https://github.com",
+    "description": "Manage repositories, issues and pull requests.",
+    "transport": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "command": "",
+    "args": [],
+    "oauth": true,
+    "fields": [],
+    "availability": "setup-required",
+    "setup": "Sign in using GitHub's official command-line authorization flow. GitHub shows a short verification code and opens its own sign-in page. Organization access remains subject to your GitHub policies. You can also use a personal access token in Configure.",
+    "setupUrl": "https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md"
+  },
+  {
     "id": "aave",
     "name": "Aave",
     "category": "finance",
