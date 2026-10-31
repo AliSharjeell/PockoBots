@@ -11,6 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,6 +44,7 @@ data class SheetMenuItem(
     val subtitle: String,
     val icon: ImageVector,
     val iconColor: Color,
+    val iconResource: Int? = null,
     val action: () -> Unit
 )
 
@@ -85,8 +89,8 @@ fun ModernSheetContent(
         Text(
             text = title,
             color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 23.sp,
+            fontWeight = FontWeight.SemiBold
         )
         if (subtitle.isNotEmpty()) {
             Text(
@@ -104,44 +108,34 @@ fun ModernSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items.forEach { item ->
+                val interaction = remember { MutableInteractionSource() }
+                val pressed by interaction.collectIsPressedAsState()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (dark) Color(0xFF1C1C1F) else Color(0xFFF8FAFC)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (dark) Color(0xFF303033) else Color(0xFFE2E8F0),
-                            shape = RoundedCornerShape(16.dp)
-                        )
+                        .pockoGlass(dark, 24.dp, pressed = pressed)
                         .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = interaction,
                             indication = null
                         ) {
                             item.action()
                         }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Icon Chip
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(item.iconColor.copy(alpha = 0.16f)),
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(item.iconColor.copy(alpha = 0.10f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = null,
-                            tint = item.iconColor,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        if(item.iconResource != null) Icon(painterResource(item.iconResource),null,tint=item.iconColor,modifier=Modifier.size(25.dp))
+                        else Icon(imageVector=item.icon,contentDescription=null,tint=item.iconColor,modifier=Modifier.size(25.dp))
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -152,14 +146,14 @@ fun ModernSheetContent(
                         Text(
                             text = item.title,
                             color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
-                            fontSize = 15.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (item.subtitle.isNotEmpty()) {
                             Text(
                                 text = item.subtitle,
                                 color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Normal
                             )
                         }
@@ -182,10 +176,10 @@ fun ModernSheetContent(
 object ModernSheet {
     @JvmStatic
     fun newConversation(activity: BotsActivity, createBot: Runnable, createGroup: Runnable) {
-        val tint = if (AgentStyle.dark) Color.White else Color(0xFF18181B)
-        show(activity, "New conversation", "Create a bot or bring your bots together.", listOf(
-            SheetMenuItem("Create bot", "A personal assistant with its own workspace", Icons.Rounded.SmartToy, tint) { createBot.run() },
-            SheetMenuItem("Create group", "Let multiple bots work in one conversation", Icons.Rounded.Groups, tint) { createGroup.run() }
+        val tint = Color(0xFF007AFF)
+        show(activity, "New conversation", "", listOf(
+            SheetMenuItem("New bot", "Your own assistant and workspace", Icons.Rounded.SmartToy, tint, R.drawable.phosphor_robot_fill) { createBot.run() },
+            SheetMenuItem("New group", "Bring your bots into one chat", Icons.Rounded.Groups, tint, R.drawable.phosphor_users_three_fill) { createGroup.run() }
         ), AgentStyle.dark)
     }
     @JvmStatic
@@ -227,7 +221,10 @@ object ModernSheet {
             setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
             setGravity(Gravity.BOTTOM)
             attributes?.windowAnimations = android.R.style.Animation_InputMethod
-            setDimAmount(0.45f)
+            navigationBarColor = if (dark) android.graphics.Color.rgb(18,18,20) else android.graphics.Color.WHITE
+            if(android.os.Build.VERSION.SDK_INT>=29)isNavigationBarContrastEnforced=false
+            androidx.core.view.WindowInsetsControllerCompat(this,decorView).setAppearanceLightNavigationBars(!dark)
+            setDimAmount(0.35f)
         }
     }
 }
