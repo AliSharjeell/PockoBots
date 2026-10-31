@@ -49,16 +49,7 @@ class BloubView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
-    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = 0x18000000
-    }
-
     private val path = Path()
-
-    init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
-    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -67,9 +58,16 @@ class BloubView @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0 || h <= 0) return
 
-        val cx = w / 2f
-        val cy = h / 2f
-        val radius = (Math.min(w, h) / 2f) * 0.88f
+        val availableWidth = (w - paddingLeft - paddingRight).coerceAtLeast(0f)
+        val availableHeight = (h - paddingTop - paddingBottom).coerceAtLeast(0f)
+        val cx = paddingLeft + availableWidth / 2f
+        val cy = paddingTop + availableHeight / 2f
+        val extent = when (shapeId.lowercase()) {
+            "capsule", "droplet", "goutte" -> 1.18f
+            "pebble", "galet", "triangle" -> 1.10f
+            else -> 1f
+        }
+        val radius = minOf(availableWidth, availableHeight) * 0.43f / extent
 
         // 1. Resolve body color
         val parsedColor = try {
@@ -78,9 +76,6 @@ class BloubView @JvmOverloads constructor(
             0xFF3B93F0.toInt()
         }
         bodyPaint.color = parsedColor
-
-        // 2. Draw subtle shadow underneath
-        canvas.drawCircle(cx, cy + radius * 0.85f, radius * 0.7f, shadowPaint)
 
         // 3. Draw Body Shape
         drawBody(canvas, cx, cy, radius)

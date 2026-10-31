@@ -244,17 +244,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void marketplace(){if(marketplaceUi==null)marketplaceUi=new MarketplaceUi(this);marketplaceUi.show(body);}
     private void createGroup(){
-        LinearLayout form=column();EditText name=field(form,"Group name","",false);
+        AgentSheet sheet=new AgentSheet(this,"Create group");LinearLayout form=sheet.content;EditText name=field(form,"Group name","",false);form.addView(muted("Choose the bots to include.",13));
         JSONArray bots=state.optJSONArray("bots");Map<String,CheckBox> selectedBots=new LinkedHashMap<>();
-        if(bots!=null)for(int i=0;i<bots.length();i++){
-            JSONObject bot=bots.optJSONObject(i);
-            CheckBox check=new CheckBox(this);check.setText(bot.optString("name"));check.setTextColor(AgentStyle.TEXT);form.addView(check);
-            selectedBots.put(bot.optString("id"),check);
-        }
-        new AlertDialog.Builder(this).setTitle("Bot group").setView(form).setPositiveButton("Create",(d,n)->{
-            JSONArray ids=new JSONArray();for(Map.Entry<String,CheckBox> e:selectedBots.entrySet())if(e.getValue().isChecked())ids.put(e.getKey());
-            request("POST","/groups",json("name",name.getText().toString(),"botIds",ids),v->openGroup(((JSONObject)v).optString("id")));
-        }).setNegativeButton("Cancel",null).show();
+        if(bots!=null)for(int i=0;i<bots.length();i++){JSONObject bot=bots.optJSONObject(i);CheckBox check=new CheckBox(this);check.setText(bot.optString("name"));check.setTextColor(AgentStyle.TEXT);check.setTypeface(AgentStyle.font(this));check.setLetterSpacing(-0.06f);form.addView(check);selectedBots.put(bot.optString("id"),check);}
+        sheet.action("Create group",()->{if(name.getText().toString().trim().isEmpty()){name.setError("Enter a group name");return;}JSONArray ids=new JSONArray();for(Map.Entry<String,CheckBox> entry:selectedBots.entrySet())if(entry.getValue().isChecked())ids.put(entry.getKey());marketplaceRequest("POST","/groups",json("name",name.getText().toString().trim(),"botIds",ids),value->{sheet.dialog.dismiss();openGroup(((JSONObject)value).optString("id"));},error->AgentSheet.message(this,"Couldn't create group",error));},true);sheet.action("Cancel",sheet.dialog::dismiss,false);sheet.show();
     }
     private void openGroup(String id){
         request("GET","/groups/"+id,null,v->{
@@ -492,10 +485,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private void editBot(JSONObject bot){
         boolean create=bot==null;
 
-        ScrollView scroll=new ScrollView(this);
-        LinearLayout form=column();
-        form.setPadding(dp(16),dp(8),dp(16),dp(16));
-        scroll.addView(form);
+        AgentSheet sheet=new AgentSheet(this,create?"Create a bot":"Bot profile");
+        LinearLayout form=sheet.content;
 
         final String[] selectedShape={"cercle"};
         final String[] selectedColor={"#3b93f0"};
@@ -519,7 +510,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         form.addView(previewBox);
 
         // Bloub Section 1: Body Shape
-        form.addView(text("Body Shape (jeremy-prt/bloub)",13));
+        form.addView(text("Body shape",13));
         HorizontalScrollView shapeScroll=new HorizontalScrollView(this);
         shapeScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout shapeRow=row();
@@ -636,10 +627,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         final EditText fAvatar=avatar,fAccent=accent,fPersonality=personality;
         final boolean[] submitted={false};
-        final AlertDialog[] dialogRef={null};
+        final Dialog[] dialogRef={sheet.dialog};
 
         final Runnable submit=()->{
             if(submitted[0])return;
+            if(name.getText().toString().trim().isEmpty()){name.setError("Enter a bot name");return;}
             submitted[0]=true;
             String avatarStr="bloub:"+selectedShape[0]+":"+selectedExpression[0];
             if(!create&&fAvatar!=null&&!fAvatar.getText().toString().isEmpty()){
@@ -654,7 +646,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 personalityStr=fPersonality.getText().toString();
             }
 
-            request(create?"POST":"PUT",create?"/bots":"/bots/"+bot.optString("id"),
+            marketplaceRequest(create?"POST":"PUT",create?"/bots":"/bots/"+bot.optString("id"),
                 json("name",name.getText().toString().trim(),
                      "role",role.getText().toString().trim(),
                      "avatar",avatarStr,
@@ -667,22 +659,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 result->{
                     if(dialogRef[0]!=null)try{dialogRef[0].dismiss();}catch(Exception ignored){}
                     open(((JSONObject)result).optString("id"));
-                });
+                },error->{submitted[0]=false;AgentSheet.message(this,"Couldn't save bot",error);});
         };
 
-        AlertDialog dialog=new AlertDialog.Builder(this)
-            .setTitle(create?"Create a bot":"Bot profile")
-            .setView(scroll)
-            .setPositiveButton(create?"CREATE BOT":"Save",(d,w)->submit.run())
-            .setNegativeButton("Cancel",null)
-            .create();
-        dialogRef[0]=dialog;
-
-        dialog.setOnShowListener(d->{
-            android.widget.Button pos=dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            if(pos!=null)pos.setOnClickListener(w->submit.run());
-        });
-        dialog.show();
+        sheet.action(create?"Create bot":"Save",submit,true);sheet.action("Cancel",sheet.dialog::dismiss,false);sheet.show();
     }
     private void botOptions(JSONObject bot){
         LinearLayout form=column();form.setPadding(dp(16),dp(12),dp(16),dp(16));
