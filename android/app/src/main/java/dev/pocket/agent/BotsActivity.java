@@ -438,7 +438,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         JSONObject bot=detail.optJSONObject("bot");JSONArray messages=detail.optJSONArray("messages");
         for(int i=0;i<messages.length();i++){
             JSONObject message=messages.optJSONObject(i);
-            if(message.optString("role").equals("system")){
+            boolean welcome=i==0&&message.optString("role").equals("system")&&message.optString("jobId").isEmpty();
+            if(message.optString("role").equals("system")&&!welcome){
                 thread.addView(muted(message.optString("text"),11));
             }else{
                 boolean isUser=message.optString("role").equals("user");
