@@ -44,6 +44,7 @@ final class TerminalCanvas extends View {
         setOnLongClickListener(v -> { longPressed=true;copy(emulator.getScreen().getTranscriptText()); return true; });
     }
     void append(String base64, long start) {
+        boolean readingHistory=topRow<0;int previousScrolls=emulator.getScrollCounter();
         byte[] bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
         int skip = (int)Math.min(bytes.length, Math.max(0, offset - start));
         if (start > offset && offset > 0) {
@@ -54,7 +55,9 @@ final class TerminalCanvas extends View {
             byte[] remaining = java.util.Arrays.copyOfRange(bytes, skip, bytes.length);
             emulator.append(remaining, remaining.length);
         }
-        offset = Math.max(offset, start + bytes.length); topRow = 0; invalidate();
+        offset = Math.max(offset, start + bytes.length);
+        if(readingHistory)topRow=Math.max(-emulator.getScreen().getActiveTranscriptRows(),topRow-Math.max(0,emulator.getScrollCounter()-previousScrolls));
+        invalidate();
     }
     int columns() { return emulator.mColumns; }
     int rows() { return emulator.mRows; }
