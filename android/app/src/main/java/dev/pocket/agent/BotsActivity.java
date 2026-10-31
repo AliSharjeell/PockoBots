@@ -123,9 +123,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);header.addView(identity,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         }else{
-            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Main terminal":screen;
-            TextView name=text(title,screen.equals("Chat")?24:19);
-            name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),screen.equals("Chat")?900:700,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
+            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen;
+            TextView name=text(title,28);
+            name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),900,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
             titlePosition.leftMargin=selected.isEmpty()?dp(4):dp(50);header.addView(name,titlePosition);
             if(selected.isEmpty()&&screen.equals("Chat")){
@@ -361,7 +361,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             request("POST","/marketplace/"+plugin.optString("id")+"/install",json("credentials",credentials),result->{
                 dialog.dismiss();JSONObject configured=(JSONObject)result;
                 String setup=configured.opt("setup")==null?"Configured. Test the connection, then select its tools for your bots.":String.valueOf(configured.opt("setup"));
-                new AlertDialog.Builder(this).setTitle("Connection configured").setMessage(setup).setPositiveButton("Connections",(d,n)->connections()).setNeutralButton("Main terminal",(d,n)->openMainTerminal()).show();
+                new AlertDialog.Builder(this).setTitle("Connection configured").setMessage(setup).setPositiveButton("Connections",(d,n)->connections()).setNeutralButton("Terminal",(d,n)->openMainTerminal()).show();
             });
         }));dialog.show();
     }
