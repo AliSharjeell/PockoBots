@@ -151,6 +151,8 @@ export async function createApp(options: {
     settings = next;
     res.json(publicSettings(settings));
   });
+  // The owner settings form reads this explicitly; shared state remains redacted.
+  app.get("/api/settings/key", (_req,res)=>{res.setHeader("Cache-Control","no-store");res.json({apiKey:settings.apiKey});});
   app.post("/api/settings/test", async (req, res) =>
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
