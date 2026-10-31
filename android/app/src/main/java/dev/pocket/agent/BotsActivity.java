@@ -377,7 +377,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             card.setOnClickListener(v->open(bot.optString("id")));
             list.addView(card);
             View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
-            LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(84),0,dp(8),0);list.addView(divider,rule);
+            LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(8),0,dp(8),0);list.addView(divider,rule);
         }
         if(shown==0)list.addView(muted("No conversations found",14));
     }
