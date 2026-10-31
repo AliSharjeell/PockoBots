@@ -51,7 +51,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         center.addView(logo,new LinearLayout.LayoutParams(dp(84),dp(84)));
         
         TextView title=new TextView(this);
-        title.setText("Pocket Agent");
+        title.setText("Pocko Bots");
         title.setTextColor(AgentStyle.TEXT);
         title.setTextSize(26);
         title.setTypeface(AgentStyle.font(this),Typeface.BOLD);
@@ -99,7 +99,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         
         // Modern top bar
         LinearLayout header=row();header.setPadding(0,dp(4),0,dp(6));
-        AgentIcon navButton=new AgentIcon(this,selected.isEmpty()?"plus":"back",selected.isEmpty()?"New conversation":"Back to messages",()->{if(selected.isEmpty())newConversation();else open("");});
+        AgentIcon navButton=new AgentIcon(this,selected.isEmpty()?"menu":"back",selected.isEmpty()?"Open menu":"Back to messages",()->{if(selected.isEmpty())menu();else open("");});
         header.addView(navButton,new LinearLayout.LayoutParams(dp(42),dp(42)));
         
         LinearLayout identity=column();identity.setPadding(dp(10),0,dp(6),0);
@@ -125,14 +125,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             botRow.addView(name);identity.addView(botRow);
             identity.addView(muted(bot.optJSONObject("active")!=null?"● Working":bot.optBoolean("enabled")?"● Ready":"● Paused",11));
         }else{
-            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Setup & permissions":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")&&selected.isEmpty()?"Main terminal":screen.equals("Settings")?"Settings":detail==null?screen:detail.optJSONObject("bot").optString("name");
+            String title=screen.equals("Chat")?"Pocko Bots":screen.equals("Setup")?"Setup & permissions":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")&&selected.isEmpty()?"Main terminal":screen.equals("Settings")?"Settings":detail==null?screen:detail.optJSONObject("bot").optString("name");
             TextView name=text(title,19);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);identity.addView(name);
-            identity.addView(muted(selected.isEmpty()?"Messages · 4 KB local":"Your bot on this phone",11));
         }
         header.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
         
         // Right tool action button supporting both "Open sidebar" and "Conversation tools"
-        AgentIcon tools=new AgentIcon(this,selected.isEmpty()?"menu":"settings","Open sidebar",this::menu);
+        AgentIcon tools=new AgentIcon(this,selected.isEmpty()?"plus":"settings",selected.isEmpty()?"New conversation":"Conversation tools",()->{if(selected.isEmpty())newConversation();else menu();});
         header.addView(tools,new LinearLayout.LayoutParams(dp(42),dp(42)));
         View altTools=new View(this);altTools.setContentDescription("Conversation tools");altTools.setOnClickListener(v->menu());
         header.addView(altTools,new LinearLayout.LayoutParams(0,dp(42)));
@@ -241,7 +240,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         panel.setPadding(dp(16),dp(32),dp(16),dp(24));
         drawer.addView(panel,new FrameLayout.LayoutParams(Math.min(dp(300),getResources().getDisplayMetrics().widthPixels-dp(40)),-1));
         
-        TextView title=text("Pocket Agent",22);
+        TextView title=text("Pocko Bots",22);
         title.setTypeface(AgentStyle.font(this),Typeface.BOLD);
         panel.addView(title);
         panel.addView(muted("Local AI on your phone",11));
