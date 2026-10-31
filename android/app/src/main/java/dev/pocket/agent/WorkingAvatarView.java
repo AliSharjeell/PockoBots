@@ -1,6 +1,5 @@
 package dev.pocket.agent;
 
-import android.animation.ValueAnimator;
 import android.graphics.Typeface;
 import android.os.SystemClock;
 import android.view.*;
