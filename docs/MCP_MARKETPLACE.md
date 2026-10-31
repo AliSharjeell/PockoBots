@@ -15,7 +15,7 @@ Sentry, Stripe, Supabase, Todoist, Trello and Vercel. Google Workspace is added
 with GitHub as additional entries. A catalog listing is not proof that an external service is
 reachable, free, or compatible with this Android runtime. Test each connection.
 
-The native directory starts with a four-column Essentials grid, then groups flat app rows under category headings. App logos
+The native directory groups flat app rows under category headings, starting with Essentials. App logos
 are bundled, with provenance in third_party/marketplace-icons/sources.json.
 There are no category badges or per-app cards. Tap Add to connect; a saved entry
 shows Added and a three-dot menu for sign-in, configuration, connection checks,

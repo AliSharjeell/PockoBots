@@ -42,7 +42,7 @@ final class MarketplaceUi {
         }
         if(!essentials.isEmpty()){
             essentials.sort(Comparator.comparingInt(item->ESSENTIALS.indexOf(item.optString("id"))));TextView title=text("Essentials",18);title.setTypeface(AgentStyle.font(app),Typeface.BOLD);title.setPadding(dp(8),dp(16),dp(8),dp(12));list.addView(title);
-            for(int i=0;i<essentials.size();i+=4){LinearLayout gridRow=app.row();gridRow.setGravity(Gravity.TOP);for(int column=0;column<4;column++){if(i+column<essentials.size())gridRow.addView(essentialTile(essentials.get(i+column)),new LinearLayout.LayoutParams(0,-2,1));else gridRow.addView(new View(app),new LinearLayout.LayoutParams(0,1,1));}list.addView(gridRow);}shown+=essentials.size();
+            for(JSONObject item:essentials)appRow(list,item);shown+=essentials.size();
         }
         for(Map.Entry<String,List<JSONObject>> section:sections.entrySet()){
             if(section.getValue().isEmpty())continue;
@@ -75,13 +75,6 @@ final class MarketplaceUi {
         boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
         if(added){TextView value=text("Added",12);value.setGravity(Gravity.CENTER);value.setOnClickListener(v->options(item));return value;}
         Button button=new Button(app);button.setText(busy?"...":"Add");AgentStyle.button(button,true);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription("Add "+item.optString("name"));button.setOnClickListener(v->connect(item));return button;
-    }
-    private View essentialTile(JSONObject item){
-        LinearLayout tile=app.column();tile.setGravity(Gravity.CENTER_HORIZONTAL);tile.setPadding(dp(3),dp(6),dp(3),dp(22));
-        ImageView icon=new ImageView(app);icon.setImageResource(MarketplaceIcons.resource(item.optString("id")));icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setPadding(dp(7),dp(7),dp(7),dp(7));icon.setBackground(AgentStyle.surface(app,item.optString("id").equals("huggingface")?0xff27272a:0xffffffff,15,false));tile.addView(icon,new LinearLayout.LayoutParams(dp(56),dp(56)));
-        TextView name=text(item.optString("id").equals("google-workspace")?"Google":item.optString("name"),14);name.setTypeface(AgentStyle.font(app),Typeface.BOLD);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams nameSize=new LinearLayout.LayoutParams(-1,dp(40));nameSize.topMargin=dp(7);tile.addView(name,nameSize);
-        TextView description=muted(item.optString("description"),10);description.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);description.setMaxLines(3);description.setEllipsize(android.text.TextUtils.TruncateAt.END);tile.addView(description,new LinearLayout.LayoutParams(-1,dp(47)));
-        LinearLayout actions=app.row();actions.setGravity(Gravity.CENTER);View add=addControl(item);if(add instanceof Button){((Button)add).setTextSize(11);add.setPadding(dp(9),0,dp(9),0);}actions.addView(add,new LinearLayout.LayoutParams(dp(48),dp(28)));AgentIcon more=new AgentIcon(app,"more","Configure "+item.optString("name"),()->options(item));more.setBackground(null);actions.addView(more,new LinearLayout.LayoutParams(dp(24),dp(40)));tile.addView(actions,new LinearLayout.LayoutParams(-1,dp(40)));return tile;
     }
     private void connect(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
