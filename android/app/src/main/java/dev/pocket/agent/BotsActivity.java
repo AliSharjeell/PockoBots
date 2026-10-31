@@ -217,22 +217,22 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private android.graphics.drawable.GradientDrawable edgeFade(boolean top){
         int color=AgentStyle.BACK&0x00ffffff;
-        int[] colors=top?new int[]{AgentStyle.BACK,color|0xdd000000,color}:new int[]{color,color|0xcc000000,AgentStyle.BACK};
+        int[] colors=top?new int[]{color|0x99000000,color|0x44000000,color}:new int[]{color,color|0x33000000,color|0x88000000};
         return new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,colors);
     }
     private void floatChatControls(View header,View tabs,LinearLayout input){
         page.removeView(header);if(tabs!=null)page.removeView(tabs);page.removeView(body);
         FrameLayout viewport=new FrameLayout(this);page.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));viewport.addView(body,new FrameLayout.LayoutParams(-1,-1));
         int controlsHeight=dp(tabs==null?56:116);ScrollView scroll=chatScroll;scroll.setClipToPadding(false);scroll.setPadding(0,controlsHeight,0,dp(82));
-        FrameLayout top=new FrameLayout(this);top.setBackground(edgeFade(true));LinearLayout controls=column();controls.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));if(tabs!=null)controls.addView(tabs,new LinearLayout.LayoutParams(-1,dp(60)));top.addView(controls,new FrameLayout.LayoutParams(-1,-2));viewport.addView(top,new FrameLayout.LayoutParams(-1,controlsHeight+dp(28),Gravity.TOP));
-        input.setPadding(0,dp(24),0,dp(4));input.setBackground(edgeFade(false));viewport.addView(input,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        FrameLayout top=new FrameLayout(this);top.setBackground(edgeFade(true));LinearLayout controls=column();controls.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));if(tabs!=null)controls.addView(tabs,new LinearLayout.LayoutParams(-1,dp(60)));top.addView(controls,new FrameLayout.LayoutParams(-1,-2));viewport.addView(top,new FrameLayout.LayoutParams(-1,controlsHeight+dp(16),Gravity.TOP));
+        input.setPadding(0,dp(16),0,dp(4));input.setBackground(edgeFade(false));viewport.addView(input,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         input.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int inset=b-t+dp(8);if(inset!=scroll.getPaddingBottom()){boolean atEnd=follow;scroll.setPadding(0,controlsHeight,0,inset);if(atEnd)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));}});
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));});
     }
     private void dock(){
         int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:(screen.equals("Settings")||settingsChild())?3:0;
         dockOverlay=new FrameLayout(this);View fade=new View(this);fade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{android.graphics.Color.TRANSPARENT,(AgentStyle.BACK&0x00ffffff)|0x99000000,AgentStyle.BACK}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
+        fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{AgentStyle.BACK&0x00ffffff,(AgentStyle.BACK&0x00ffffff)|0x33000000,(AgentStyle.BACK&0x00ffffff)|0x66000000}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
         dockOverlay.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{
             if(index==0)open("");
             if(index==1)showScreen("Marketplace");
