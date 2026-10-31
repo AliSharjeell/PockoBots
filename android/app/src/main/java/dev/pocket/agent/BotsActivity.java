@@ -119,7 +119,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             JSONObject bot=detail.optJSONObject("bot");
             LinearLayout identity=row();identity.setPadding(dp(12),dp(7),dp(12),dp(7));
             identity.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
-            identity.setContentDescription("Bot profile");identity.setFocusable(true);identity.setOnClickListener(v->editBot(bot));
+            identity.setContentDescription("Edit bot name and appearance");identity.setMinimumHeight(dp(48));identity.setFocusable(true);identity.setOnClickListener(v->editBot(bot));
             View avatar;
             if(bot.optString("avatar","").startsWith("bloub:")){
                 String[] parts=bot.optString("avatar").split(":");BloubView bloub=new BloubView(this);
@@ -497,9 +497,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         AgentSheet sheet=new AgentSheet(this,create?"Create a bot":"Bot profile");
         LinearLayout form=sheet.content;
+        EditText name=field(form,"Name",create?"":bot.optString("name"),false);
+        final boolean[] appearanceChanged={false};
 
         final String[] selectedShape={"cercle"};
-        final String[] selectedColor={"#3b93f0"};
+        final String[] selectedColor={create?"#3b93f0":bot.optString("accent","#3b93f0")};
         final String[] selectedExpression={"neutre"};
 
         if(!create&&bot.optString("avatar").startsWith("bloub:")){
@@ -536,7 +538,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             chip.setBackground(AgentStyle.surface(this,selectedShape[0].equals(opt.getId())?AgentStyle.BLUE:AgentStyle.PANEL,14,false));
             chip.setTextColor(selectedShape[0].equals(opt.getId())?0xFFFFFFFF:AgentStyle.MUTED);
             chip.setOnClickListener(v->{
-                selectedShape[0]=opt.getId();
+                appearanceChanged[0]=true;selectedShape[0]=opt.getId();
                 bloubPreview.setShapeId(opt.getId());
                 for(int i=0;i<shapeChips.size();i++){
                     boolean sel=BloubView.Companion.getSHAPES().get(i).getId().equals(opt.getId());
@@ -572,7 +574,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             dotContainer.addView(innerDot,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
 
             dotContainer.setOnClickListener(v->{
-                selectedColor[0]=opt.getHex();
+                appearanceChanged[0]=true;selectedColor[0]=opt.getHex();
                 bloubPreview.setColorHex(opt.getHex());
                 for(int i=0;i<colorDots.size();i++){
                     boolean sel=BloubView.Companion.getCOLORS().get(i).getHex().equalsIgnoreCase(opt.getHex());
@@ -602,7 +604,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             chip.setBackground(AgentStyle.surface(this,selectedExpression[0].equals(opt.getId())?AgentStyle.BLUE:AgentStyle.PANEL,14,false));
             chip.setTextColor(selectedExpression[0].equals(opt.getId())?0xFFFFFFFF:AgentStyle.MUTED);
             chip.setOnClickListener(v->{
-                selectedExpression[0]=opt.getId();
+                appearanceChanged[0]=true;selectedExpression[0]=opt.getId();
                 bloubPreview.setExpressionId(opt.getId());
                 for(int i=0;i<expChips.size();i++){
                     boolean sel=BloubView.Companion.getEXPRESSIONS().get(i).getId().equals(opt.getId());
@@ -618,7 +620,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         // Section 4: Identity & Instructions (Only 2 EditTexts in creation mode!)
         form.addView(text("Identity & Instructions",14));
-        EditText name=field(form,"Name",create?"":bot.optString("name"),false);
         EditText role=field(form,"Instructions",create?"":bot.optString("role"),false);
         role.setSingleLine(false);
         role.setMinLines(3);
@@ -627,8 +628,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         EditText avatar=null,accent=null,personality=null;
         if(!create){
-            avatar=field(form,"Bot icon (emoji or initials)",bot.optString("avatar"),false);
-            accent=field(form,"Accent color",bot.optString("accent","#007AFF"),false);
+            avatar=field(form,"Custom emoji or initials (optional override)","",false);
+            accent=field(form,"Custom color (optional override)","",false);
             personality=field(form,"Personality",bot.optString("personality"),false);
             personality.setSingleLine(false);
             button(form,"Tools, alerts & routines",()->botOptions(bot),false);
@@ -643,7 +644,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(submitted[0])return;
             if(name.getText().toString().trim().isEmpty()){name.setError("Enter a bot name");return;}
             submitted[0]=true;
-            String avatarStr="bloub:"+selectedShape[0]+":"+selectedExpression[0];
+            String avatarStr=!create&&!appearanceChanged[0]?bot.optString("avatar"):"bloub:"+selectedShape[0]+":"+selectedExpression[0];
             if(!create&&fAvatar!=null&&!fAvatar.getText().toString().isEmpty()){
                 avatarStr=fAvatar.getText().toString();
             }
@@ -663,9 +664,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                      "accent",accentStr,
                      "personality",personalityStr,
                      "kind","unified",
-                     "allowShell",true,
-                     "allowUrgent",true,
-                     "dailyLimit",0),
+                     "allowShell",create||bot.optBoolean("allowShell",true),
+                     "allowUrgent",create||bot.optBoolean("allowUrgent",true),
+                     "dailyLimit",create?0:bot.optInt("dailyLimit",0)),
                 result->{
                     if(dialogRef[0]!=null)try{dialogRef[0].dismiss();}catch(Exception ignored){}
                     open(((JSONObject)result).optString("id"));
