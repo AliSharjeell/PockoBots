@@ -1,6 +1,25 @@
-# Native sidebar and island UI
+# Native messaging and island UI
 
-## Unified bot workspace in v0.5
+## Messaging UI in v0.6
+
+The current UI preserves the updated inbox cards, glass dock, customizable bot
+avatars and Cupertino-style conversation bubbles. Captures below come from the
+isolated Pixel QA app with a local model fixture. They do not show a live paid
+subscription or an authorized Google account.
+
+![Messaging inbox](images/v0.6-home.png)
+
+![MCP marketplace](images/v0.6-marketplace.png)
+
+![Conversation with Markdown and preview link](images/v0.6-conversation.png)
+
+![Group replies retain their speakers](images/v0.6-group.png)
+
+![Light appearance](images/v0.6-light.png)
+
+![Native structured chat cards](images/v0.6-cards.png)
+
+## Historical unified bot workspace in v0.5
 
 Actual Pixel captures from the isolated QA installation, using local fixtures.
 Each bot handles coding and phone/browser work in the same conversation.

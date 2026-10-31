@@ -95,8 +95,8 @@ Actual Android emulator captures using local test fixtures:
 
 <table>
 <tr>
-<td align="center"><img src="docs/images/v0.5-chat.png" width="260" alt="Bot chat with rendered Markdown, a table and a clickable preview link"><br>One conversation</td>
-<td align="center"><img src="docs/images/v0.5-files.png" width="260" alt="Native project file browser inside the bot interface"><br>Your project files</td>
+<td align="center"><img src="docs/images/v0.6-conversation.png" width="260" alt="Bot chat with rendered Markdown, a table and a clickable preview link"><br>One conversation</td>
+<td align="center"><img src="docs/images/v0.6-home.png" width="260" alt="Bot inbox with custom avatars and a glass navigation dock"><br>Your local bots</td>
 <td align="center"><img src="docs/images/v0.5-browser.png" width="260" alt="Bot using the real Android browser with its floating progress island"><br>Real phone control</td>
 </tr>
 </table>
