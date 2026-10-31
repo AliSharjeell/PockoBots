@@ -13,7 +13,7 @@ import org.json.*;
 /** Project tools embedded in the bot shell, including a shared /workspace shell. */
 final class BotWorkspace {
     private final BotsActivity app;private final Handler main=new Handler(Looper.getMainLooper());
-    private LinearLayout body;private String project="",directory=".",screen="",terminalId="";private int generation;private TerminalCanvas terminal;
+    private LinearLayout body;private String project="",directory=".",screen="",terminalId="";private int generation;private TerminalCanvas terminal;private TextView terminalStatus;
     BotWorkspace(BotsActivity app){this.app=app;}
     void stop(){generation++;main.removeCallbacksAndMessages(null);terminal=null;}
     private int dp(int n){return app.dp(n);}
@@ -28,12 +28,24 @@ final class BotWorkspace {
         final int epoch=generation;final String key="shell-"+scope();terminalId=app.getSharedPreferences("bot-tools",0).getString(key,"");
         LinearLayout keys=row();HorizontalScrollView strip=new HorizontalScrollView(app);strip.addView(keys);body.addView(strip);
         String[] names={"Esc","Tab","Ctrl-C","Ctrl-D","Up","Down"};String[] values={"\u001b","\t","\u0003","\u0004","\u001b[A","\u001b[B"};for(int i=0;i<values.length;i++){String value=values[i];button(keys,names[i],()->send(app.json("data",value)));}
-        button(keys,"Paste",()->{if(terminal!=null)terminal.paste();});button(keys,"New shell",()->{if(!terminalId.isEmpty())app.request("DELETE","/terminals/"+terminalId,null,v->{});app.getSharedPreferences("bot-tools",0).edit().remove(key).apply();show(body,"Terminal",project);});
-        terminal=new TerminalCanvas(app,new TerminalCanvas.Input(){public void send(String s){BotWorkspace.this.send(app.json("data",s));}public void resize(int cols,int rows){BotWorkspace.this.send(app.json("data","","cols",cols,"rows",rows));}});body.addView(terminal,new LinearLayout.LayoutParams(-1,0,1));
-        if(terminalId.isEmpty())app.request("POST","/terminals",app.json("projectId",project,"root",project.isEmpty()),v->{String id=((JSONObject)v).optString("id");app.getSharedPreferences("bot-tools",0).edit().putString(key,id).apply();if(epoch!=generation)return;terminalId=id;send(app.json("data","","cols",terminal.columns(),"rows",terminal.rows()));pollTerminal(epoch);});else pollTerminal(epoch);
+        button(keys,"Paste",()->{if(terminal!=null)terminal.paste();});button(keys,"New shell",()->{if(!terminalId.isEmpty())app.requestQuiet("DELETE","/terminals/"+terminalId,null,v->{},()->{});app.getSharedPreferences("bot-tools",0).edit().remove(key).apply();show(body,"Terminal",project);});
+        terminalStatus=app.muted("",12);terminalStatus.setVisibility(View.GONE);body.addView(terminalStatus);
+        terminal=new TerminalCanvas(app,new TerminalCanvas.Input(){public void send(String s){BotWorkspace.this.send(app.json("data",s));}public void resize(int cols,int rows){if(epoch==generation)BotWorkspace.this.send(app.json("data","","cols",cols,"rows",rows));}});body.addView(terminal,new LinearLayout.LayoutParams(-1,0,1));
+        if(terminalId.isEmpty())app.marketplaceRequest("POST","/terminals",app.json("projectId",project,"root",project.isEmpty()),v->{String id=((JSONObject)v).optString("id");app.getSharedPreferences("bot-tools",0).edit().putString(key,id).apply();if(epoch!=generation)return;terminalId=id;send(app.json("data","","cols",terminal.columns(),"rows",terminal.rows()));pollTerminal(epoch);},error->{if(epoch==generation&&terminalStatus!=null){terminalStatus.setText("Shell unavailable. Tap New shell to retry.");terminalStatus.setVisibility(View.VISIBLE);}});else pollTerminal(epoch);
     }
     private void send(JSONObject data){if(!terminalId.isEmpty())app.terminalInput(terminalId,data);}
-    private void pollTerminal(int epoch){if(epoch!=generation||terminal==null)return;app.requestQuiet("GET","/terminals/"+terminalId,null,v->{if(epoch!=generation||terminal==null)return;JSONObject output=(JSONObject)v;terminal.append(output.optString("output"),output.optLong("offset"));if(output.optBoolean("exited"))body.addView(app.muted("Shell exited. Tap New shell to restart.",12));else main.postDelayed(()->pollTerminal(epoch),400);},()->{if(epoch==generation){app.getSharedPreferences("bot-tools",0).edit().remove("shell-"+scope()).apply();terminalId="";show(body,"Terminal",project);}});}
+    private void pollTerminal(int epoch){
+        if(epoch!=generation||terminal==null)return;
+        app.marketplaceRequest("GET","/terminals/"+terminalId,null,value->{
+            if(epoch!=generation||terminal==null)return;JSONObject output=(JSONObject)value;terminal.append(output.optString("output"),output.optLong("offset"));
+            if(output.optBoolean("exited")){terminalStatus.setText("Shell exited. Tap New shell to restart.");terminalStatus.setVisibility(View.VISIBLE);}
+            else{terminalStatus.setVisibility(View.GONE);main.postDelayed(()->pollTerminal(epoch),400);}
+        },error->{
+            if(epoch!=generation||terminal==null)return;
+            if(error!=null&&(error.contains("Terminal not found")||error.contains("Terminal is closed"))){app.getSharedPreferences("bot-tools",0).edit().remove("shell-"+scope()).apply();terminalId="";show(body,"Terminal",project);}
+            else main.postDelayed(()->pollTerminal(epoch),1200);
+        });
+    }
     private void files(){
         final int epoch=generation;LinearLayout content=scrolling();LinearLayout bar=row();content.addView(bar);TextView path=text(directory.equals(".")?"Project files":directory,16);path.setTypeface(AgentStyle.font(app),Typeface.BOLD);bar.addView(path,new LinearLayout.LayoutParams(0,-2,1));button(bar,"Up",()->{int slash=directory.lastIndexOf('/');directory=slash<0?".":directory.substring(0,slash);show(body,"Files",project);});button(bar,"+ New",this::newFile);
 
