@@ -32,7 +32,7 @@ public class MobileOverlayService extends Service {
         windows=getSystemService(WindowManager.class);
         layout=new WindowManager.LayoutParams(-2,-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,PixelFormat.TRANSLUCENT);
-        layout.gravity=Gravity.TOP|Gravity.LEFT;layout.x=Math.max(dp(12),(getResources().getDisplayMetrics().widthPixels-dp(228))/2);layout.y=dp(40);
+        layout.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;layout.x=0;layout.y=dp(24);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
         surface.setElevation(dp(16));surface.setBackground(AgentStyle.surface(this,android.graphics.Color.BLACK,28,true));surface.setClipToOutline(true);orb=new ThinkingOrbView(this);
         surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
@@ -93,9 +93,9 @@ public class MobileOverlayService extends Service {
         TextView chevron=text(expanded?"⌄":"⌃",16);chevron.setContentDescription(expanded?"Collapse task panel":"Expand task panel");chevron.setTextIsSelectable(false);chevron.setPadding(dp(8),0,dp(2),0);header.addView(chevron);surface.addView(header);
         View.OnTouchListener drag=(v,event) -> {
             switch(event.getAction()){
-                case MotionEvent.ACTION_DOWN:startX=event.getRawX();startY=event.getRawY();windowX=layout.x;windowY=layout.y;return true;
-                case MotionEvent.ACTION_MOVE:layout.x=Math.max(0,Math.min(getResources().getDisplayMetrics().widthPixels-surface.getWidth(),windowX+(int)(event.getRawX()-startX)));
-                    layout.y=Math.max(0,Math.min(getResources().getDisplayMetrics().heightPixels-dp(64),windowY+(int)(event.getRawY()-startY)));windows.updateViewLayout(surface,layout);return true;
+                case MotionEvent.ACTION_DOWN:if(morph!=null)morph.cancel();startX=event.getRawX();startY=event.getRawY();windowX=layout.x;windowY=layout.y;return true;
+                case MotionEvent.ACTION_MOVE:layout.x=windowX+(int)(event.getRawX()-startX);
+                    layout.y=windowY-(int)(event.getRawY()-startY);clampPosition(surface.getWidth(),surface.getHeight());windows.updateViewLayout(surface,layout);return true;
                 case MotionEvent.ACTION_UP:if(Math.abs(event.getRawX()-startX)<dp(8)&&Math.abs(event.getRawY()-startY)<dp(8))v.performClick();return true;
                 default:return true;
             }
@@ -130,10 +130,16 @@ public class MobileOverlayService extends Service {
         surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int height=surface.getMeasuredHeight();
         boolean transition=targetWidth>0&&(renderedExpanded!=expanded||targetWidth!=width||Math.abs(targetHeight-height)>dp(16));renderedExpanded=expanded;targetWidth=width;targetHeight=height;
         if(transition&&ValueAnimator.areAnimatorsEnabled()){
-            if(morph!=null)morph.cancel();int fromWidth=surface.getWidth(),fromHeight=surface.getHeight(),center=layout.x+fromWidth/2;
+            if(morph!=null)morph.cancel();int fromWidth=surface.getWidth(),fromHeight=surface.getHeight();
             morph=ValueAnimator.ofFloat(0,1);morph.setDuration(320);morph.setInterpolator(new android.view.animation.DecelerateInterpolator(1.8f));
-            morph.addUpdateListener(frame -> {if(!attached)return;float f=(float)frame.getAnimatedValue();layout.width=fromWidth+Math.round((width-fromWidth)*f);layout.height=fromHeight+Math.round((height-fromHeight)*f);layout.x=Math.max(0,Math.min(getResources().getDisplayMetrics().widthPixels-layout.width,center-layout.width/2));windows.updateViewLayout(surface,layout);});morph.start();
-        }else if(morph==null||!morph.isRunning()){layout.width=width;layout.height=height;layout.x=Math.min(layout.x,Math.max(0,getResources().getDisplayMetrics().widthPixels-layout.width));if(attached)windows.updateViewLayout(surface,layout);}
+            morph.addUpdateListener(frame -> {if(!attached)return;float f=(float)frame.getAnimatedValue();layout.width=fromWidth+Math.round((width-fromWidth)*f);layout.height=fromHeight+Math.round((height-fromHeight)*f);clampPosition(layout.width,layout.height);windows.updateViewLayout(surface,layout);});morph.start();
+        }else if(morph==null||!morph.isRunning()){layout.width=width;layout.height=height;clampPosition(width,height);if(attached)windows.updateViewLayout(surface,layout);}
+    }
+    private void clampPosition(int width,int height){
+        int horizontal=Math.max(0,(getResources().getDisplayMetrics().widthPixels-width)/2-dp(8));
+        layout.x=Math.max(-horizontal,Math.min(horizontal,layout.x));
+        int maxBottom=Math.max(dp(12),getResources().getDisplayMetrics().heightPixels-height-dp(12));
+        layout.y=Math.max(dp(12),Math.min(maxBottom,layout.y));
     }
     /** Hide our own control surface while Artemis observes/acts, never the target app. */
     public static void suspendOverlay(boolean hide){
