@@ -117,7 +117,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
         if(botHeader){
             JSONObject bot=detail.optJSONObject("bot");
-            LinearLayout identity=row();identity.setPadding(dp(12),dp(7),dp(12),dp(7));
+            LinearLayout identity=row();identity.setClipChildren(false);identity.setClipToPadding(false);identity.setPadding(dp(12),dp(7),dp(12),dp(7));
             identity.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
             identity.setContentDescription("Edit bot name and appearance");identity.setMinimumHeight(dp(48));identity.setFocusable(true);identity.setOnClickListener(v->editBot(bot));
             headerAvatar=new WorkingAvatarView(this,bot,13);View avatar=headerAvatar;
@@ -478,7 +478,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         chatBusy=busy;updateComposerAction();if(headerAvatar!=null)headerAvatar.setWorking(busy);
         if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
-            LinearLayout thinking=row();WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
+            LinearLayout thinking=row();thinking.setClipChildren(false);thinking.setClipToPadding(false);WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
             thinking.addView(avatar,new LinearLayout.LayoutParams(dp(30),dp(30)));
             ShimmerTextView work=new ShimmerTextView(this,"Working");work.active(true);work.setPadding(dp(10),0,dp(10),0);thinking.addView(work);JSONObject progress=session==null?null:session.optJSONObject("progress");long started=progress==null?currentJob.optLong("created"):progress.optLong("started",currentJob.optLong("created"));thinking.addView(new ElapsedTimeView(this,started,System.currentTimeMillis(),true));
             thread.addView(thinking);
