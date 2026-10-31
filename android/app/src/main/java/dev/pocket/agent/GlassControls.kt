@@ -1,5 +1,9 @@
 package dev.pocket.agent
 
+import android.app.Dialog
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
@@ -49,6 +53,14 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
 }
 
 object GlassControls {
+    @JvmStatic
+    fun bindDialog(dialog: Dialog, owner: ComponentActivity) {
+        dialog.window?.decorView?.apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+        }
+    }
+
     /** Keep native text input, accessibility and click handling above a decorative glass layer. */
     @JvmStatic
     fun wrap(content: View, corner: Float, primary: Boolean): View {
