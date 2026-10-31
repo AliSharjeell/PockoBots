@@ -17,7 +17,7 @@ import java.util.concurrent.*;
 public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
-    private LinearLayout page,body,thread,replyBanner;private FrameLayout root;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
+    private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="";
     private MarketplaceUi marketplaceUi;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
@@ -296,7 +296,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         });
     }
     private void inbox(){
-        body.removeAllViews();LinearLayout list=column();
+        if(homeResults!=null&&homeResults.isAttachedToWindow()){renderInbox(homeResults);return;}
+        body.removeAllViews();LinearLayout list=column();homeResults=list;
         body.addView(new AgentSearchBar(this,"Search bots and groups",homeSearchQuery,value->{homeSearchQuery=value;renderInbox(list);}));
         ScrollView scroll=new ScrollView(this);scroll.addView(list);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));renderInbox(list);
     }

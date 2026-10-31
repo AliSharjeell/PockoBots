@@ -12,6 +12,8 @@ import java.util.*;
 final class MarketplaceUi {
     private final BotsActivity app;
     private LinearLayout body;
+    private JSONArray entries;
+    private String searchQuery="";
     private final Set<String> pending=new HashSet<>();
     MarketplaceUi(BotsActivity app){this.app=app;}
     private int dp(int value){return app.dp(value);}
@@ -21,21 +23,29 @@ final class MarketplaceUi {
         app.marketplaceRequest(method,path,data,done,error->{pending.clear();if(body.isAttachedToWindow()){if(!method.equals("GET"))show(body);message("Couldn't connect",error==null?"Please try again.":error);}});
     }
     void show(LinearLayout parent){
-        body=parent;parent.removeAllViews();
-        ScrollView scroll=new ScrollView(app);LinearLayout list=app.column();list.setPadding(dp(4),0,dp(4),dp(12));scroll.addView(list);parent.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
-        list.addView(muted("Loading apps...",13));
-        request("GET","/marketplace",null,value->{
-            if(!parent.isAttachedToWindow())return;list.removeAllViews();JSONArray entries=(JSONArray)value;
-            Map<String,List<JSONObject>> sections=new LinkedHashMap<>();
-            for(String category:new String[]{"productivity","coding","research","data-analytics","design","automation","finance","other"})sections.put(category,new ArrayList<>());
-            for(int i=0;i<entries.length();i++){JSONObject item=entries.getJSONObject(i);sections.computeIfAbsent(item.optString("category","other"),key->new ArrayList<>()).add(item);}
-            for(Map.Entry<String,List<JSONObject>> section:sections.entrySet()){
-                if(section.getValue().isEmpty())continue;
-                TextView heading=text(category(section.getKey()),18);heading.setTypeface(AgentStyle.font(app),Typeface.BOLD);heading.setPadding(dp(8),dp(24),dp(8),dp(8));list.addView(heading);
-                section.getValue().sort(Comparator.comparing(item->item.optString("name"),String.CASE_INSENSITIVE_ORDER));
-                for(JSONObject item:section.getValue())appRow(list,item);
-            }
-        });
+        body=parent;parent.removeAllViews();LinearLayout list=app.column();list.setPadding(dp(4),0,dp(4),dp(12));
+        parent.addView(new AgentSearchBar(app,"Search apps",searchQuery,value->{searchQuery=value;render(list);}));
+        ScrollView scroll=new ScrollView(app);scroll.addView(list);parent.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render(list);
+        request("GET","/marketplace",null,value->{if(!parent.isAttachedToWindow())return;entries=(JSONArray)value;render(list);});
+    }
+    private void render(LinearLayout list){
+        list.removeAllViews();if(entries==null){list.addView(muted("Loading apps...",13));return;}
+        String query=searchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;
+        Map<String,List<JSONObject>> sections=new LinkedHashMap<>();
+        for(String category:new String[]{"productivity","coding","research","data-analytics","design","automation","finance","other"})sections.put(category,new ArrayList<>());
+        for(int i=0;i<entries.length();i++){
+            JSONObject item=entries.optJSONObject(i);String section=item.optString("category","other");
+            String terms=item.optString("name")+" "+item.optString("description")+" "+category(section)+" "+section;
+            if(!terms.toLowerCase(Locale.ROOT).contains(query))continue;
+            sections.computeIfAbsent(section,key->new ArrayList<>()).add(item);
+        }
+        for(Map.Entry<String,List<JSONObject>> section:sections.entrySet()){
+            if(section.getValue().isEmpty())continue;
+            TextView heading=text(category(section.getKey()),18);heading.setTypeface(AgentStyle.font(app),Typeface.BOLD);heading.setPadding(dp(8),dp(24),dp(8),dp(8));list.addView(heading);
+            section.getValue().sort(Comparator.comparing(item->item.optString("name"),String.CASE_INSENSITIVE_ORDER));
+            for(JSONObject item:section.getValue()){appRow(list,item);shown++;}
+        }
+        if(shown==0)list.addView(muted("No apps found",14));
     }
     private String category(String id){switch(id){case "productivity":return "Productivity";case "coding":return "Developer tools";case "research":return "Search & research";case "data-analytics":return "Data & analytics";case "design":return "Design";case "automation":return "Automation";case "finance":return "Finance";default:return "More apps";}}
     private JSONObject connection(JSONObject item){return item.optJSONObject("connection");}
