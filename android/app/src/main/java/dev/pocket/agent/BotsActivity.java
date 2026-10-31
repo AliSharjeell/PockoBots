@@ -461,31 +461,23 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 main.postDelayed(()->request("POST","/mobile/tasks/"+phone.optString("id")+"/answer",json("questionId",question.optString("id"),"text",answer),v->refresh(false)),400);
             },true);
         }
-        JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false;
-        for(int i=Math.max(0,jobs.length()-8);i<jobs.length();i++){
+        JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false,needsPhoneAccess=false;
+        if(jobs!=null)for(int i=0;i<jobs.length();i++){
             JSONObject job=jobs.optJSONObject(i);String status=job.optString("status");
             if(Arrays.asList("completed","cancelled","failed").contains(status))continue;
             busy|=Arrays.asList("running","arming","waiting").contains(status);paused|=status.equals("paused");
-            LinearLayout card=column();AgentStyle.card(card);
-            card.addView(muted(status.toUpperCase(Locale.ROOT)+" - "+job.optString("text"),11));
-            if(!job.optString("error").isEmpty())card.addView(muted(job.optString("error"),12));
-            if(job.optBoolean("phoneArming")){
-                card.addView(muted("Waiting for phone access. Enable setup permissions and unlock your device.",12));
-                button(card,"Open Settings",this::showSetup,false);
-            }
-            button(card,"Cancel task",()->request("POST","/bots/"+selected+"/jobs/"+job.optString("id")+"/cancel",json(),v->refresh(false)),false);
-            thread.addView(card);
+            needsPhoneAccess|=job.optBoolean("phoneArming");
         }
+        if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
             LinearLayout thinking=row();ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");
             thinking.addView(orb,new LinearLayout.LayoutParams(dp(30),dp(30)));
-            thinking.addView(muted("Working - you can queue another task",12));
+            thinking.addView(muted("Working",12));
             thread.addView(thinking);
         }
-        if(busy||paused||!bot.optBoolean("enabled")){
+        if(paused||!bot.optBoolean("enabled")){
             LinearLayout controls=row();thread.addView(controls);
-            boolean resume=paused||!bot.optBoolean("enabled");
-            button(controls,resume?"Resume bot":"Pause bot",()->request("POST","/bots/"+selected+(resume?"/resume":"/pause"),json(),v->refresh(false)),false);
+            button(controls,"Resume bot",()->request("POST","/bots/"+selected+"/resume",json(),v->refresh(false)),false);
             if(paused)button(controls,"Settings",this::showSetup,false);
         }
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
