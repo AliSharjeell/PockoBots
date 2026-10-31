@@ -10,13 +10,13 @@ import java.util.Locale;
 /** The bot's own avatar gently breathes and tilts while its task is running. */
 final class WorkingAvatarView extends FrameLayout {
     private final View image;private boolean working,ticking;
-    WorkingAvatarView(BotsActivity app,JSONObject bot,int textSize){
+    WorkingAvatarView(android.content.Context app,JSONObject bot,int textSize){
         super(app);setClipChildren(false);setClipToPadding(false);
         String avatar=bot.optString("avatar","");
         if(avatar.startsWith("bloub:")){
             String[] parts=avatar.split(":");BloubView bloub=new BloubView(app);if(parts.length>1)bloub.setShapeId(parts[1]);if(parts.length>2)bloub.setExpressionId(parts[2]);bloub.setColorHex(bot.optString("accent","#007AFF"));image=bloub;
         }else{
-            TextView initials=app.text(avatar.isEmpty()?bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT):avatar,textSize);initials.setGravity(Gravity.CENTER);initials.setPadding(0,0,0,0);initials.setTypeface(AgentStyle.font(app),Typeface.BOLD);initials.setTextColor(0xffffffff);int color;try{color=android.graphics.Color.parseColor(bot.optString("accent"));}catch(Exception ignored){color=AgentStyle.BLUE;}initials.setBackground(AgentStyle.surface(app,color,16,false));image=initials;
+            TextView initials=AgentStyle.text(app,avatar.isEmpty()?bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT):avatar,textSize);initials.setGravity(Gravity.CENTER);initials.setPadding(0,0,0,0);initials.setTypeface(AgentStyle.font(app),Typeface.BOLD);initials.setTextColor(0xffffffff);int color;try{color=android.graphics.Color.parseColor(bot.optString("accent"));}catch(Exception ignored){color=AgentStyle.BLUE;}initials.setBackground(AgentStyle.surface(app,color,16,false));image=initials;
         }
         addView(image,new FrameLayout.LayoutParams(-1,-1));setContentDescription(bot.optString("name")+" avatar");
     }

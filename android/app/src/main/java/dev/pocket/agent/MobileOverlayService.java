@@ -24,7 +24,7 @@ public class MobileOverlayService extends Service {
     private boolean expanded,attached,closing,suspended;private EditText answer;private float startX,startY;private int windowX,windowY;
     private long armingUntil;
     private NotificationManager notifications;
-    private ThinkingOrbView orb;private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
+    private WorkingAvatarView botAvatar;private JSONObject avatarBot=new JSONObject();private String avatarOwner="";private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
     @Override public void onCreate(){
         super.onCreate();instance=this;notifications=getSystemService(NotificationManager.class);
         notifications.createNotificationChannel(new NotificationChannel("mobile-tasks","Mobile Use tasks",NotificationManager.IMPORTANCE_LOW));
@@ -34,7 +34,7 @@ public class MobileOverlayService extends Service {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,PixelFormat.TRANSLUCENT);
         layout.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;layout.x=0;layout.y=dp(24);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
-        surface.setElevation(dp(16));surface.setBackground(AgentStyle.surface(this,android.graphics.Color.BLACK,28,true));surface.setClipToOutline(true);orb=new ThinkingOrbView(this);
+        surface.setElevation(dp(16));surface.setBackground(AgentStyle.surface(this,android.graphics.Color.BLACK,28,true));surface.setClipToOutline(true);
         surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());}
         catch(Exception e){MobileAccess.authorize(false);stopSelf();return;}
@@ -65,7 +65,8 @@ public class MobileOverlayService extends Service {
     }
     private void poll(){
         if(closing||id.isEmpty()||api==null)return;String selected=id;
-        try{JSONObject result=api.get("/mobile/tasks/"+selected);main.post(() -> {
+        try{JSONObject result=api.get("/mobile/tasks/"+selected);String owner=result.optString("ownerBotId");JSONObject fetched=null;if(!owner.isEmpty())try{fetched=api.get("/bots/"+owner).optJSONObject("bot");}catch(Exception ignored){}final JSONObject identity=fetched;main.post(() -> {
+            if(identity!=null){avatarBot=identity;if(!avatarOwner.equals(identity.toString())){avatarOwner=identity.toString();botAvatar=null;signature="";}}
             if(closing||!selected.equals(id))return;String previous=task.optString("status");task=result;
             String status=task.optString("status");
             if(!status.equals("running")&&System.currentTimeMillis()>armingUntil)MobileAccess.authorize(false);
@@ -87,7 +88,7 @@ public class MobileOverlayService extends Service {
         String status=task.optString("status","queued");
         String shortTitle=status.equals("waiting")?"Needs your reply":status.equals("running")?"Agent is working":status.equals("completed")?"Task complete":status.equals("queued")?"Getting ready":status.equals("paused")?"Task paused":status.equals("failed")?"Task needs attention":"Task stopped";
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
-        if(orb.getParent()!=null)((android.view.ViewGroup)orb.getParent()).removeView(orb);orb.state(status);LinearLayout.LayoutParams orbParams=new LinearLayout.LayoutParams(dp(34),dp(34));orbParams.setMargins(0,0,dp(10),0);header.addView(orb,orbParams);
+        if(botAvatar==null)botAvatar=new WorkingAvatarView(this,avatarBot,16);if(botAvatar.getParent()!=null)((android.view.ViewGroup)botAvatar.getParent()).removeView(botAvatar);botAvatar.setWorking(status.equals("running")||status.equals("queued"));LinearLayout.LayoutParams avatarParams=new LinearLayout.LayoutParams(dp(34),dp(34));avatarParams.setMargins(0,0,dp(10),0);header.setClipChildren(false);header.addView(botAvatar,avatarParams);
         LinearLayout captions=new LinearLayout(this);captions.setOrientation(LinearLayout.VERTICAL);ShimmerTextView pill=new ShimmerTextView(this,shortTitle);pill.active(status.equals("running")||status.equals("queued"));pill.setPadding(0,0,0,0);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);captions.addView(pill);
         TextView detail=text(status.equals("waiting")?"Paused until you reply":task.optInt("steps")+" steps · Mobile Use",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,dp(3),0,0);captions.addView(detail);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
         TextView chevron=text(expanded?"⌄":"⌃",16);chevron.setContentDescription(expanded?"Collapse task panel":"Expand task panel");chevron.setTextIsSelectable(false);chevron.setPadding(dp(8),0,dp(2),0);header.addView(chevron);surface.addView(header);
