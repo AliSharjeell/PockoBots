@@ -1,0 +1,226 @@
+[
+  {
+    "id": "aave",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Faave.com&sz=128",
+    "brandSource": "https://aave.com",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "f42234b31b2807dbad1164915da4ebb65ff5e271b0a280218951f46ad6c03672",
+    "resource": "brand_aave"
+  },
+  {
+    "id": "airtable",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/airtable.svg",
+    "brandSource": "https://airtable.com/newsroom",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_airtable"
+  },
+  {
+    "id": "apple-apps",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/apple.svg",
+    "brandSource": "https://www.apple.com",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_apple_apps"
+  },
+  {
+    "id": "atlassian",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/atlassian.svg",
+    "brandSource": "https://atlassian.design/resources/logo-library",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_atlassian"
+  },
+  {
+    "id": "brave-search",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/brave.svg",
+    "brandSource": "https://brave.com/brave-branding-assets",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_brave_search"
+  },
+  {
+    "id": "canva",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/15.0.0/icons/canva.svg",
+    "brandSource": "https://www.canva.com",
+    "license": "CC0-1.0 (Simple Icons 15.0.0 asset)",
+    "resource": "brand_canva"
+  },
+  {
+    "id": "cloudflare",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/cloudflare.svg",
+    "brandSource": "https://www.cloudflare.com/logo/",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_cloudflare"
+  },
+  {
+    "id": "cobrain",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fcobrain.space&sz=128",
+    "brandSource": "https://cobrain.space",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "7fe2d3e64691ce8b06604c72a0ebdf6f92769bdec9514f74f578e2219c3929f6",
+    "resource": "brand_cobrain"
+  },
+  {
+    "id": "composio",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fcomposio.dev&sz=128",
+    "brandSource": "https://composio.dev",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "dddd8ca058513ce03e2ab6ea38bf669740b8af6e08bdb7c482b0067d02c28646",
+    "resource": "brand_composio"
+  },
+  {
+    "id": "context7",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fcontext7.com&sz=128",
+    "brandSource": "https://context7.com",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "8b1fa9ebb2ad6f6af2311d10f8f9572ac57abc8608caf665cd00911a5c7a1a03",
+    "resource": "brand_context7"
+  },
+  {
+    "id": "figma",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/figma.svg",
+    "brandSource": "https://www.figma.com/using-the-figma-brand/",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_figma"
+  },
+  {
+    "id": "firecrawl",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fwww.firecrawl.dev&sz=128",
+    "brandSource": "https://www.firecrawl.dev",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "f959dabe576a814a4ac9ced4eeba2f320b10111041e6b75cd18058ce3568b9ba",
+    "resource": "brand_firecrawl"
+  },
+  {
+    "id": "google-workspace",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fworkspace.google.com&sz=128",
+    "brandSource": "https://workspace.google.com",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "7ee03af4254d9f856b08f73e34f8b3526babb1ed7954b5557b1167c3238a919c",
+    "resource": "brand_google_workspace"
+  },
+  {
+    "id": "huggingface",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/huggingface.svg",
+    "brandSource": "https://huggingface.co/brand",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_huggingface"
+  },
+  {
+    "id": "linear",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/linear.svg",
+    "brandSource": "https://linear.app",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_linear"
+  },
+  {
+    "id": "neon",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/neon.svg",
+    "brandSource": "https://neon.com/brand",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_neon"
+  },
+  {
+    "id": "netlify",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/netlify.svg",
+    "brandSource": "https://www.netlify.com/press/",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_netlify"
+  },
+  {
+    "id": "notion",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/notion.svg",
+    "brandSource": "https://www.notion.so",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_notion"
+  },
+  {
+    "id": "obsidian",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/obsidian.svg",
+    "brandSource": "https://obsidian.md",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_obsidian"
+  },
+  {
+    "id": "paper",
+    "source": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fpaper.design&sz=128",
+    "brandSource": "https://paper.design",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "sha256": "bbc5eeb10e808bbd159b2b93d0e2de635bba06cce6317a350de075ab4bb4533c",
+    "resource": "brand_paper"
+  },
+  {
+    "id": "posthog",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/posthog.svg",
+    "brandSource": "https://posthog.com/handbook/company/brand-assets",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_posthog"
+  },
+  {
+    "id": "prisma",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/prisma.svg",
+    "brandSource": "https://github.com/prisma/presskit/tree/4bcb64181f266723439d955d60afa1c55fefa715",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_prisma"
+  },
+  {
+    "id": "railway",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/railway.svg",
+    "brandSource": "https://railway.app",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_railway"
+  },
+  {
+    "id": "render",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/render.svg",
+    "brandSource": "https://render.com",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_render"
+  },
+  {
+    "id": "resend",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/resend.svg",
+    "brandSource": "https://resend.com/brand",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_resend"
+  },
+  {
+    "id": "sentry",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/sentry.svg",
+    "brandSource": "https://sentry.io/branding/",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_sentry"
+  },
+  {
+    "id": "stripe",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/stripe.svg",
+    "brandSource": "https://stripe.com/newsroom/information",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_stripe"
+  },
+  {
+    "id": "supabase",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/supabase.svg",
+    "brandSource": "https://github.com/supabase/supabase/blob/4031a7549f5d46da7bc79c01d56be4177dc7c114/packages/common/assets/images/supabase-logo-wordmark--light.svg",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_supabase"
+  },
+  {
+    "id": "todoist",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/todoist.svg",
+    "brandSource": "https://doist.com/press",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_todoist"
+  },
+  {
+    "id": "trello",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/trello.svg",
+    "brandSource": "https://atlassian.design/resources/logo-library",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_trello"
+  },
+  {
+    "id": "vercel",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/vercel.svg",
+    "brandSource": "https://vercel.com/geist/brands",
+    "license": "CC0-1.0 (Simple Icons asset)",
+    "resource": "brand_vercel"
+  }
+]
