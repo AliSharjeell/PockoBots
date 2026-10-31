@@ -11,7 +11,7 @@ public class BotAlertService extends Service {
     static boolean isRinging(){BotAlertService service=instance;return service!=null&&service.sound!=null&&service.sound.isPlaying();}
     static volatile String activeAlert="",pendingAlert="";private Ringtone sound;private Vibrator vibrator;private final Handler main=new Handler(Looper.getMainLooper());private JSONObject alert;
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        if(intent==null)return START_NOT_STICKY;if("dismiss".equals(intent.getAction())||"answer".equals(intent.getAction())){String target=intent.getStringExtra("alertId");if(target!=null&&!target.equals(activeAlert))return START_NOT_STICKY;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY;}
+        if(intent==null)return START_NOT_STICKY;if("dismiss".equals(intent.getAction())||"answer".equals(intent.getAction())){String target=intent.getStringExtra("alertId");if(activeAlert.isEmpty()){getSystemService(NotificationManager.class).cancel(30);stopSelf();return START_NOT_STICKY;}if(target!=null&&!target.equals(activeAlert))return START_NOT_STICKY;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY;}
         String id=intent.getStringExtra("alertId");if(id==null||id.equals(activeAlert))return START_NOT_STICKY;
         if(!activeAlert.isEmpty())return START_NOT_STICKY;
         try{alert=BotNotifications.alert(this,id);if(!alert.has("id")){pendingAlert="";stopSelf();return START_NOT_STICKY;}instance=this;activeAlert=id;pendingAlert="";startForeground(30,BotNotifications.priority(this,alert,false));
