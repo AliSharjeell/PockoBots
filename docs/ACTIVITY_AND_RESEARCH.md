@@ -4,6 +4,8 @@ Working avatars breathe, tilt and blink. Working labels shimmer, and elapsed
 timers advance independently of incoming tokens. The current activity panel
 stays open while a run is active; completed tool calls are compact, with full
 inputs and outputs available on tap. Earlier run details remain accessible.
+The floating phone-control island uses the same animated bot avatar. Home uses
+the avatar alone to indicate work, keeping timestamps and unread badges separate.
 The native UI takes interaction inspiration from
 [Beautiful UI](https://www.beautifului.dev/), particularly its loading states,
 expandable traces and compact tool chips. Its website code is not imported.
@@ -11,6 +13,20 @@ expandable traces and compact tool chips. Its website code is not imported.
 Provider thinking is displayed only when the provider supplies it. Sessions
 checkpoint partial text, thinking and tool activity. Restarted runs restore
 paused; they are not represented as still executing after their process died.
+
+## Code changes
+
+File writes and shell tools compare actual before/after file contents. Activity
+shows file names with green added and red removed line counts; tap to read a
+colored patch. Shell snapshots exclude generated/dependency directories, binary
+files and symlinks, and are bounded to 128 text files, 4 MB and 4,096 entries.
+Individual snapshot files are limited to 256 KB. Files outside this snapshot
+are omitted rather than assigned invented counts. A tool captures up to 12 file
+changes, with a 24,000-character patch preview per file; full counts remain.
+External vendor CLI commands that do not pass through these tools do not report
+these patches. Large/pathological diffs may be omitted if computation times out.
+
+Files is named after the bot and resets to its project root when opening a bot.
 
 Some providers can return a normal stop containing thinking but no answer.
 PockoBots now requests continuation for those turns, up to three times. Repeated
