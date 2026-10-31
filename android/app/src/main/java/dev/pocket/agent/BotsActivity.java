@@ -717,36 +717,33 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Permissions"))showScreen("Permissions");}
     @Override public void onBackPressed(){if(settingsChild()){showScreen("Settings");return;}if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
     private void connections(){
-        request("GET","/connectors",null,value -> {
-            JSONArray list=(JSONArray)value;LinearLayout form=column();form.setPadding(dp(12),0,dp(12),dp(12));
-            button(form,"Add MCP connection",() -> connectionForm(null),true);
+        marketplaceRequest("GET","/connectors",null,value->{
+            AgentSheet sheet=new AgentSheet(this,"Custom MCP connections");JSONArray list=(JSONArray)value;int count=0;
             for(int i=0;i<list.length();i++){
-                JSONObject c=list.optJSONObject(i);
-                button(form,c.optString("name")+" · "+c.optString("transport"),() -> new AlertDialog.Builder(this).setTitle(c.optString("name")).setItems(new String[]{"Sign in with OAuth","Test connection","Edit","Remove"},(d,n) -> {
-                    if(n==0)request("POST","/connectors/"+c.optString("id")+"/oauth/start",json(),r->{JSONObject auth=(JSONObject)r;String url=auth.optString("authorizationUrl");if(!url.isEmpty())openUrl(url);else if("authorized".equals(auth.optString("status")))Toast.makeText(this,"Already signed in. Test the connection to load its tools.",Toast.LENGTH_LONG).show();else throw new IllegalStateException("The connector did not provide a sign-in link.");});
-                    if(n==1)request("POST","/connectors/"+c.optString("id")+"/test",json(),r -> new AlertDialog.Builder(this).setTitle("Connected").setMessage(((JSONObject)r).optJSONArray("tools").length()+" tools available").setPositiveButton("OK",null).show());
-                    if(n==2)connectionForm(c);
-                    if(n==3)request("DELETE","/connectors/"+c.optString("id"),null,r -> {refresh(false);});
-                }).show(),false);
+                JSONObject connection=list.optJSONObject(i);if(!connection.optString("marketplaceId").isEmpty())continue;count++;
+                LinearLayout item=row();item.setPadding(dp(4),dp(14),dp(4),dp(14));LinearLayout labels=column();TextView name=text(connection.optString("name"),16);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);labels.addView(name);labels.addView(muted(connection.optString("transport").equals("http")?connection.optString("url"):"Local command: "+connection.optString("command"),12));item.addView(labels,new LinearLayout.LayoutParams(0,-2,1));item.addView(muted(">",18));sheet.content.addView(item);item.setOnClickListener(v->{sheet.dialog.dismiss();connectionActions(connection);});View line=new View(this);line.setBackgroundColor(AgentStyle.BORDER);sheet.content.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
             }
-            ScrollView scroll=new ScrollView(this);scroll.addView(form);
-            new AlertDialog.Builder(this).setTitle("MCP connections").setView(scroll).setPositiveButton("Close",null).show();
-        });
+            if(count==0)sheet.content.addView(muted("No custom connections yet. Add an HTTP endpoint or a local MCP command.",14));
+            sheet.action("Add connection",()->{sheet.dialog.dismiss();connectionForm(null);},true);sheet.action("Done",sheet.dialog::dismiss,false);sheet.show();
+        },error->AgentSheet.message(this,"Couldn't load connections",error));
+    }
+    private void connectionActions(JSONObject connection){
+        AgentSheet sheet=new AgentSheet(this,connection.optString("name"));sheet.content.addView(muted(connection.optString("transport").equals("http")?connection.optString("url"):connection.optString("command"),13));String id=connection.optString("id");
+        if(connection.optBoolean("oauth"))sheet.action("Sign in",()->{sheet.dialog.dismiss();marketplaceRequest("POST","/connectors/"+id+"/oauth/start",json(),value->{JSONObject auth=(JSONObject)value;String url=auth.optString("authorizationUrl");if(!url.isEmpty())openUrl(url);else AgentSheet.message(this,"Sign-in",auth.optString("status").equals("authorized")?"Already signed in. Check the connection to load its tools.":"No sign-in URL was returned.");},error->AgentSheet.message(this,"Couldn't sign in",error));},true);
+        sheet.action("Check connection",()->{sheet.dialog.dismiss();marketplaceRequest("POST","/connectors/"+id+"/test",json(),value->{JSONArray tools=((JSONObject)value).optJSONArray("tools");AgentSheet.message(this,"Connection ready",(tools==null?0:tools.length())+" tools available");},error->AgentSheet.message(this,"Connection failed",error));},false);
+        sheet.action("Edit",()->{sheet.dialog.dismiss();connectionForm(connection);},false);
+        sheet.action("Remove connection",()->{sheet.dialog.dismiss();AgentSheet confirm=new AgentSheet(this,"Remove connection?");confirm.content.addView(muted("Bots using "+connection.optString("name")+" will lose access to its tools.",13));confirm.action("Remove",()->marketplaceRequest("DELETE","/connectors/"+id,null,result->{confirm.dialog.dismiss();refresh(false);connections();},error->AgentSheet.message(this,"Couldn't remove connection",error)),true);confirm.action("Cancel",confirm.dialog::dismiss,false);confirm.show();},false);sheet.show();
     }
     private void connectionForm(JSONObject previous){
-        LinearLayout form=column();form.setPadding(dp(16),0,dp(16),dp(16));
+        AgentSheet sheet=new AgentSheet(this,previous==null?"Add MCP connection":"Edit MCP connection");LinearLayout form=sheet.content;
         EditText name=field(form,"Name",previous==null?"":previous.optString("name"),false);
-        Spinner transport=new Spinner(this);transport.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"HTTP endpoint","Local stdio command"}));
-        form.addView(transport);if(previous!=null)transport.setSelection(previous.optString("transport").equals("stdio")?1:0);
-        EditText url=field(form,"HTTP URL",previous==null?"":previous.optString("url"),false),token=field(form,"Bearer token · blank keeps saved token","",true),command=field(form,"Local executable",previous==null?"npx":previous.optString("command"),false),args=field(form,"Arguments · JSON array",previous==null?"[]":previous.optJSONArray("args").toString(),false);
-        ScrollView scroll=new ScrollView(this);scroll.addView(form);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("MCP connection").setView(scroll).setPositiveButton("Save",null).setNegativeButton("Cancel",null).create();
-        dialog.setOnShowListener(v -> dialog.getButton(-1).setOnClickListener(w -> {
-            try{
-                JSONObject data=json("name",name.getText().toString(),"transport",transport.getSelectedItemPosition()==0?"http":"stdio","url",url.getText().toString(),"token",token.getText().toString(),"command",command.getText().toString(),"args",new JSONArray(args.getText().toString()));
-                if(previous!=null)data.put("id",previous.optString("id"));
-                request("POST","/connectors",data,r -> {dialog.dismiss();refresh(false);});
-            }catch(Exception e){error(e);}
-        }));dialog.show();
+        final boolean[] http={previous==null||previous.optString("transport").equals("http")};LinearLayout modes=AgentStyle.segment(this);Button endpoint=button(modes,"HTTP endpoint",()->{},false),local=button(modes,"Local command",()->{},false);for(Button choice:new Button[]{endpoint,local})choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(44),1));form.addView(modes,new LinearLayout.LayoutParams(-1,dp(52)));
+        LinearLayout web=column(),stdio=column();form.addView(web);form.addView(stdio);
+        EditText url=field(web,"Endpoint URL",previous==null?"":previous.optString("url"),false),token=field(web,previous!=null&&previous.optBoolean("hasToken")?"Bearer token - saved; leave blank to keep":"Bearer token (optional)","",true);
+        CheckBox oauth=new CheckBox(this);oauth.setText("Use browser sign-in (MCP OAuth)");oauth.setTypeface(AgentStyle.font(this));oauth.setLetterSpacing(-.06f);oauth.setTextColor(AgentStyle.TEXT);oauth.setChecked(previous!=null&&previous.optBoolean("oauth"));web.addView(oauth);
+        EditText command=field(stdio,"Executable",previous==null?"npx":previous.optString("command"),false),args=field(stdio,"Arguments (JSON array)",previous==null||previous.optJSONArray("args")==null?"[]":previous.optJSONArray("args").toString(),false);
+        Runnable renderMode=()->{AgentStyle.selected(endpoint,http[0]);AgentStyle.selected(local,!http[0]);web.setVisibility(http[0]?View.VISIBLE:View.GONE);stdio.setVisibility(http[0]?View.GONE:View.VISIBLE);};endpoint.setOnClickListener(v->{http[0]=true;renderMode.run();});local.setOnClickListener(v->{http[0]=false;renderMode.run();});renderMode.run();
+        TextView status=muted("",12);status.setVisibility(View.GONE);form.addView(status);Button save=sheet.action("Save connection",()->{},true);
+        save.setOnClickListener(v->{try{JSONObject data=json("name",name.getText().toString().trim(),"transport",http[0]?"http":"stdio","url",http[0]?url.getText().toString().trim():"","token",http[0]?token.getText().toString():"","command",http[0]?"":command.getText().toString().trim(),"args",http[0]?new JSONArray():new JSONArray(args.getText().toString()),"oauth",http[0]&&oauth.isChecked(),"enabled",previous==null||previous.optBoolean("enabled",true));if(previous!=null)data.put("id",previous.optString("id"));save.setEnabled(false);status.setVisibility(View.GONE);marketplaceRequest("POST","/connectors",data,result->{sheet.dialog.dismiss();refresh(false);connections();},error->{save.setEnabled(true);status.setText(error);status.setVisibility(View.VISIBLE);});}catch(Exception error){status.setText("Check the arguments JSON: "+error.getMessage());status.setVisibility(View.VISIBLE);}});sheet.action("Cancel",sheet.dialog::dismiss,false);sheet.show();
     }
 }
