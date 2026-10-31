@@ -532,7 +532,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         List<TextView> shapeChips=new ArrayList<>();
         for(BloubView.Companion.ShapeOption opt:BloubView.Companion.getSHAPES()){
-            TextView chip=text(opt.getIcon()+" "+opt.getLabel(),12);
+            TextView chip=text(opt.getLabel(),12);
             chip.setPadding(dp(12),dp(6),dp(12),dp(6));
             chip.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             chip.setBackground(AgentStyle.surface(this,selectedShape[0].equals(opt.getId())?AgentStyle.BLUE:AgentStyle.PANEL,14,false));
@@ -598,7 +598,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         List<TextView> expChips=new ArrayList<>();
         for(BloubView.Companion.ExpressionOption opt:BloubView.Companion.getEXPRESSIONS()){
-            TextView chip=text(opt.getEmoji()+" "+opt.getLabel(),12);
+            TextView chip=text(opt.getLabel(),12);
             chip.setPadding(dp(12),dp(6),dp(12),dp(6));
             chip.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             chip.setBackground(AgentStyle.surface(this,selectedExpression[0].equals(opt.getId())?AgentStyle.BLUE:AgentStyle.PANEL,14,false));
@@ -619,7 +619,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
 
         // Section 4: Identity & Instructions (Only 2 EditTexts in creation mode!)
-        form.addView(text("Identity & Instructions",14));
         EditText role=field(form,"Instructions",create?"":bot.optString("role"),false);
         role.setSingleLine(false);
         role.setMinLines(3);
