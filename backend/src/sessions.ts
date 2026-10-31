@@ -218,7 +218,7 @@ export class Sessions {
     this.beginProgress(record);this.agents.set(id, agent);
     this.busy.add(id);await this.persist();
     agent.subscribe(async (event) => {
-      if(event.type==="message_start"&&event.message.role==="user"){const time=(event.message as any).timestamp;record.pendingSteering=record.pendingSteering?.filter(update=>update.time!==time);}
+      if(event.type==="message_start"&&event.message.role==="user"){const time=(event.message as any).timestamp;record.pendingSteering=record.pendingSteering?.filter(update=>update.time!==time);record.messages=[...agent.state.messages];await this.persist();}
       this.capture(record,event,agent.state.streamingMessage||((event as any).message));
       this.publish({ type: "agent", sessionId: id, event });
       if (event.type === "message_end" || event.type === "agent_end") {
@@ -232,6 +232,7 @@ export class Sessions {
       .catch((e) => {record.runError=String(e.message||e).split(settings.apiKey||"\u0000").join("[redacted]");if(record.progress)interruptProgress(record.progress,"failed");this.publish({type:"error",sessionId:id,error:record.runError});})
       .finally(async () => {
         this.busy.delete(id);
+        if(agent.state.errorMessage)record.runError=String(agent.state.errorMessage).split(settings.apiKey||"\u0000").join("[redacted]");
         if(record.progress?.status==="working"){const last:any=agent.state.messages.at(-1);if(last?.stopReason==="error")interruptProgress(record.progress,"failed");else if(last?.stopReason==="aborted")interruptProgress(record.progress,"stopped");else record.progress.status="completed";}
         record.messages = [...agent.state.messages];
         try {
