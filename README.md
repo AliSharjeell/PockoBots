@@ -34,8 +34,8 @@ and relevant conversation, tool output or phone screenshots leave the device.
 | Build and run software | Edit files, clone repositories, run Git, install dependencies, execute commands and start development servers. |
 | Use your phone | Operate visible Android apps and the browser through the integrated Artemis helper. The bot chooses its tools from the task. |
 | Keep working in the background | Queue tasks, run proactive routines, retain notes and notify you while the app is closed. |
-| Work as a team | Create multiple bots with separate chats and workspaces; bots can delegate bounded tasks to one another. |
-| Connect your tools | Attach selected MCP servers over Streamable HTTP or launch local stdio tools. |
+| Work as a team | Create customized bots with separate chats and workspaces; group chats retain each speaker, and bots can delegate bounded tasks to teammates. |
+| Connect your tools | Browse 31 connection definitions, complete supported OAuth sign-ins, and attach selected remote or local MCP tools. |
 | Reach you | Reply directly to notifications. Priority alerts can ring on the lock screen; Answer reveals the message and starts an installed offline Android voice. |
 | Share what you build | Open clickable local previews or create a real public Dev Tunnel link after signing in. |
 
@@ -47,6 +47,17 @@ right in chat.
 Create a bot with just **a name and instructions**. Every bot gets the same
 coding, browsing and phone capabilities. There are no mode switches or default
 daily run caps.
+
+Settings supports BYOK and phone-side CLI adapters for Codex, Claude Code,
+OpenCode and Gemini. Vendor login, eligibility and usage limits remain with the
+vendor. See [subscription setup and limits](docs/SUBSCRIPTIONS.md) and the
+[MCP marketplace guide](docs/MCP_MARKETPLACE.md). Google Workspace needs your
+OAuth client configuration; a catalog entry alone is not an authorized connection.
+
+Hidden native-app control is experimental. A YouTube secondary-display experiment
+passed on the Pixel emulator with an ADB/scrcpy companion, while Settings remained
+on the main screen. The standalone app still uses the visible screen; no isolated
+LinkedIn or Instagram account is claimed. See the [measured display results](docs/BACKGROUND_DISPLAYS.md).
 
 ## Built around the phone you already carry
 
