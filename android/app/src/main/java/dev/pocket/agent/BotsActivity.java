@@ -699,22 +699,23 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }).setNegativeButton("Cancel",null).show();
     }
     private boolean accessibility(){return com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null;}
-    void permissionSettings(LinearLayout content){
-        content.addView(text("Permissions & background",20));content.addView(muted("Every bot can code, browse and operate your phone. Shell commands and priority ringing are enabled by default; you can change them in each bot's preferences.",13));
-        content.addView(text("Shell commands: allowed by default",14));content.addView(text("Priority ringing alerts: allowed by default",14));
-        content.addView(muted("Alerts can ring while locked. Answer shows the message and uses an installed offline Android voice. Phone actions require an unlocked screen.",12));
-        boolean notifications=getSystemService(NotificationManager.class).areNotificationsEnabled();
-        button(content,(notifications?"Allowed: ":"Enable: ")+"Notifications & replies",()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},1);else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));},false);
-        if(Build.VERSION.SDK_INT>=34)button(content,(getSystemService(NotificationManager.class).canUseFullScreenIntent()?"Allowed: ":"Enable: ")+"Full-screen alert permission",()->startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:"+getPackageName()))),false);
-        button(content,"Background app capabilities",()->new AlertDialog.Builder(this).setTitle("Phone execution capabilities").setMessage(AgentDisplayCapabilities.inspect(this).toString()).setPositiveButton("Close",null).setNeutralButton("Probe private display",(d,n)->AgentDisplayCapabilities.probeOwnDisplay(this,"com.android.chrome",result->new AlertDialog.Builder(this).setTitle("Measured display support").setMessage(result.toString()).setPositiveButton("Close",null).show())).show(),false);
-        button(content,"Android voice data",()->{try{startActivity(new Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA));}catch(ActivityNotFoundException e){Toast.makeText(this,"Install an offline voice in Android text-to-speech settings",Toast.LENGTH_LONG).show();}},false);
-        button(content,(accessibility()?"Enabled: ":"Enable: ")+"Phone accessibility",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),false);
-        button(content,(Settings.canDrawOverlays(this)?"Allowed: ":"Allow: ")+"Floating island",()->startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()))),false);
-        content.addView(muted("Android requires you to grant these permissions in its own settings. Missing phone permissions do not block coding. Bots continue outside the app; Android battery restrictions still apply.",12));
-        if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))button(content,"Continue to Home",()->{getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");},true);
+    private void permissionRow(LinearLayout content,String title,String status,Runnable action){
+        LinearLayout item=row();item.setPadding(dp(8),dp(18),dp(8),dp(18));LinearLayout labels=column();labels.addView(text(title,16));labels.addView(muted(status,12));item.addView(labels,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){item.addView(muted(">",20));item.setOnClickListener(v->action.run());}content.addView(item);View line=new View(this);line.setBackgroundColor(AgentStyle.BORDER);content.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
     }
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Settings"))showScreen("Settings");}
-    @Override public void onBackPressed(){if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
+    void permissionSettings(LinearLayout content){
+        content.addView(muted("Android permissions apply to all bots. Phone actions need an unlocked screen. Shell and priority alerts are enabled by default in new bots.",13));
+        boolean notifications=getSystemService(NotificationManager.class).areNotificationsEnabled();
+        permissionRow(content,"Notifications & replies",notifications?"Allowed":"Not allowed",()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},1);else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));});
+        if(Build.VERSION.SDK_INT>=34)permissionRow(content,"Full-screen priority alerts",getSystemService(NotificationManager.class).canUseFullScreenIntent()?"Allowed":"Not allowed",()->startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:"+getPackageName()))));
+        permissionRow(content,"Phone accessibility",accessibility()?"Allowed":"Not allowed",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        permissionRow(content,"Floating island",Settings.canDrawOverlays(this)?"Allowed":"Not allowed",()->startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()))));
+        boolean unrestricted=getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(getPackageName());permissionRow(content,"Background battery access",unrestricted?"Unrestricted":"Restricted by Android",()->startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+        permissionRow(content,"Android voice data","Manage installed offline voices",()->{try{startActivity(new Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA));}catch(ActivityNotFoundException e){Toast.makeText(this,"Install an offline voice in Android text-to-speech settings",Toast.LENGTH_LONG).show();}});
+        content.addView(muted("Bots continue outside the app. Android can stop tasks after force-stop, shutdown or battery restrictions.",12));
+        if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))button(content,"Continue to Home",this::completeSetup,true);
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Permissions"))showScreen("Permissions");}
+    @Override public void onBackPressed(){if(settingsChild()){showScreen("Settings");return;}if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
     private void connections(){
         request("GET","/connectors",null,value -> {
             JSONArray list=(JSONArray)value;LinearLayout form=column();form.setPadding(dp(12),0,dp(12),dp(12));
