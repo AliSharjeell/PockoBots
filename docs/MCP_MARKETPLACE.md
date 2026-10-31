@@ -15,11 +15,19 @@ Sentry, Stripe, Supabase, Todoist, Trello and Vercel. Google Workspace is added
 as a separate entry. A catalog listing is not proof that an external service is
 reachable, free, or compatible with this Android runtime. Test each connection.
 
-Installing an entry saves a connection configuration. It reports configured,
-not connected. Use Test to establish MCP tool connectivity. Local stdio servers
-may download their package on first use. Apple apps requires macOS; Paper and
-the catalog's Figma desktop endpoint need desktop software; Obsidian needs its
-compatible REST API plugin. These four entries are marked external-host-required
+The native directory groups flat app rows under category headings. App logos
+are bundled, with provenance in third_party/marketplace-icons/sources.json.
+There are no category badges or per-app cards. Tap + to connect; a saved entry
+shows Added and a three-dot menu for sign-in, configuration, connection checks,
+help or removal. Added means a configuration exists, not that account access
+has been granted. The separate sign-in caption reflects authorization state.
+
+Installing an entry saves a connection configuration. OAuth entries immediately
+start browser authorization, while key-based entries first request credentials.
+The app checks tool connectivity after a key-based setup; the OAuth callback
+checks it after authorization and offers Return to PockoBots. Local stdio servers
+may download their package on first use. Apple apps requires macOS; Paper needs desktop software; Obsidian needs its
+compatible REST API plugin. These three entries are marked external-host-required
 and cannot be installed as pretend Android apps. Add an actually reachable
 endpoint under custom connections if you have the required external host.
 
@@ -28,10 +36,14 @@ endpoint under custom connections if you have the required external host.
 HTTP entries with sign-in use the official MCP SDK's OAuth client, authorization
 server/resource discovery, dynamic registration when supported, PKCE, issuer
 binding, token refresh and a one-time random state parameter. Browser sign-in
-redirects to the phone's loopback callback. Pending states expire after ten
+redirects to the phone's loopback callback. The return link navigates to pockobots://oauth/complete; it contains no tokens
+or authorization codes. Pending states expire after ten
 minutes, cannot be replayed, and are lost on runtime restart; restart sign-in
 if needed. A vendor may require pre-registration or disallow loopback clients;
-a failed OAuth flow is reported instead of claiming account access.
+a failed OAuth flow is reported instead of claiming account access. The
+configuration sheets keep saved credentials when fields are left blank.
+HTTP OAuth entries also offer an optional bearer API-key fallback for vendors
+that support it. Provider-specific headers still use their named fields.
 
 Tokens, refresh tokens, verifier values, custom auth headers and stdio environment
 values are saved only in private app state and omitted from public connector
@@ -87,3 +99,47 @@ Endpoints:
 Tests use a real loopback authorization server fixture to verify PKCE, private
 token persistence, state mismatch/replay rejection and secret redaction. No
 production account is represented as connected by these tests.
+
+## Browser sign-in coverage and reference research - 2026-10-31
+
+The catalogue now marks 22 of 31 entries for direct MCP OAuth. This is protocol
+configuration, not a claim that all 22 accounts or vendor client policies have
+been exercised. No production account consent was automated during development.
+Airtable, Figma, PostHog, Resend, Render and Hugging Face now prefer their remote
+services instead of mandatory local keys or desktop-only setup. Sources:
+
+- [Airtable hosted MCP and OAuth](https://www.airtable.com/platform/mcp)
+- [Figma remote installation and supported-client restrictions](https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/)
+- [PostHog sign-in and region routing](https://posthog.com/docs/model-context-protocol/vscode)
+- [Resend's official open-source server and remote OAuth endpoint](https://github.com/resend/resend-mcp)
+- [Render OAuth and API-key options](https://render.com/docs/mcp-server)
+- [Hugging Face server setup](https://huggingface.co/docs/hub/en/agents-mcp)
+
+Public OAuth discovery was read without signing in for Airtable, Figma, PostHog
+and Hugging Face. Each advertised an authorization endpoint and dynamic client
+registration. Hugging Face's metadata was available at
+https://huggingface.co/.well-known/oauth-authorization-server. This is not a
+successful consent test. Figma restricts supported clients; Render may require
+client registration. The UI exposes errors and a supported API-key alternative
+rather than using another application's client ID.
+
+The integration-platform review covered [Composio managed authentication](https://docs.composio.dev/docs/authentication)
+and [Nango's auth/integration runtime](https://github.com/NangoHQ/nango).
+They offer useful account-connection UIs and token lifecycle handling, but add
+a hosted or separately deployed broker and its account/configuration. PockoBots
+therefore uses the existing open-source MCP SDK for direct PKCE browser login,
+discovery, registration and refresh. No mandatory broker backend was added.
+Composio remains an optional marketplace connector: use its consumer endpoint
+and your own consumer API key, with upstream apps connected in Composio For You.
+Its credentials and app actions are handled by Composio's service, as described
+in [its consumer-project guide](https://docs.composio.dev/kb/guide/consumer-project-boundaries-and-auth-selection).
+
+Google Workspace's local connector still requires your own Google OAuth client.
+An authentication library cannot supply an approved Google application identity
+by itself. Services that only accept API keys, require an approved client, or
+need another desktop host retain a guided configuration flow.
+
+Five scoped backend checks cover catalogue coverage, PKCE/state replay guards,
+private token storage, blank-field credential retention, bearer-key fallback,
+authenticated mutation routes and the token-free app return page. They use
+local fixtures, not real vendor accounts. Visual review is left to the user.
