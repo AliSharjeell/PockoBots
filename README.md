@@ -22,7 +22,8 @@ app; its included environment sets itself up. No separate Termux installation
 or rented cloud execution machine is required.
 
 **PockoBots is free, open-source software. Model usage is separate:** bring your
-own API key and pay your chosen provider, if applicable. The current app does
+own API key or sign into a supported vendor CLI and pay your chosen provider,
+if applicable. The current app does
 not bundle an offline language model. With a cloud provider, model requests
 and relevant conversation, tool output or phone screenshots leave the device.
 
@@ -38,9 +39,9 @@ and relevant conversation, tool output or phone screenshots leave the device.
 | Reach you | Reply directly to notifications. Priority alerts can ring on the lock screen; Answer reveals the message and starts an installed offline Android voice. |
 | Share what you build | Open clickable local previews or create a real public Dev Tunnel link after signing in. |
 
-Each conversation has **Chat / Terminal / Files**. The sidebar brings together
-model settings, MCP connections, permissions, server sharing and a shared main
-terminal for your tools and repositories. Markdown, code, tables and links render
+Each conversation has **Chat / Terminal / Files**. The bottom dock opens Bots, the MCP marketplace, a shared main terminal, and
+Settings. The conversation tools menu opens bot preferences, connections,
+permissions and server sharing. Markdown, code, tables and links render
 right in chat.
 
 Create a bot with just **a name and instructions**. Every bot gets the same

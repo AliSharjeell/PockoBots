@@ -2,11 +2,11 @@
 
 Open the source project at `C:\AppsNew\pocket-agent\android` using **File > Open**.
 The repository root is the Node/backend project; the `android` directory is the
-Android Studio project. The checked-in Gradle wrapper selects Gradle 8.11.1 and
+Android Studio project. The checked-in Gradle wrapper selects Gradle 8.13 and
 verifies the downloaded distribution checksum.
 
 In **Settings > Build, Execution, Deployment > Build Tools > Gradle**, choose
-JDK 17 as the Gradle JDK. Install Android SDK Platform 35 through SDK Manager
+JDK 17 as the Gradle JDK. Install Android SDK Platform 36 through SDK Manager
 if requested, then let Gradle sync finish. On this workspace, a tested JDK 17
 is available at `C:\tmp\pocket-runtime-research\jdk17\jdk-17.0.20.1+1`.
 
@@ -32,7 +32,7 @@ installation step. The Android emulator does not need Termux.
 
 | Change | Source | Update the emulator |
 | --- | --- | --- |
-| Native project/chat/settings/file/server screens | `android/app/src/main/java/dev/pocket/agent/MainActivity.java` | Run or Debug again |
+| Native project/chat/settings/file/server screens | `android/app/src/main/java/dev/pocket/agent/BotsActivity.java` and neighboring Java/Kotlin components | Run or Debug again |
 | Native terminal input/rendering | `android/app/src/main/java/dev/pocket/agent/TerminalCanvas.java` | Run or Debug again |
 | Runtime setup and lifecycle | `RuntimeInstaller.java`, `RuntimeService.java` in the same Java directory | Run or Debug again |
 | Agent, API, Mobile Use, project management, Git, server tools | `backend/src/` | Run again; Gradle bundles the backend when npm dependencies are installed |
