@@ -2,6 +2,7 @@
 
 import android.content.Context
 import android.view.View
+import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -11,11 +12,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.SmartToy
-import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -25,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.semantics.Role
@@ -44,14 +39,14 @@ import java.util.function.IntConsumer
 
 data class DockTabItem(
     val label: String,
-    val icon: ImageVector
+    val icon: Int
 )
 
 val DockTabs = listOf(
-    DockTabItem("Bots", Icons.Rounded.SmartToy),
-    DockTabItem("Market", Icons.Rounded.Storefront),
-    DockTabItem("Terminal", Icons.Rounded.Terminal),
-    DockTabItem("Settings", Icons.Rounded.Tune)
+    DockTabItem("Home", R.drawable.lucide_house),
+    DockTabItem("Marketplace", R.drawable.lucide_store),
+    DockTabItem("Terminal", R.drawable.lucide_square_terminal),
+    DockTabItem("Settings", R.drawable.lucide_settings_2)
 )
 
 @Composable
@@ -177,7 +172,7 @@ fun GlassDockBar(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = tab.icon,
+                            painter = painterResource(tab.icon),
                             contentDescription = null,
                             tint = contentTint,
                             modifier = Modifier.size(20.dp)
