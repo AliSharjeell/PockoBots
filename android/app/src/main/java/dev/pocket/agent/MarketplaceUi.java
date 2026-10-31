@@ -14,6 +14,7 @@ final class MarketplaceUi {
     private LinearLayout body;
     private JSONArray entries;
     private String searchQuery="";
+    private static final List<String> ESSENTIALS=Arrays.asList("github","supabase","google-workspace","cloudflare","neon","railway","render","vercel","brave-search","huggingface","figma");
     private final Set<String> pending=new HashSet<>();
     MarketplaceUi(BotsActivity app){this.app=app;}
     private int dp(int value){return app.dp(value);}
@@ -30,14 +31,18 @@ final class MarketplaceUi {
     }
     private void render(LinearLayout list){
         list.removeAllViews();if(entries==null){list.addView(muted("Loading apps...",13));return;}
-        String query=searchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;
+        String query=searchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;List<JSONObject> essentials=new ArrayList<>();
         Map<String,List<JSONObject>> sections=new LinkedHashMap<>();
         for(String category:new String[]{"productivity","coding","research","data-analytics","design","automation","finance","other"})sections.put(category,new ArrayList<>());
         for(int i=0;i<entries.length();i++){
             JSONObject item=entries.optJSONObject(i);String section=item.optString("category","other");
-            String terms=item.optString("name")+" "+item.optString("description")+" "+category(section)+" "+section;
+            String terms=item.optString("name")+" "+item.optString("description")+" "+category(section)+" "+section+(ESSENTIALS.contains(item.optString("id"))?" essentials":"");
             if(!terms.toLowerCase(Locale.ROOT).contains(query))continue;
-            sections.computeIfAbsent(section,key->new ArrayList<>()).add(item);
+            if(ESSENTIALS.contains(item.optString("id")))essentials.add(item);else sections.computeIfAbsent(section,key->new ArrayList<>()).add(item);
+        }
+        if(!essentials.isEmpty()){
+            essentials.sort(Comparator.comparingInt(item->ESSENTIALS.indexOf(item.optString("id"))));TextView title=text("Essentials",18);title.setTypeface(AgentStyle.font(app),Typeface.BOLD);title.setPadding(dp(8),dp(16),dp(8),dp(12));list.addView(title);
+            for(int i=0;i<essentials.size();i+=3){LinearLayout gridRow=app.row();gridRow.setGravity(Gravity.TOP);for(int column=0;column<3;column++){if(i+column<essentials.size())gridRow.addView(essentialTile(essentials.get(i+column)),new LinearLayout.LayoutParams(0,-2,1));else gridRow.addView(new View(app),new LinearLayout.LayoutParams(0,1,1));}list.addView(gridRow);}shown+=essentials.size();
         }
         for(Map.Entry<String,List<JSONObject>> section:sections.entrySet()){
             if(section.getValue().isEmpty())continue;
@@ -62,10 +67,20 @@ final class MarketplaceUi {
         LinearLayout copy=app.column();copy.setPadding(dp(10),0,dp(6),0);
         TextView name=text(item.optString("name"),16);name.setTypeface(AgentStyle.font(app),Typeface.BOLD);copy.addView(name);
         TextView description=muted(item.optString("description"),12);description.setMaxLines(2);description.setEllipsize(android.text.TextUtils.TruncateAt.END);copy.addView(description);copy.addView(muted(status(item),11));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
-        boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
-        TextView add=text(busy?"...":added?"Added":"+",added?12:26);add.setGravity(Gravity.CENTER);add.setPadding(dp(8),0,dp(8),0);add.setTypeface(AgentStyle.font(app),Typeface.BOLD);add.setContentDescription(added?"Added "+item.optString("name"):"Add "+item.optString("name"));add.setEnabled(!busy);add.setOnClickListener(v->{if(added)options(item);else connect(item);});row.addView(add,new LinearLayout.LayoutParams(added?dp(56):dp(36),dp(44)));
+        boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));row.addView(addControl(item),new LinearLayout.LayoutParams(added?dp(56):dp(64),dp(36)));
         AgentIcon more=new AgentIcon(app,"more","Configure "+item.optString("name"),()->options(item));more.setBackground(null);more.setEnabled(!busy);row.addView(more,new LinearLayout.LayoutParams(dp(30),dp(44)));list.addView(row);
         View rule=new View(app);rule.setBackgroundColor(AgentStyle.BORDER);LinearLayout.LayoutParams line=new LinearLayout.LayoutParams(-1,dp(1));line.setMargins(dp(60),0,dp(8),0);list.addView(rule,line);
+    }
+    private View addControl(JSONObject item){
+        boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
+        if(added){TextView value=text("Added",12);value.setGravity(Gravity.CENTER);value.setOnClickListener(v->options(item));return value;}
+        Button button=new Button(app);button.setText(busy?"...":"Add");AgentStyle.button(button,true);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription("Add "+item.optString("name"));button.setOnClickListener(v->connect(item));return button;
+    }
+    private View essentialTile(JSONObject item){
+        LinearLayout tile=app.column();tile.setGravity(Gravity.CENTER_HORIZONTAL);tile.setPadding(dp(4),dp(4),dp(4),dp(20));
+        FrameLayout iconRow=new FrameLayout(app);ImageView icon=new ImageView(app);icon.setImageResource(MarketplaceIcons.resource(item.optString("id")));icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setPadding(dp(6),dp(6),dp(6),dp(6));icon.setBackground(AgentStyle.surface(app,0xffffffff,12,false));iconRow.addView(icon,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.CENTER));
+        AgentIcon more=new AgentIcon(app,"more","Configure "+item.optString("name"),()->options(item));more.setBackground(null);iconRow.addView(more,new FrameLayout.LayoutParams(dp(24),dp(42),Gravity.END));tile.addView(iconRow,new LinearLayout.LayoutParams(-1,dp(46)));
+        TextView name=text(item.optString("id").equals("google-workspace")?"Google":item.optString("name"),13);name.setGravity(Gravity.CENTER);name.setMaxLines(1);name.setEllipsize(android.text.TextUtils.TruncateAt.END);tile.addView(name,new LinearLayout.LayoutParams(-1,dp(30)));tile.addView(addControl(item),new LinearLayout.LayoutParams(dp(68),dp(34)));return tile;
     }
     private void connect(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
