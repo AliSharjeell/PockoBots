@@ -333,9 +333,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             return;
         }
 
-        // Flat conversations separated by inset rules
-        for(int i=0;i<bots.length();i++){
-            JSONObject bot=bots.optJSONObject(i);JSONObject recent=bot.optJSONObject("lastMessage");
+        // Newest conversation first, independent of whether its latest sender was the owner or bot.
+        ArrayList<JSONObject> orderedBots=new ArrayList<>();for(int i=0;i<bots.length();i++)orderedBots.add(bots.optJSONObject(i));orderedBots.sort(Comparator.comparingLong((JSONObject bot)->{JSONObject recent=bot.optJSONObject("lastMessage");return recent==null?bot.optLong("created"):recent.optLong("time",bot.optLong("created"));}).reversed());
+        for(JSONObject bot:orderedBots){
+            JSONObject recent=bot.optJSONObject("lastMessage");
             String terms=bot.optString("name")+" "+bot.optString("role")+" "+(recent==null?"":recent.optString("text"));if(!terms.toLowerCase(Locale.ROOT).contains(query))continue;shown++;
             LinearLayout card=column();
             card.setPadding(dp(8),dp(18),0,dp(18));
