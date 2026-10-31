@@ -184,7 +184,7 @@ export class Sessions {
       },
       beforeToolCall: async (context, signal) => {
         if (
-          ["bash", "start_server", "stop_process", "share_port"].includes(
+          ["bash", "start_server", "stop_process", "share_port", "github_cli", "add_integration"].includes(
             context.toolCall.name,
           )
         ) {

@@ -19,7 +19,7 @@ async function fixture() {
     state: (id: string) => sessions.get(id), stop: () => {}, setTrust: () => {},
     prompt: async (id: string, text: string, profile: any) => { profiles.set(id, profile); if (onPrompt) await onPrompt(id, text, profile); sessions.set(id, { busy: false, approvals: [], messages: [{ role: "assistant", content: [{ type: "text", text: "Verified reply for " + id }] }] }); },
   };
-  const bots = new Bots(store, { create: async () => ({ id: randomUUID() }) } as any, adapter, {} as any, { require: () => {}, tools: async () => [] } as any, () => {}, text => text.replaceAll("private-token", "[redacted]"));
+  const bots = new Bots(store, { create: async () => ({ id: randomUUID() }) } as any, adapter, {} as any, { list:()=>[], require: () => {}, tools: async () => [] } as any, () => {}, text => text.replaceAll("private-token", "[redacted]"));
   await bots.init(); await bots.engine(false);
   const groups = new Groups(store, bots, () => {}, text => text.replaceAll("private-token", "[redacted]")); await groups.init();
   return { store, bots, groups, profiles, adapter, setPrompt: (handler: typeof onPrompt) => { onPrompt = handler; }, close: async () => { await groups.close(); await bots.close(); await rm(root, { recursive: true, force: true }); } };

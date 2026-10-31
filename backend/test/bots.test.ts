@@ -70,7 +70,7 @@ test("bot context keeps complete tool groups and bounds history",()=>{
 test("proactive checks coalesce missed intervals, honor daily limits and keep NO_UPDATE quiet",async()=>{
   const root=await mkdtemp(join(tmpdir(),"pocket-routines-"));const store=new Store(root);await store.init();let runs=0;
   const sessions:any={progress:()=>undefined,create:async()=>({id:randomUUID()}),stop:()=>{},setTrust:()=>{},prompt:async()=>{runs++;},state:()=>({busy:false,messages:[{role:"assistant",content:[{type:"text",text:"NO_UPDATE"}]}]})};
-  const bots=new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
+  const bots=new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{list:()=>[],require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
   await bots.init();try{
     const bot=await bots.create({name:"Watcher",role:"Check updates",kind:"coding",intervalMinutes:15,heartbeat:"Check now",dailyLimit:1});await bots.engine(true);
     const late=bot.nextWake+4*60*60000;await bots.tick(late);assert.equal(runs,1);assert.equal(bots.state(bot.id).jobs.length,1);assert.equal(bot.nextWake,late+15*60000);
@@ -105,7 +105,7 @@ test("pausing during an MCP connection prevents the queued agent from starting",
 test("unified bot defaults are unlimited and migrate existing profiles without losing their workspace",async()=>{
  const root=await mkdtemp(join(tmpdir(),"pocket-unified-"));const store=new Store(root);await store.init();let runs=0;
  const sessions:any={progress:()=>undefined,create:async()=>({id:randomUUID()}),stop:()=>{},setTrust:()=>{},prompt:async()=>{runs++;},state:()=>({busy:false,messages:[{role:"assistant",content:[{type:"text",text:"Done"}]}]})};
- const make=()=>new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
+ const make=()=>new Bots(store,{create:async()=>({id:randomUUID()})} as any,sessions,{} as any,{list:()=>[],require:()=>{},tools:async()=>[]} as any,()=>{},s=>s);
  let bots=make();await bots.init();const bot=await bots.create({name:"All tools",role:"Help me"});
  try{assert.equal(bot.kind,"unified");assert.equal(bot.allowShell,true);assert.equal(bot.allowUrgent,true);assert.equal(bot.dailyLimit,0);assert.equal(bots.enabled,true);
  for(let i=0;i<26;i++){await bots.enqueue(bot.id,"Task "+i);await bots.tick();await bots.tick();}assert.equal(runs,26);
