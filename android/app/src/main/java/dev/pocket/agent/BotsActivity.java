@@ -143,7 +143,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(screen.equals("Settings")){AgentIcon appearance=new AgentIcon(this,AgentStyle.dark?"sun":"moon",AgentStyle.dark?"Use light mode":"Use dark mode",this::toggleAppearance);header.addView(GlassControls.wrap(appearance,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));}
             if(selected.isEmpty()&&screen.equals("Chat")){
                 AgentIcon create=new AgentIcon(this,"plus","New conversation",this::newConversation);
-                header.addView(GlassControls.wrap(create,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
+                header.addView(GlassControls.wrap(create,28f,true),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
             }
         }
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
