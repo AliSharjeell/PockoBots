@@ -15,6 +15,7 @@ type Session = {
   created: number;
   projectId?: string;
   runError?: string;
+  pendingSteering?: {text:string;time:number}[];
   progress?: RunProgress;
   progressHistory?: RunProgress[];
 };
@@ -156,7 +157,7 @@ export class Sessions {
     if (this.busy.has(id)) throw Error("Agent is already running");
     if (typeof text !== "string" || !text.trim() || text.length > 32000)
       throw Error("Enter a prompt of at most 32000 characters");
-    record.runError=undefined;const settings = { ...this.settings() };
+    record.runError=undefined;if(record.pendingSteering?.length){text+="\n\nPending owner updates:\n"+record.pendingSteering.map(update=>update.text).join("\n").slice(-14000);record.pendingSteering=[];}const settings = { ...this.settings() };
     const workspace = this.projects ? await this.projects.workspace(record.projectId) : this.workspace;
     if (settings.executionProvider && settings.executionProvider !== "byok") {
       if (!this.trusted.has(id)) throw Error("Subscription agents require shell access. Enable it in this bot's preferences before starting.");
@@ -217,6 +218,7 @@ export class Sessions {
     this.beginProgress(record);this.agents.set(id, agent);
     this.busy.add(id);await this.persist();
     agent.subscribe(async (event) => {
+      if(event.type==="message_start"&&event.message.role==="user"){const time=(event.message as any).timestamp;record.pendingSteering=record.pendingSteering?.filter(update=>update.time!==time);}
       this.capture(record,event,agent.state.streamingMessage||((event as any).message));
       this.publish({ type: "agent", sessionId: id, event });
       if (event.type === "message_end" || event.type === "agent_end") {
@@ -247,6 +249,10 @@ export class Sessions {
   private cliMessage(record:Session,settings:Settings,text:string,error=false) {
     const safe=settings.apiKey?text.split(settings.apiKey).join("[redacted]"):text;
     record.messages.push({role:"assistant",content:[{type:"text",text:safe}],api:settings.api,provider:settings.executionProvider||"byok",model:settings.providerModel||"default",usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:error?"error":"stop",...(error?{errorMessage:safe}:{}),timestamp:Date.now()});
+  }
+  async steer(id:string,text:string){
+    const record=this.records.get(id),agent=this.agents.get(id);if(!record||!agent||!this.busy.has(id)||this.cliRuns.has(id))return false;
+    if(!text.trim()||text.length>16000)throw Error("Enter an update of at most 16000 characters");record.pendingSteering??=[];if(record.pendingSteering.length>=12)throw Error("Wait for the bot to apply its pending updates");const update={text,time:Date.now()};record.pendingSteering.push(update);agent.steer({role:"user",content:"Owner update to the current task: "+text,timestamp:update.time});await this.persist();return true;
   }
   stop(id: string) {
     const record=this.records.get(id);if(record?.progress&&this.busy.has(id)){interruptProgress(record.progress,"stopped");this.checkpoint(record);}
