@@ -17,7 +17,7 @@ import java.util.concurrent.*;
 public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
-    private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
+    private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="";
     private MarketplaceUi marketplaceUi;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
@@ -100,8 +100,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     void showSetup(){showScreen("Settings");}
     private void showScreen(String next){if(page!=null){getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(page.getWindowToken(),0);page.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
-        workspace.stop();page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
-        page.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),dp(8)+insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
+        workspace.stop();dockOverlay=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
+        page.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),dp(8)+insets.getSystemWindowInsetBottom());if(dockOverlay!=null){FrameLayout.LayoutParams dockParams=(FrameLayout.LayoutParams)dockOverlay.getLayoutParams();dockParams.bottomMargin=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();dockOverlay.setLayoutParams(dockParams);}return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
         boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
@@ -218,12 +218,15 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void dock(){
         int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:screen.equals("Settings")?3:0;
-        page.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{
+        dockOverlay=new FrameLayout(this);View fade=new View(this);fade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{android.graphics.Color.TRANSPARENT,(AgentStyle.BACK&0x00ffffff)|0x99000000,AgentStyle.BACK}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
+        dockOverlay.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{
             if(index==0)open("");
             if(index==1)showScreen("Marketplace");
             if(index==2){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
             if(index==3)showScreen("Settings");
-        }),new LinearLayout.LayoutParams(-1,dp(78)));
+        }),new FrameLayout.LayoutParams(-1,dp(78),Gravity.BOTTOM));
+        FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(-1,dp(112),Gravity.BOTTOM);WindowInsets insets=root.getRootWindowInsets();if(insets!=null)position.bottomMargin=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();root.addView(dockOverlay,position);
     }
     private void newConversation(){
         ModernSheet.newConversation(this,()->editBot(null),this::createGroup);
@@ -292,7 +295,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(homeResults!=null&&homeResults.isAttachedToWindow()){renderInbox(homeResults);return;}
         body.removeAllViews();LinearLayout list=column();homeResults=list;
         body.addView(new AgentSearchBar(this,"Search bots and groups",homeSearchQuery,value->{homeSearchQuery=value;renderInbox(list);}));
-        ScrollView scroll=new ScrollView(this);scroll.addView(list);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));renderInbox(list);
+        ScrollView scroll=new ScrollView(this);scroll.setClipToPadding(false);scroll.setPadding(0,0,0,dp(96));scroll.addView(list);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));renderInbox(list);
     }
     private void renderInbox(LinearLayout list){
         list.removeAllViews();String query=homeSearchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;

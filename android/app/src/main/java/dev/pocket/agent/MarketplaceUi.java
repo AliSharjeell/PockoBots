@@ -26,7 +26,7 @@ final class MarketplaceUi {
     void show(LinearLayout parent){
         body=parent;parent.removeAllViews();LinearLayout list=app.column();list.setPadding(dp(4),0,dp(4),dp(12));
         parent.addView(new AgentSearchBar(app,"Search apps",searchQuery,value->{searchQuery=value;render(list);}));
-        ScrollView scroll=new ScrollView(app);scroll.addView(list);parent.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render(list);
+        ScrollView scroll=new ScrollView(app);scroll.setClipToPadding(false);scroll.setPadding(0,0,0,dp(96));scroll.addView(list);parent.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render(list);
         request("GET","/marketplace",null,value->{if(!parent.isAttachedToWindow())return;entries=(JSONArray)value;render(list);});
     }
     private void render(LinearLayout list){
