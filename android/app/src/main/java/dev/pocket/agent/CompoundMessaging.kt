@@ -130,20 +130,6 @@ object CompoundMessaging {
             gravity = if (isUser) Gravity.RIGHT else Gravity.LEFT
         }
 
-        // Show bot name on first message of cluster
-        if (!isUser && isFirstInGroup && botName.isNotEmpty()) {
-            val nameView = TextView(ctx).apply {
-                letterSpacing = -0.06f
-                typeface = AgentStyle.font(ctx)
-                this.text = botName
-                textSize = 11f
-                typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
-                setTextColor(if (isDark) 0xFFA1A1AA.toInt() else 0xFF71717A.toInt())
-                setPadding(dp(ctx, 12), 0, dp(ctx, 12), dp(ctx, 3))
-            }
-            contentCol.addView(nameView)
-        }
-
         // Bubble Container Frame
         val bubbleFrame = FrameLayout(ctx).apply {
             isClickable = true
