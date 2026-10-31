@@ -70,6 +70,7 @@ object CompoundMessaging {
         botAvatar: String,
         botAccent: String,
         markdown: ChatMarkdown,
+        timestamp: Long,
         onReply: ReplyCallback
     ) {
         val ctx = activity
@@ -189,7 +190,7 @@ object CompoundMessaging {
         }
 
         val timeView = TextView(ctx).apply {
-            this.text = timeFormat.format(Date())
+            this.text = timeFormat.format(Date(timestamp))
             textSize = 10f
             if (isUser) {
                 setTextColor(0xAAFFFFFF.toInt())
@@ -366,7 +367,7 @@ object CompoundMessaging {
                     0 -> showQuickPromptDialog(activity, onQuickPrompt)
                     1 -> onMcpConnect.run()
                     2 -> {
-                        Toast.makeText(ctx, "Draft kept", Toast.LENGTH_SHORT).show()
+                        activity.copyConversation()
                     }
                     3 -> onClearChat.run()
                 }

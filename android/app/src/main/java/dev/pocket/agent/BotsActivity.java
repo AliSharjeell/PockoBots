@@ -18,6 +18,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner;private FrameLayout root,drawer;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
+    private String replyQuote="";
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
     int dp(int n){return AgentStyle.dp(this,n);}
@@ -89,7 +90,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
-    private void open(String id){saveDraft();selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
+    private void open(String id){saveDraft();replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Setup");}
     private void showScreen(String next){if(page!=null){getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(page.getWindowToken(),0);page.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
@@ -542,15 +543,19 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             list.addView(card);
         }
     }
+    public void copyConversation(){
+        if(detail==null)return;JSONArray messages=detail.optJSONArray("messages");StringBuilder text=new StringBuilder();if(messages!=null)for(int i=0;i<messages.length();i++){JSONObject message=messages.optJSONObject(i);if(message!=null)text.append(message.optString("role")).append(": ").append(message.optString("text")).append("\n\n");}
+        getSystemService(android.content.ClipboardManager.class).setPrimaryClip(android.content.ClipData.newPlainText("Bot conversation",text.toString()));Toast.makeText(this,"Conversation copied",Toast.LENGTH_SHORT).show();
+    }
     private void send(){
         String value=composer.getText().toString().trim();if(value.isEmpty())return;
-        if(replyBanner!=null){replyBanner.setVisibility(View.GONE);replyBanner.removeAllViews();}
         if(state.optJSONObject("settings").optString("executionProvider","byok").equals("byok")&&!state.optJSONObject("settings").optBoolean("hasKey")){
             new AlertDialog.Builder(this).setTitle("Connect your model").setMessage("Save your BYOK connection before sending tasks. Your draft will be kept.").setPositiveButton("Open settings",(d,n)->showScreen("Settings")).setNegativeButton("Cancel",null).show();
             return;
         }
         String id=selected;
-        request("POST","/bots/"+id+"/messages",json("text",value),v->{
+        request("POST","/bots/"+id+"/messages",json("text",replyQuote.isEmpty()?value:replyQuote+"\n\n"+value),v->{
+            replyQuote="";if(replyBanner!=null){replyBanner.setVisibility(View.GONE);replyBanner.removeAllViews();}
             if(id.equals(selected)&&composer!=null)composer.setText("");
             draft="";getSharedPreferences("bot-chats",0).edit().remove("draft-"+id).apply();
             request("POST","/bots/"+id+"/resume",json(),r->refresh(false));
@@ -558,6 +563,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void setReplyQuote(String author, String snippet){
         if(replyBanner==null)return;
+        replyQuote="> "+author+": "+snippet.substring(0,Math.min(800,snippet.length())).replace("\n","\n> ");
         replyBanner.removeAllViews();
         replyBanner.setVisibility(View.VISIBLE);
         View bar=new View(this);bar.setBackgroundColor(0xFF007AFF);
@@ -569,7 +575,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         textCol.addView(quote);
         replyBanner.addView(textCol,new LinearLayout.LayoutParams(0,-2,1));
         AgentIcon close=new AgentIcon(this,"close","Cancel reply",()->{
-            replyBanner.setVisibility(View.GONE);
+            replyQuote="";replyBanner.setVisibility(View.GONE);
             replyBanner.removeAllViews();
         });
         replyBanner.addView(close,new LinearLayout.LayoutParams(dp(28),dp(28)));
@@ -577,12 +583,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private void bubble(String value,boolean user){
         bubble(value,user,true,true);
     }
-    private void bubble(String value,boolean user,boolean isFirst,boolean isLast){
+    private void bubble(String value,boolean user,boolean isFirst,boolean isLast){bubble(value,user,isFirst,isLast,System.currentTimeMillis());}
+    private void bubble(String value,boolean user,boolean isFirst,boolean isLast,long time){
         if(!user&&ChatCards.render(this,thread,value,markdown))return;
         String botName=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("name"):"";
         String botAvatar=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("avatar",""):"";
         String botAccent=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("accent","#4F46E5"):"#4F46E5";
-        CompoundMessaging.renderBubble(this,thread,value,user,isFirst,isLast,botName,botAvatar,botAccent,markdown,(author,snippet)->{
+        CompoundMessaging.renderBubble(this,thread,value,user,isFirst,isLast,botName,botAvatar,botAccent,markdown,time,(author,snippet)->{
             setReplyQuote(author,snippet);
         });
     }
@@ -598,7 +605,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 boolean isUser=message.optString("role").equals("user");
                 boolean isFirst=i==0||!messages.optJSONObject(i-1).optString("role").equals(message.optString("role"));
                 boolean isLast=i==messages.length()-1||!messages.optJSONObject(i+1).optString("role").equals(message.optString("role"));
-                bubble(message.optString("text"),isUser,isFirst,isLast);
+                bubble(message.optString("text"),isUser,isFirst,isLast,message.optLong("time"));
             }
         }
         JSONObject session=detail.optJSONObject("session");
