@@ -51,11 +51,18 @@ val DockTabs = listOf(
     DockTabItem("Settings", R.drawable.phosphor_gear_six_regular, R.drawable.phosphor_gear_six_fill)
 )
 
+val WorkspaceTabs = listOf(
+    DockTabItem("Chat", R.drawable.phosphor_chat_circle_regular, R.drawable.phosphor_chat_circle_fill),
+    DockTabItem("Terminal", R.drawable.phosphor_terminal_window_regular, R.drawable.phosphor_terminal_window_fill),
+    DockTabItem("Files", R.drawable.phosphor_folder_open_regular, R.drawable.phosphor_folder_open_fill)
+)
+
 @Composable
 fun GlassDockBar(
     dark: Boolean = true,
     selectedIndex: Int = 0,
-    onTabSelected: (Int) -> Unit = {}
+    onTabSelected: (Int) -> Unit = {},
+    tabs: List<DockTabItem> = DockTabs
 ) {
     val backdrop = rememberCanvasBackdrop {
         drawRect(
@@ -121,7 +128,7 @@ fun GlassDockBar(
                 .height(58.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DockTabs.forEachIndexed { index, tab ->
+            tabs.forEachIndexed { index, tab ->
                 val selected = selectedIndex == index
                 val tabActiveBg by animateColorAsState(
                     targetValue = when {
@@ -187,7 +194,12 @@ fun GlassDockBar(
 /** Kyant Backdrop refraction with modern Material 3 icons and live preview support. */
 object GlassDock {
     @JvmStatic
-    fun create(context: Context, dark: Boolean, selected: Int, action: IntConsumer): View =
+    fun create(context: Context, dark: Boolean, selected: Int, action: IntConsumer): View = createDock(context, dark, selected, DockTabs, action)
+
+    @JvmStatic
+    fun createWorkspace(context: Context, dark: Boolean, selected: Int, action: IntConsumer): View = createDock(context, dark, selected, WorkspaceTabs, action)
+
+    private fun createDock(context: Context, dark: Boolean, selected: Int, tabs: List<DockTabItem>, action: IntConsumer): View =
         ComposeView(context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -195,7 +207,8 @@ object GlassDock {
                     GlassDockBar(
                         dark = dark,
                         selectedIndex = selected,
-                        onTabSelected = { action.accept(it) }
+                        onTabSelected = { action.accept(it) },
+                        tabs = tabs
                     )
                 }
             }

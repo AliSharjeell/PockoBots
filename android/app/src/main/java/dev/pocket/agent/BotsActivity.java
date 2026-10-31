@@ -149,15 +149,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
 
         if(!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)){
-            LinearLayout tabs=AgentStyle.segment(this);
-            for(String tab:new String[]{"Chat","Terminal","Files"}){
-                Button choice=button(tabs,tab,()->showScreen(tab),false);
-                choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(36),1));
-                AgentStyle.selected(choice,screen.equals(tab));
-            }
-            LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,dp(44));
-            tlp.setMargins(0,dp(4),0,dp(6));
-            page.addView(tabs,tlp);
+            String[] tabs={"Chat","Terminal","Files"};
+            page.addView(GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index])),new LinearLayout.LayoutParams(-1,dp(86)));
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
