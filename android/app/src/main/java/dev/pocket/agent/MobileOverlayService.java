@@ -23,10 +23,10 @@ public class MobileOverlayService extends Service {
     private AgentApi api;private JSONObject task=new JSONObject();private String id="",signature="",draft="";
     private boolean expanded,attached,closing,suspended;private EditText answer;private float startX,startY;private int windowX,windowY;
     private long armingUntil;
-    private NotificationManager notifications;
+    private NotificationManager notifications;private ChatMarkdown markdown;
     private WorkingAvatarView botAvatar;private JSONObject avatarBot=new JSONObject();private String avatarOwner="";private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
     @Override public void onCreate(){
-        super.onCreate();instance=this;notifications=getSystemService(NotificationManager.class);
+        super.onCreate();instance=this;markdown=new ChatMarkdown(this);notifications=getSystemService(NotificationManager.class);
         notifications.createNotificationChannel(new NotificationChannel("mobile-tasks","Mobile Use tasks",NotificationManager.IMPORTANCE_LOW));
         startForeground(2,notification("Preparing your mobile task"));
         windows=getSystemService(WindowManager.class);
@@ -66,6 +66,7 @@ public class MobileOverlayService extends Service {
     private void poll(){
         if(closing||id.isEmpty()||api==null)return;String selected=id;
         try{JSONObject result=api.get("/mobile/tasks/"+selected);String owner=result.optString("ownerBotId");JSONObject fetched=null;if(!owner.isEmpty())try{fetched=api.get("/bots/"+owner).optJSONObject("bot");}catch(Exception ignored){}final JSONObject identity=fetched;main.post(() -> {
+            if(closing||!selected.equals(id))return;
             if(identity!=null){avatarBot=identity;if(!avatarOwner.equals(identity.toString())){avatarOwner=identity.toString();botAvatar=null;signature="";}}
             if(closing||!selected.equals(id))return;String previous=task.optString("status");task=result;
             String status=task.optString("status");
@@ -82,16 +83,21 @@ public class MobileOverlayService extends Service {
     private void control(String action){armingUntil=0;MobileAccess.authorize(false);if(!id.isEmpty()&&api!=null)call(action,new JSONObject(),this::pollSoon);}
     private void pollSoon(){if(!closing&&!polling.isShutdown())polling.execute(this::poll);}
     private Button button(LinearLayout parent,String title,Runnable click,boolean primary){Button view=new Button(this);view.setText(title);AgentStyle.button(view,primary);parent.addView(view);view.setOnClickListener(v -> click.run());return view;}
+    private void icon(LinearLayout parent,String symbol,String description,Runnable action){AgentIcon view=new AgentIcon(this,symbol,description,action);view.setIconTint(0xfff4f4f5);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(44),dp(44));params.setMargins(dp(4),0,0,0);parent.addView(view,params);}
+    private TextView markdownText(String value,int size){TextView view=text("",size);markdown.set(view,value);android.text.SpannableString links=new android.text.SpannableString(view.getText());for(android.text.style.URLSpan link:links.getSpans(0,links.length(),android.text.style.URLSpan.class)){int start=links.getSpanStart(link),end=links.getSpanEnd(link);links.removeSpan(link);links.setSpan(new android.text.style.ClickableSpan(){public void onClick(View widget){try{android.net.Uri uri=android.net.Uri.parse(link.getURL());if("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))startActivity(new Intent(Intent.ACTION_VIEW,uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}},start,end,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}view.setText(links);return view;}
     private TextView text(String value,int size){TextView view=AgentStyle.text(this,value,size);view.setPadding(0,dp(5),0,dp(5));view.setTextIsSelectable(true);return view;}
     private void render(){
         if(surface==null||!attached)return;if(answer!=null)draft=answer.getText().toString();answer=null;surface.removeAllViews();
         String status=task.optString("status","queued");
-        String shortTitle=status.equals("waiting")?"Needs your reply":status.equals("running")?"Agent is working":status.equals("completed")?"Task complete":status.equals("queued")?"Getting ready":status.equals("paused")?"Task paused":status.equals("failed")?"Task needs attention":"Task stopped";
+        String botName=avatarBot.optString("name","Bot");
+        String shortTitle=status.equals("waiting")?"Needs your reply":status.equals("running")?botName+" is working":status.equals("completed")?"Task complete":status.equals("queued")?"Getting ready":status.equals("paused")?"Task paused":status.equals("failed")?"Task needs attention":"Task stopped";
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
         if(botAvatar==null)botAvatar=new WorkingAvatarView(this,avatarBot,16);if(botAvatar.getParent()!=null)((android.view.ViewGroup)botAvatar.getParent()).removeView(botAvatar);botAvatar.setWorking(status.equals("running")||status.equals("queued"));LinearLayout.LayoutParams avatarParams=new LinearLayout.LayoutParams(dp(34),dp(34));avatarParams.setMargins(0,0,dp(10),0);header.setClipChildren(false);header.addView(botAvatar,avatarParams);
+        if(!status.equals("running"))shortTitle=botName+" \u00b7 "+shortTitle;
         LinearLayout captions=new LinearLayout(this);captions.setOrientation(LinearLayout.VERTICAL);ShimmerTextView pill=new ShimmerTextView(this,shortTitle);pill.active(status.equals("running")||status.equals("queued"));pill.setPadding(0,0,0,0);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);captions.addView(pill);
-        TextView detail=text(status.equals("waiting")?"Paused until you reply":task.optInt("steps")+" steps · Mobile Use",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,dp(3),0,0);captions.addView(detail);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
-        TextView chevron=text(expanded?"⌄":"⌃",16);chevron.setContentDescription(expanded?"Collapse task panel":"Expand task panel");chevron.setTextIsSelectable(false);chevron.setPadding(dp(8),0,dp(2),0);header.addView(chevron);surface.addView(header);
+        LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);TextView detail=text(status.equals("waiting")?"Needs reply":task.optInt("steps")+" steps",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,dp(3),dp(8),0);meta.addView(detail);boolean live=status.equals("running")||status.equals("queued")||status.equals("waiting");ElapsedTimeView elapsed=new ElapsedTimeView(this,task.optLong("created",System.currentTimeMillis()),task.optLong("updated",System.currentTimeMillis()),live);elapsed.setContentDescription("Task elapsed time");meta.addView(elapsed);captions.addView(meta);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
+        icon(header,expanded?"down":"up",expanded?"Collapse task panel":"Expand task panel",()->{expanded=!expanded;render();});
+        if(expanded)icon(header,"close","Close panel and pause task",()->{control("pause");stopSelf();});surface.addView(header);
         View.OnTouchListener drag=(v,event) -> {
             switch(event.getAction()){
                 case MotionEvent.ACTION_DOWN:if(morph!=null)morph.cancel();startX=event.getRawX();startY=event.getRawY();windowX=layout.x;windowY=layout.y;return true;
@@ -108,26 +114,25 @@ public class MobileOverlayService extends Service {
             TextView title=text("MOBILE USE",10);title.setTextColor(AgentStyle.MUTED);title.setPadding(0,dp(16),0,dp(6));surface.addView(title);
             TextView goal=text(task.optString("prompt"),13);goal.setMaxLines(3);goal.setPadding(dp(12),dp(10),dp(12),dp(10));goal.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));surface.addView(goal);
             ScrollView scroll=new ScrollView(this);LinearLayout logs=new LinearLayout(this);logs.setOrientation(LinearLayout.VERTICAL);scroll.addView(logs);
-            String output=task.optString("output");if(!output.isEmpty())logs.addView(text(output,13));
-            JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0){TextView current=text(trace.optJSONObject(trace.length()-1).optString("text"),11);current.setTextColor(AgentStyle.MUTED);logs.addView(current);}
+            String output=task.optString("output");if(!output.isEmpty())logs.addView(markdownText(output,13));
+            JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0){TextView current=markdownText(trace.optJSONObject(trace.length()-1).optString("text"),11);current.setTextColor(AgentStyle.MUTED);logs.addView(current);}
             if(!task.optString("error").isEmpty())logs.addView(text(task.optString("error"),12));
             surface.addView(scroll,new LinearLayout.LayoutParams(-1,Math.min(dp(190),output.length()>700?dp(190):dp(110))));
             JSONObject question=task.optJSONObject("question");
             if(question!=null){
-                surface.addView(text(question.optString("text"),13));answer=new EditText(this);AgentStyle.input(answer);answer.setHint("Reply or say ready after handling it in the app");answer.setText(draft);answer.setMaxLines(3);surface.addView(answer);
+                surface.addView(markdownText(question.optString("text"),13));answer=new EditText(this);AgentStyle.input(answer);answer.setHint("Reply or say ready after handling it in the app");answer.setText(draft);answer.setMaxLines(3);surface.addView(answer);
                 button(surface,"Reply & continue",() -> {String reply=answer.getText().toString().trim();if(reply.isEmpty())return;
                     armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);JSONObject body=new JSONObject();try{body.put("questionId",question.optString("id")).put("text",reply);}catch(Exception ignored){}
                     call("answer",body,() -> {draft="";if(answer!=null)answer.setText("");expanded=false;pollSoon();render();});},true);
             }
-            LinearLayout controls=new LinearLayout(this);surface.addView(controls);
-            if(status.equals("paused")||status.equals("queued"))button(controls,"Resume",() -> {armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);},true);
-            if(status.equals("running")||status.equals("waiting"))button(controls,"Pause",() -> control("pause"),false);
-            if(!status.equals("completed")&&!status.equals("failed")&&!status.equals("stopped"))button(controls,"Stop",() -> control("stop"),false);
-            button(controls,"Open",() -> startActivity(new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)),false);
-            button(controls,"×",() -> {control("pause");stopSelf();},false);
+            LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER_VERTICAL);controls.setPadding(0,dp(10),0,0);surface.addView(controls);
+            if(status.equals("paused")||status.equals("queued"))icon(controls,"play","Resume task",() -> {armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);});
+            if(status.equals("running")||status.equals("waiting"))icon(controls,"pause","Pause task",() -> control("pause"));
+            if(!status.equals("completed")&&!status.equals("failed")&&!status.equals("stopped"))icon(controls,"stop","Stop task",() -> control("stop"));
+            icon(controls,"open","Open bot chat",() -> startActivity(new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         }
         layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);
-        int width=expanded?Math.min(dp(344),getResources().getDisplayMetrics().widthPixels-dp(24)):dp(228);
+        int width=expanded?Math.min(dp(344),getResources().getDisplayMetrics().widthPixels-dp(24)):Math.min(dp(280),getResources().getDisplayMetrics().widthPixels-dp(24));
         surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int height=surface.getMeasuredHeight();
         boolean transition=targetWidth>0&&(renderedExpanded!=expanded||targetWidth!=width||Math.abs(targetHeight-height)>dp(16));renderedExpanded=expanded;targetWidth=width;targetHeight=height;
         if(transition&&ValueAnimator.areAnimatorsEnabled()){
