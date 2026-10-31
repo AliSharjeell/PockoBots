@@ -65,18 +65,6 @@ fun GlassDockBar(
     tabs: List<DockTabItem> = DockTabs,
     compact: Boolean = false
 ) {
-    val backdrop = rememberCanvasBackdrop {
-        drawRect(
-            Brush.linearGradient(
-                listOf(
-                    if (dark) Color(0xFF171719) else Color(0xFF6B6B6E),
-                    if (dark) Color(0xFF202022) else Color(0xFF555558),
-                    if (dark) Color(0xFF141416) else Color(0xFF626265)
-                )
-            )
-        )
-    }
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -92,39 +80,7 @@ fun GlassDockBar(
                     shape = RoundedCornerShape(32.dp),
                     spotColor = if (dark) Color(0xFF000000) else Color(0x33000000)
                 )
-                .drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { RoundedCornerShape(32.dp) },
-                    effects = {
-                        blur(10.dp.toPx())
-                        lens(18.dp.toPx(), 26.dp.toPx())
-                    },
-                    onDrawSurface = {
-                        drawRect(
-                            if (dark) Color.White.copy(alpha = 0.035f)
-                            else Color.White.copy(alpha = 0.12f)
-                        )
-                    }
-                )
-                .border(
-                    width = 1.dp,
-                    brush = if (dark) {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.35f),
-                                Color.White.copy(alpha = 0.12f)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFFFFFFFF).copy(alpha = 0.9f),
-                                Color(0xFFDDE3EC).copy(alpha = 0.6f)
-                            )
-                        )
-                    },
-                    shape = RoundedCornerShape(32.dp)
-                )
+                .pockoGlass(dark, 32.dp)
                 .padding(4.dp)
                 .height(if (compact) 40.dp else 58.dp),
             verticalAlignment = Alignment.CenterVertically
