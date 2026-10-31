@@ -523,15 +523,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         // Bloub Section 1: Body Shape
         form.addView(text("Body shape",13));
-        HorizontalScrollView shapeScroll=new HorizontalScrollView(this);
-        shapeScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout shapeRow=row();
-        shapeRow.setPadding(dp(2),dp(4),dp(2),dp(8));
-        shapeScroll.addView(shapeRow);
-        form.addView(shapeScroll);
+        LinearLayout shapeGrid=column();
+        form.addView(shapeGrid);
+        LinearLayout shapeRow=null;
 
         List<TextView> shapeChips=new ArrayList<>();
         for(BloubView.Companion.ShapeOption opt:BloubView.Companion.getSHAPES()){
+            if(shapeChips.size()%4==0){shapeRow=row();shapeGrid.addView(shapeRow,new LinearLayout.LayoutParams(-1,-2));}
             TextView chip=text(opt.getLabel(),12);
             chip.setPadding(dp(12),dp(6),dp(12),dp(6));
             chip.setTypeface(AgentStyle.font(this),Typeface.BOLD);
@@ -546,9 +544,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                     shapeChips.get(i).setTextColor(sel?0xFFFFFFFF:AgentStyle.MUTED);
                 }
             });
+            chip.setGravity(Gravity.CENTER);chip.setPadding(dp(4),dp(8),dp(4),dp(8));
             shapeChips.add(chip);
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);
-            lp.rightMargin=dp(6);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
+            lp.setMargins(dp(2),dp(4),dp(2),dp(4));
             shapeRow.addView(chip,lp);
         }
 
