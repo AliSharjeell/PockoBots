@@ -449,7 +449,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 if(parts!=null)for(int i=0;i<parts.length();i++)if(parts.optJSONObject(i).optString("type").equals("text"))output.append(parts.optJSONObject(i).optString("text"));
                 if(output.length()>0)bubble(output.toString(),false,true,true);
             }
-            JSONArray history=session.optJSONArray("progressHistory");if(history!=null)for(int i=0;i<history.length();i++)renderRunActivity(history.optJSONObject(i));renderRunActivity(session.optJSONObject("progress"));
+            JSONArray history=session.optJSONArray("progressHistory");if(history!=null&&history.length()>0){TextView earlier=muted("Earlier activity ("+history.length()+" runs)",12);earlier.setOnClickListener(v->{AgentSheet sheet=new AgentSheet(this,"Activity history");for(int i=history.length()-1;i>=0;i--){JSONObject run=history.optJSONObject(i);JSONArray calls=run.optJSONArray("tools");Button item=button(sheet.content,run.optString("status")+" - "+(calls==null?0:calls.length())+" tools",()->showRunDetails(run),false);}sheet.show();});thread.addView(earlier);}renderRunActivity(session.optJSONObject("progress"));
             JSONArray approvals=session.optJSONArray("approvals");
             if(approvals!=null)for(int i=0;i<approvals.length();i++){
                 JSONObject approval=approvals.optJSONObject(i);
@@ -480,7 +480,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(busy){
             LinearLayout thinking=row();WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
             thinking.addView(avatar,new LinearLayout.LayoutParams(dp(30),dp(30)));
-            thinking.addView(muted("Working",12));
+            ShimmerTextView work=new ShimmerTextView(this,"Working");work.active(true);work.setPadding(dp(10),0,dp(10),0);thinking.addView(work);JSONObject progress=session==null?null:session.optJSONObject("progress");long started=progress==null?currentJob.optLong("created"):progress.optLong("started",currentJob.optLong("created"));thinking.addView(new ElapsedTimeView(this,started,System.currentTimeMillis(),true));
             thread.addView(thinking);
         }
         if(paused||!bot.optBoolean("enabled")){
@@ -491,15 +491,28 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);if(follow)markChatRead();});
     }
+    private String toolLabel(JSONObject tool){
+        String name=tool.optString("name").replace('_',' '),detail="";try{JSONObject args=new JSONObject(tool.optString("input","{}"));detail=args.optString("command",args.optString("path",args.optString("query",args.optString("url",""))));}catch(Exception ignored){}return detail.isEmpty()?name:detail.replaceAll("\\s+"," ").trim();
+    }
+    private void showToolDetails(JSONObject tool){
+        AgentSheet sheet=new AgentSheet(this,tool.optString("name"));sheet.content.addView(muted(tool.optString("status"),12));for(String field:new String[]{"input","output"})if(!tool.optString(field).isEmpty()){sheet.content.addView(text(field.equals("input")?"Input":"Output",14));TextView value=text(tool.optString(field),12);value.setTextIsSelectable(true);sheet.content.addView(value);}sheet.action("Done",sheet.dialog::dismiss,false);sheet.show();
+    }
+    private void showRunDetails(JSONObject progress){
+        AgentSheet sheet=new AgentSheet(this,"Activity details");if(!progress.optString("thinking").isEmpty()){sheet.content.addView(text("Thinking",15));TextView thoughts=text(progress.optString("thinking"),12);thoughts.setTextIsSelectable(true);sheet.content.addView(thoughts);}JSONArray tools=progress.optJSONArray("tools");if(tools!=null)for(int i=0;i<tools.length();i++){JSONObject tool=tools.optJSONObject(i);Button call=button(sheet.content,toolLabel(tool)+" - "+tool.optString("status"),()->showToolDetails(tool),false);call.setMaxLines(2);}sheet.action("Done",sheet.dialog::dismiss,false);sheet.show();
+    }
     private void renderRunActivity(JSONObject progress){
         if(progress==null)return;JSONArray tools=progress.optJSONArray("tools");String thinking=progress.optString("thinking");int count=tools==null?0:tools.length();if(count==0&&thinking.isEmpty())return;
-        String key="activity-"+progress.optString("id");boolean working=progress.optString("status").equals("working"),expanded=getSharedPreferences("bot-activity",0).getBoolean(key,working);
-        LinearLayout activity=column();activity.setPadding(dp(10),dp(6),dp(10),dp(6));TextView heading=muted((thinking.isEmpty()?"Tools":"Thinking & tools")+" ("+count+")"+(expanded?"  -":"  +"),12);heading.setTypeface(AgentStyle.font(this),Typeface.BOLD);activity.addView(heading);heading.setOnClickListener(v->{getSharedPreferences("bot-activity",0).edit().putBoolean(key,!expanded).apply();renderThread();});
+        String key="activity-"+progress.optString("id");boolean working=progress.optString("status").equals("working"),expanded=working||getSharedPreferences("bot-activity",0).getBoolean(key,false);
+        LinearLayout activity=column();activity.setPadding(dp(14),dp(12),dp(14),dp(12));LinearLayout header=row();ShimmerTextView heading=new ShimmerTextView(this,working?(thinking.isEmpty()?"Working":"Thinking"):"Activity");heading.active(working);heading.setTypeface(AgentStyle.font(this),Typeface.BOLD);heading.setTextSize(13);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));long started=progress.optLong("started",progress.optLong("updated"));header.addView(new ElapsedTimeView(this,started,progress.optLong("updated"),working));activity.addView(header);header.setOnClickListener(v->{if(working)showRunDetails(progress);else{getSharedPreferences("bot-activity",0).edit().putBoolean(key,!expanded).apply();renderThread();}});
         if(expanded){
-            if(!thinking.isEmpty()){TextView stream=muted(working?thinking.substring(Math.max(0,thinking.length()-2400)):thinking,12);stream.setMaxLines(8);stream.setEllipsize(android.text.TextUtils.TruncateAt.END);activity.addView(stream);stream.setOnClickListener(v->{AgentSheet sheet=new AgentSheet(this,"Thinking");TextView full=text(thinking,13);full.setTextIsSelectable(true);sheet.content.addView(full);sheet.action("Done",sheet.dialog::dismiss,false);sheet.show();});}
-            if(tools!=null)for(int i=0;i<tools.length();i++){JSONObject tool=tools.optJSONObject(i);String status=tool.optString("status"),label=tool.optString("name").replace('_',' ');TextView call=muted(label+" - "+status,12);if(status.equals("running"))call.setTextColor(AgentStyle.BLUE);activity.addView(call);call.setOnClickListener(v->{AgentSheet sheet=new AgentSheet(this,tool.optString("name"));sheet.content.addView(muted(status,12));if(!tool.optString("input").isEmpty()){sheet.content.addView(text("Input",14));TextView input=text(tool.optString("input"),12);input.setTextIsSelectable(true);sheet.content.addView(input);}if(!tool.optString("output").isEmpty()){sheet.content.addView(text("Output",14));TextView output=text(tool.optString("output"),12);output.setTextIsSelectable(true);sheet.content.addView(output);}sheet.action("Done",sheet.dialog::dismiss,false);sheet.show();});}
-        }
-        thread.addView(activity);
+            if(!thinking.isEmpty()){TextView stream=muted(working?thinking.substring(Math.max(0,thinking.length()-1000)):thinking,12);stream.setPadding(0,dp(10),0,dp(6));stream.setMaxLines(4);stream.setEllipsize(android.text.TextUtils.TruncateAt.END);activity.addView(stream);stream.setOnClickListener(v->showRunDetails(progress));}
+            int start=Math.max(0,count-4);if(start>0){TextView earlier=muted(start+" earlier tool calls",11);earlier.setPadding(0,dp(8),0,dp(6));earlier.setOnClickListener(v->showRunDetails(progress));activity.addView(earlier);}
+            if(tools!=null)for(int i=start;i<count;i++){
+                JSONObject tool=tools.optJSONObject(i);boolean running=tool.optString("status").equals("running");LinearLayout call=row();call.setPadding(0,dp(7),0,dp(7));if(running){ProgressBar pulse=new ProgressBar(this,null,android.R.attr.progressBarStyleSmall);pulse.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(AgentStyle.BLUE));call.addView(pulse,new LinearLayout.LayoutParams(dp(16),dp(16)));}else{TextView mark=muted(tool.optString("status").equals("error")?"!":"\u2022",12);mark.setPadding(0,0,0,0);mark.setGravity(Gravity.CENTER);call.addView(mark,new LinearLayout.LayoutParams(dp(16),dp(16)));}
+                TextView label=running?new ShimmerTextView(this,toolLabel(tool)):muted(toolLabel(tool),12);if(label instanceof ShimmerTextView)((ShimmerTextView)label).active(true);label.setPadding(dp(10),0,dp(6),0);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);call.addView(label,new LinearLayout.LayoutParams(0,-2,1));TextView state=muted(running?"Running":tool.optString("status").equals("done")?"Done":tool.optString("status"),10);state.setPadding(dp(4),0,0,0);call.addView(state);call.setOnClickListener(v->showToolDetails(tool));activity.addView(call);
+            }
+        }else activity.addView(muted(count>0?count+" tool calls - tap to expand":"Thinking saved - tap to expand",11));
+        View panel=GlassControls.wrap(activity,20f,false);LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.setMargins(dp(12),dp(6),dp(12),dp(10));thread.addView(panel,size);
     }
     private void updateComposerAction(){
         if(composerAction==null||composer==null)return;boolean text=!composer.getText().toString().trim().isEmpty(),stop=chatBusy&&!text;composerAction.setSymbol(stop?"stop":"send");composerAction.setContentDescription(stop?"Stop current task":"Send to bot");composerAction.setEnabled(stop||text);
