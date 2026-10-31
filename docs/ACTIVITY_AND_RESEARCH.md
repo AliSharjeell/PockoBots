@@ -51,6 +51,50 @@ snippets, provider and retrieval time. No search API key is required. Availabili
 and indexing depend on these external services; verification/rate-limit pages
 are not presented as results. Configured search MCP connectors remain available.
 Results are untrusted data, not instructions. No phone-browser control is needed.
+Results now pass a conservative keyword relevance check; unrelated feeds trigger
+fallback instead of appearing as a successful search. Safe queries can reuse a
+two-minute in-memory cache; time-sensitive queries do not. Requests are bounded
+to eight seconds per provider, and errors distinguish verification, network and
+relevance failures. This is a key-free online search tool, not an offline index.
+
+Run `npx tsx scripts/check-search-live.ts` for an explicit network diagnostic.
+The November 1, 2026 Pixel emulator run returned useful results for only one of
+four queries: Pakistan passed; LocationManager documentation, AndroidLiquidGlass
+and Lahore weather failed relevance or verification checks. These public sources
+cannot currently be described as consistently reliable on this connection.
+
+## Shared integrations and GitHub CLI
+
+Every bot receives the installed integration inventory and the tools
+`list_integrations`, `integration_tools` and `call_integration_tool`. Schemas are
+discovered lazily, so connecting many apps does not fill every prompt or hit the
+64-direct-tool limit. Disabled connections cannot be called. Tokens stay in
+the private store and are redacted from results.
+
+When explicitly asked by the owner, `add_integration` saves an HTTP or stdio MCP
+configuration globally. Other bots can discover it immediately and it survives
+restart. Supabase project-reference query parameters are supported; URL secrets
+are rejected. OAuth approvals still require the owner to finish the browser
+flow from Settings > Connections & sharing > Custom MCP connections.
+
+GitHub uses the official checksum-verified Linux `gh` binary, not an unrelated
+npm package. Sign in through Marketplace > GitHub, or choose **Enable GitHub CLI
+for all bots** for a previously connected account. The private CLI account is
+shared across bot workspaces and terminal sessions. Bots use `github_cli` without
+reading credentials. Existing terminals can use **Restart terminal** to refresh
+their environment. Terminal HTTP/HTTPS links are tappable, including wrapped
+URLs. A PockoBots GitHub App registration is not required for this CLI flow.
+
+## Incoming bot calls
+
+Priority alerts use the bot avatar, large answer/decline controls and native
+Android CallStyle notifications on supported versions. Answer reveals Markdown
+and reads it with an installed offline voice; it is a local alert, not a carrier
+call or live voice conversation. Full-screen intent and overlay permissions are
+honored; Android still controls background launches. The call page opens directly
+while the app is foreground, or under the owner-granted overlay/full-screen
+exceptions, with the call notification as fallback. See
+[Android activity-launch rules](https://developer.android.com/guide/components/activities/secure-bal).
 
 ## Approximate location
 
