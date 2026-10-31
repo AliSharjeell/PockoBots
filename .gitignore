@@ -4,6 +4,7 @@ dist/
 *.log
 .state/
 android/.gradle/
+android/.kotlin/
 android/local.properties
 android/**/build/
 *.apk
