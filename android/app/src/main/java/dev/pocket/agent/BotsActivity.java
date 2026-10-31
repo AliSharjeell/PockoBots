@@ -77,13 +77,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         slp.bottomMargin=dp(32);
         center.addView(sub,slp);
         
-        ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
-        bar.setIndeterminate(true);
-        if(bar.getIndeterminateDrawable()!=null){
-            bar.getIndeterminateDrawable().setColorFilter(AgentStyle.BLUE,android.graphics.PorterDuff.Mode.SRC_IN);
-        }
-        center.addView(bar,new LinearLayout.LayoutParams(dp(220),dp(6)));
-        
+        center.addView(new LoadingSkeleton(this,"bots",3),new LinearLayout.LayoutParams(-1,dp(230)));
+
         loading.addView(center,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         setContentView(loading);
     }
