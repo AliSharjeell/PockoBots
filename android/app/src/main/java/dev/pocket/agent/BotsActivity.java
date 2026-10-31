@@ -19,7 +19,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="",pendingRead="";
-    private MarketplaceUi marketplaceUi;
+    private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
     void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
@@ -106,7 +106,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
     private void showScreen(String next){if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
-        workspace.stop();dockOverlay=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
+        workspace.stop();dockOverlay=null;headerAvatar=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
         page.setOnApplyWindowInsetsListener((v,insets)->{int navigation=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();int bottom=selected.isEmpty()?Math.max(0,insets.getSystemWindowInsetBottom()-navigation):dp(8)+insets.getSystemWindowInsetBottom();v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),bottom);positionDock(navigation);return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
@@ -120,16 +120,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             LinearLayout identity=row();identity.setPadding(dp(12),dp(7),dp(12),dp(7));
             identity.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
             identity.setContentDescription("Edit bot name and appearance");identity.setMinimumHeight(dp(48));identity.setFocusable(true);identity.setOnClickListener(v->editBot(bot));
-            View avatar;
-            if(bot.optString("avatar","").startsWith("bloub:")){
-                String[] parts=bot.optString("avatar").split(":");BloubView bloub=new BloubView(this);
-                if(parts.length>1)bloub.setShapeId(parts[1]);bloub.setColorHex(bot.optString("accent","#007AFF"));
-                if(parts.length>2)bloub.setExpressionId(parts[2]);avatar=bloub;
-            }else{
-                TextView chip=text(bot.optString("avatar",bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT)),13);
-                chip.setGravity(Gravity.CENTER);chip.setPadding(0,0,0,0);chip.setTextColor(0xffffffff);
-                chip.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),10,false));avatar=chip;
-            }
+            headerAvatar=new WorkingAvatarView(this,bot,13);View avatar=headerAvatar;
             identity.addView(avatar,new LinearLayout.LayoutParams(dp(28),dp(28)));
             TextView name=text(bot.optString("name"),17);name.setTextColor(AgentStyle.TEXT);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -354,20 +345,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             android.util.TypedValue ripple=new android.util.TypedValue();getTheme().resolveAttribute(android.R.attr.selectableItemBackground,ripple,true);card.setBackgroundResource(ripple.resourceId);
             
             LinearLayout item=row();
-            View avatarView;
-            if(bot.optString("avatar","").startsWith("bloub:")){
-                String[] parts=bot.optString("avatar").split(":");
-                BloubView bloub=new BloubView(this);
-                if(parts.length>1)bloub.setShapeId(parts[1]);
-                bloub.setColorHex(bot.optString("accent","#007AFF"));
-                if(parts.length>2)bloub.setExpressionId(parts[2]);
-                avatarView=bloub;
-            }else{
-                TextView avatar=text(bot.optString("avatar").isEmpty()?bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT):bot.optString("avatar"),18);
-                avatar.setGravity(Gravity.CENTER);avatar.setTextColor(0xffffffff);
-                avatar.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),16,false));
-                avatarView=avatar;
-            }
+            WorkingAvatarView avatarView=new WorkingAvatarView(this,bot,20);avatarView.setWorking(bot.optJSONObject("active")!=null);
             item.addView(avatarView,new LinearLayout.LayoutParams(dp(60),dp(60)));
             
             LinearLayout copy=column();copy.setPadding(dp(12),0,dp(8),0);
@@ -494,10 +472,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             busy|=Arrays.asList("running","arming","waiting").contains(status);paused|=status.equals("paused");
             needsPhoneAccess|=job.optBoolean("phoneArming");
         }
+        if(headerAvatar!=null)headerAvatar.setWorking(busy);
         if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
-            LinearLayout thinking=row();ThinkingOrbView orb=new ThinkingOrbView(this);orb.state("running");
-            thinking.addView(orb,new LinearLayout.LayoutParams(dp(30),dp(30)));
+            LinearLayout thinking=row();WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
+            thinking.addView(avatar,new LinearLayout.LayoutParams(dp(30),dp(30)));
             thinking.addView(muted("Working",12));
             thread.addView(thinking);
         }
