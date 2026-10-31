@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.drawable.ColorDrawable
 import android.view.Gravity
 import android.view.ViewGroup
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,12 +56,12 @@ fun ModernSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(if (dark) Color(0xFF10121A) else Color(0xFFFFFFFF))
+            .background(if (dark) Color(0xFF121214) else Color(0xFFFFFFFF))
             .border(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     listOf(
-                        if (dark) Color(0xFF333A4E) else Color(0xFFE2E8F0),
+                        if (dark) Color(0xFF38383B) else Color(0xFFE2E8F0),
                         Color.Transparent
                     )
                 ),
@@ -74,7 +76,7 @@ fun ModernSheetContent(
                 .width(42.dp)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(if (dark) Color(0xFF2E3448) else Color(0xFFCBD5E1))
+                .background(if (dark) Color(0xFF525255) else Color(0xFFCBD5E1))
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -110,11 +112,11 @@ fun ModernSheetContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(
-                            if (dark) Color(0xFF161924) else Color(0xFFF8FAFC)
+                            if (dark) Color(0xFF1C1C1F) else Color(0xFFF8FAFC)
                         )
                         .border(
                             width = 1.dp,
-                            color = if (dark) Color(0xFF222738) else Color(0xFFE2E8F0),
+                            color = if (dark) Color(0xFF303033) else Color(0xFFE2E8F0),
                             shape = RoundedCornerShape(16.dp)
                         )
                         .clickable(
@@ -179,6 +181,14 @@ fun ModernSheetContent(
 
 object ModernSheet {
     @JvmStatic
+    fun newConversation(activity: BotsActivity, createBot: Runnable, createGroup: Runnable) {
+        val tint = if (AgentStyle.dark) Color.White else Color(0xFF18181B)
+        show(activity, "New conversation", "Create a bot or bring your bots together.", listOf(
+            SheetMenuItem("Create bot", "A personal assistant with its own workspace", Icons.Rounded.SmartToy, tint) { createBot.run() },
+            SheetMenuItem("Create group", "Let multiple bots work in one conversation", Icons.Rounded.Groups, tint) { createGroup.run() }
+        ), AgentStyle.dark)
+    }
+    @JvmStatic
     fun show(
         context: Context,
         title: String,
@@ -188,7 +198,9 @@ object ModernSheet {
     ) {
         val dialog = Dialog(context)
         val view = ComposeView(context).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setViewTreeLifecycleOwner(context as? androidx.lifecycle.LifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(context as? androidx.savedstate.SavedStateRegistryOwner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
             setContent {
                 PockoTheme(darkTheme = dark) {
                     ModernSheetContent(
@@ -208,13 +220,15 @@ object ModernSheet {
         }
 
         dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.show()
         dialog.window?.apply {
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
             setGravity(Gravity.BOTTOM)
             attributes?.windowAnimations = android.R.style.Animation_InputMethod
+            setDimAmount(0.45f)
         }
-        dialog.show()
     }
 }
 

@@ -220,9 +220,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }),new LinearLayout.LayoutParams(-1,dp(70)));
     }
     private void newConversation(){
-        new AlertDialog.Builder(this).setTitle("New conversation").setItems(new String[]{"Create bot","Create group"},(d,n)->{
-            if(n==0)editBot(null);else createGroup();
-        }).show();
+        ModernSheet.newConversation(this,()->editBot(null),this::createGroup);
     }
     void settingsConnections(LinearLayout content){
         content.addView(text("Connections & sharing",20));
