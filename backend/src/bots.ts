@@ -101,12 +101,13 @@ export class Bots {
     this.message(id, "assistant", (urgent ? "Priority alert: " : "Notification: ") + alert.text); await this.changed(); return alert;
   }
   async engine(enabled: boolean) { if (typeof enabled !== "boolean") throw Error("Invalid engine setting"); this.enabled = enabled; if (!enabled) for (const bot of this.records) await this.pause(bot.id, false); await this.changed(); }
-  async enqueue(id: string, text: unknown, source: BotJob["source"] = "user", depth = 0, delivery: Pick<BotJob, "groupId" | "groupMessageId" | "sourceBotId" | "replyToJobId"> = {}) {
+  async enqueue(id: string, text: unknown, source: BotJob["source"] = "user", depth = 0, delivery: Pick<BotJob, "groupId" | "groupMessageId" | "sourceBotId" | "replyToJobId"> & { displayText?: string } = {}) {
     this.get(id); if (delivery.sourceBotId) this.get(delivery.sourceBotId); if (typeof text !== "string" || !text.trim() || text.length > 16000) throw Error("Enter a task of at most 16000 characters");
     if (depth > 3) throw Error("Bot delegation chain limit reached");
     if (this.jobs.filter(j => j.botId === id && ["queued", "arming", "running", "waiting", "paused"].includes(j.status)).length >= 20) throw Error("Bot queue is full (20 tasks)");
-    const job: BotJob = { ...delivery, id: randomUUID(), botId: id, text: text.trim(), source, depth, status: "queued", created: Date.now(), updated: Date.now() };
-    this.jobs.push(job); this.message(id, source === "user" ? "user" : "system", text, job.id);
+    const { displayText, ...origin } = delivery;
+    const job: BotJob = { ...origin, id: randomUUID(), botId: id, text: text.trim(), source, depth, status: "queued", created: Date.now(), updated: Date.now() };
+    this.jobs.push(job); this.message(id, source === "user" ? "user" : "system", displayText ?? text, job.id);
     // Retain bounded history while never discarding unfinished work.
     const finished = this.jobs.filter(j => j.botId === id && ["completed", "failed", "cancelled"].includes(j.status));
     const trim = new Set(finished.slice(0, Math.max(0, finished.length - 100)).map(j => j.id)); this.jobs = this.jobs.filter(j => !trim.has(j.id));
