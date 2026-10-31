@@ -21,16 +21,16 @@ final class MarketplaceUi {
     private TextView text(String value,int size){return app.text(value,size);}
     private TextView muted(String value,int size){return app.muted(value,size);}
     private void request(String method,String path,JSONObject data,BotsActivity.Result done){
-        app.marketplaceRequest(method,path,data,done,error->{pending.clear();if(body.isAttachedToWindow()){if(!method.equals("GET"))show(body);message("Couldn't connect",error==null?"Please try again.":error);}});
+        app.marketplaceRequest(method,path,data,done,error->{pending.clear();if(body.isAttachedToWindow()){if(!method.equals("GET"))show(body);else{body.removeAllViews();body.addView(muted("Couldn't load apps. Please try again.",14));app.button(body,"Retry",()->show(body),false);}message("Couldn't connect",error==null?"Please try again.":error);}});
     }
     void show(LinearLayout parent){
         body=parent;parent.removeAllViews();LinearLayout list=app.column();list.setPadding(dp(4),0,dp(4),dp(12));
         parent.addView(new AgentSearchBar(app,"Search apps",searchQuery,value->{searchQuery=value;render(list);}));
         ScrollView scroll=new ScrollView(app);scroll.setClipToPadding(false);scroll.setPadding(0,0,0,dp(96));scroll.addView(list);parent.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render(list);
-        request("GET","/marketplace",null,value->{if(!parent.isAttachedToWindow())return;entries=(JSONArray)value;render(list);});
+        request("GET","/marketplace",null,value->{if(!parent.isAttachedToWindow())return;entries=(JSONArray)value;UiMotion.change(list,0);render(list);});
     }
     private void render(LinearLayout list){
-        list.removeAllViews();if(entries==null){list.addView(muted("Loading apps...",13));return;}
+        list.removeAllViews();if(entries==null){list.addView(new LoadingSkeleton(app,"apps",7),new LinearLayout.LayoutParams(-1,-2));return;}
         String query=searchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;List<JSONObject> essentials=new ArrayList<>();
         Map<String,List<JSONObject>> sections=new LinkedHashMap<>();
         for(String category:new String[]{"productivity","coding","research","data-analytics","design","automation","finance","other"})sections.put(category,new ArrayList<>());
