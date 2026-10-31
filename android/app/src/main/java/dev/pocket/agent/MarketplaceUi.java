@@ -73,7 +73,7 @@ final class MarketplaceUi {
     }
     private View addControl(JSONObject item){
         boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
-        Button button=new Button(app);button.setText(busy?"...":added?"Added":"Add");AgentStyle.button(button,!added);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription((added?"Configure ":"Add ")+item.optString("name"));if(added){button.setBackground(AgentStyle.surface(app,0xff27272a,22,false));button.setTextColor(0xffffffff);}button.setOnClickListener(v->{if(added)options(item);else connect(item);});return button;
+        Button button=new Button(app);button.setText(busy?"...":added?"Added":"Add");AgentStyle.button(button,!added);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription((added?"Configure ":"Add ")+item.optString("name"));button.setTextColor(added?AgentStyle.TEXT:0xffffffff);button.setOnClickListener(v->{if(added)options(item);else connect(item);});return GlassControls.wrap(button,22f,!added);
     }
     private void connect(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
