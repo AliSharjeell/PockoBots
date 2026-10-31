@@ -18,7 +18,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
-    private String replyQuote="",homeSearchQuery="";
+    private String replyQuote="",homeSearchQuery="",pendingRead="";
     private MarketplaceUi marketplaceUi;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
@@ -96,7 +96,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
-    private void open(String id){saveDraft();replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
+    private void open(String id){saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
@@ -165,7 +165,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(selected.isEmpty()){inbox();dock();return;}
         
         chatScroll=new ScrollView(this);thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
-        chatScroll.setOnScrollChangeListener((v,x,y,ox,oy)->follow=y+chatScroll.getHeight()>=thread.getHeight()-dp(60));
+        chatScroll.setOnScrollChangeListener((v,x,y,ox,oy)->{follow=y+chatScroll.getHeight()>=thread.getHeight()-dp(60);if(follow)markChatRead();});
         
         // Cupertino Telegram ChatBottomBar matching 6xingyv/compound
         LinearLayout bottomBarContainer=column();
@@ -347,26 +347,31 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 avatar.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),16,false));
                 avatarView=avatar;
             }
-            item.addView(avatarView,new LinearLayout.LayoutParams(dp(44),dp(44)));
+            item.addView(avatarView,new LinearLayout.LayoutParams(dp(60),dp(60)));
             
-            LinearLayout copy=column();copy.setPadding(dp(12),0,0,0);
+            LinearLayout copy=column();copy.setPadding(dp(12),0,dp(8),0);
             LinearLayout title=row();
-            TextView name=text(bot.optString("name"),16);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
+            TextView name=text(bot.optString("name"),20);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             title.addView(name,new LinearLayout.LayoutParams(0,-2,1));
             
             copy.addView(title);
             
             JSONObject last=bot.optJSONObject("lastMessage");
-            TextView preview=muted(last==null?bot.optString("role"):last.optString("text"),12);
-            preview.setMaxLines(2);preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            TextView preview=muted((last==null?bot.optString("role"):last.optString("text")).replaceAll("\\s+"," ").trim(),12);
+            preview.setSingleLine(true);preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
             copy.addView(preview);
-            if(bot.optInt("queued")>0)copy.addView(muted(bot.optInt("queued")+" queued",10));
             item.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            LinearLayout metadata=column();metadata.setGravity(Gravity.END);metadata.setPadding(0,dp(4),0,0);
+            if(last!=null&&last.optLong("time")>0){long timestamp=last.optLong("time");String format=android.text.format.DateUtils.isToday(timestamp)?"h:mm a":"MMM d";TextView time=muted(new java.text.SimpleDateFormat(format,Locale.getDefault()).format(new Date(timestamp)),10);time.setPadding(0,0,0,dp(7));time.setSingleLine(true);metadata.addView(time);}
+            LinearLayout indicators=row();indicators.setGravity(Gravity.END);
+            if(bot.optJSONObject("active")!=null){ProgressBar running=new ProgressBar(this,null,android.R.attr.progressBarStyleSmall);running.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(AgentStyle.TEXT));running.setContentDescription("Bot is working");LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(18),dp(18));size.rightMargin=bot.optInt("unreadCount")>0?dp(6):0;indicators.addView(running,size);}
+            int unread=bot.optInt("unreadCount");if(unread>0){TextView badge=text(unread>99?"99+":String.valueOf(unread),11);badge.setTypeface(AgentStyle.font(this),Typeface.BOLD);badge.setTextColor(0xffffffff);badge.setGravity(Gravity.CENTER);badge.setPadding(dp(6),0,dp(6),0);badge.setMinWidth(dp(22));badge.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,12,false));badge.setContentDescription(unread+" unread messages");indicators.addView(badge,new LinearLayout.LayoutParams(-2,dp(22)));}
+            metadata.addView(indicators,new LinearLayout.LayoutParams(-1,dp(24)));item.addView(metadata,new LinearLayout.LayoutParams(dp(70),-2));
             card.addView(item);
             card.setOnClickListener(v->open(bot.optString("id")));
             list.addView(card);
             View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
-            LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(68),0,dp(8),0);list.addView(divider,rule);
+            LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(84),0,dp(8),0);list.addView(divider,rule);
         }
         if(shown==0)list.addView(muted("No conversations found",14));
     }
@@ -481,7 +486,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(paused)button(controls,"Settings",this::showSetup,false);
         }
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
-        chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
+        chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);if(follow)markChatRead();});
+    }
+    private void markChatRead(){
+        if(!visible||!screen.equals("Chat")||selected.isEmpty()||detail==null||!follow||!pendingRead.isEmpty())return;
+        JSONArray messages=detail.optJSONArray("messages");JSONObject bot=detail.optJSONObject("bot");if(messages==null||messages.length()==0||bot==null)return;
+        String id=messages.optJSONObject(messages.length()-1).optString("id");if(id.isEmpty()||id.equals(bot.optString("lastReadMessageId")))return;
+        pendingRead=id;requestQuiet("POST","/bots/"+selected+"/read",json("messageId",id),value->pendingRead="",()->pendingRead="");
     }
     private int accent(String value){try{return android.graphics.Color.parseColor(value);}catch(Exception e){return 0xff007AFF;}}
     private void editBot(JSONObject bot){
