@@ -13,7 +13,7 @@ import static org.junit.Assert.*;
 public class UiMotionRegressionTest {
     @Test public void replacingAttachedGlassControlsKeepsTheirLifecycleOwnerAcrossNavigationAndThemeChanges() throws Exception {
         android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();
-        String app=inst.getTargetContext().getPackageName();assertTrue("Use isolated QA package",app.endsWith(".qa"));
+        String app=inst.getTargetContext().getPackageName();org.junit.Assume.assumeTrue("Use isolated QA package",app.endsWith(".qa"));
         Activity host=inst.startActivitySync(new Intent().setClassName(app,"dev.pocket.agent.UiMotionRegressionActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         boolean dark=AgentStyle.dark;
         try{

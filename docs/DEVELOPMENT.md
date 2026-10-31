@@ -148,3 +148,27 @@ an installation holding your real provider key.
 Unified bot UI: BotsActivity; embedded terminal/files/settings/sharing: BotWorkspace;
 native Markdown spans: ChatMarkdown. Legacy MainActivity remains for compatibility
 and its original runtime tests; the bot sidebar never navigates into its mode UI.
+
+
+## Glass navigation regression
+
+Run the isolated native view lifecycle check on a connected emulator:
+
+```powershell
+.\android\gradlew.bat -p android :app:assembleDebug :app:assembleDebugAndroidTest -PruntimeAbi=x86_64 -PqaInstall -PuiRegressionOnly
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -r -e class dev.pocket.agent.UiMotionRegressionTest dev.pocket.agent.qa.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+This mode uses a separate QA package and excludes the Linux runtime assets. Its
+host never starts the runtime or loads account data. The test skips the owner's
+normal package and exercises seven navigation/theme replacements with real
+Compose glass controls, checking their lifecycle and saved-state owners.
+`uiRegressionOnly` is rejected unless `qaInstall` is also supplied. Build again
+without either property before installing the normal app.
+
+Use attached-container property animations for page changes. Android Visibility
+transitions can move departing Compose controls into a ViewOverlay that has no
+lifecycle owner, crashing on attachment. Content pages can use loading skeletons;
+the app startup screen displays its logo and runtime status without a skeleton.
