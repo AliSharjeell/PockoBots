@@ -18,7 +18,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner;private FrameLayout root;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
-    private String replyQuote="";
+    private String replyQuote="",homeSearchQuery="";
+    private MarketplaceUi marketplaceUi;
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
     void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
@@ -86,8 +87,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         loading.addView(center,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         setContentView(loading);
     }
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Settings";if(screen.equals("Setup"))screen="Settings";if(oauthReturn(getIntent())){selected="";screen="Marketplace";}showLoadingScreen("Starting your local bots...");}
-    @Override protected void onSaveInstanceState(Bundle out){out.putString("bot",selected);out.putString("screen",screen);super.onSaveInstanceState(out);}
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");homeSearchQuery=saved.getString("homeSearch","");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Settings";if(screen.equals("Setup"))screen="Settings";if(oauthReturn(getIntent())){selected="";screen="Marketplace";}showLoadingScreen("Starting your local bots...");}
+    @Override protected void onSaveInstanceState(Bundle out){out.putString("bot",selected);out.putString("screen",screen);out.putString("homeSearch",homeSearchQuery);super.onSaveInstanceState(out);}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(oauthReturn(intent)){selected="";screen="Marketplace";if(api!=null)showScreen("Marketplace");return;}String id=intent.getStringExtra("botId");if(id!=null&&id.matches("[0-9a-f-]{36}")){if(api==null)selected=id;else open(id);}}
     @Override protected void onResume(){super.onResume();visible=true;getSharedPreferences("bot-runtime",0).edit().putBoolean("enabled",true).apply();startForegroundService(new Intent(this,RuntimeService.class).putExtra("botsEnabled",true));connect();}
     private void connect(){if(!visible)return;if(!RuntimeService.ready){showLoadingScreen(RuntimeService.status);main.postDelayed(this::connect,1000);return;}try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());refresh(true);}catch(Exception e){error(e);}}
@@ -241,7 +242,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             d.dismiss();recreate();
         }).setNegativeButton("Cancel",null).show();
     }
-    private void marketplace(){new MarketplaceUi(this).show(body);}
+    private void marketplace(){if(marketplaceUi==null)marketplaceUi=new MarketplaceUi(this);marketplaceUi.show(body);}
     private void createGroup(){
         LinearLayout form=column();EditText name=field(form,"Group name","",false);
         JSONArray bots=state.optJSONArray("bots");Map<String,CheckBox> selectedBots=new LinkedHashMap<>();
@@ -295,21 +296,20 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         });
     }
     private void inbox(){
-        body.removeAllViews();ScrollView scroll=new ScrollView(this);LinearLayout list=column();scroll.addView(list);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        
-        // Group chips / list
-        requestQuiet("GET","/groups",null,g->{
-            JSONArray groups=g instanceof JSONArray?(JSONArray)g:((JSONObject)g).optJSONArray("groups");
-            if(groups!=null&&groups.length()>0){
-                for(int n=0;n<groups.length();n++){
-                    JSONObject group=groups.optJSONObject(n);
-                    button(list,"Group: "+group.optString("name"),()->openGroup(group.optString("id")),false);
-                }
-            }
-        },()->{});
-
+        body.removeAllViews();LinearLayout list=column();
+        body.addView(new AgentSearchBar(this,"Search bots and groups",homeSearchQuery,value->{homeSearchQuery=value;renderInbox(list);}));
+        ScrollView scroll=new ScrollView(this);scroll.addView(list);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));renderInbox(list);
+    }
+    private void renderInbox(LinearLayout list){
+        list.removeAllViews();String query=homeSearchQuery.trim().toLowerCase(Locale.ROOT);int shown=0;
+        JSONArray groups=state.optJSONArray("groups");
+        if(groups!=null)for(int n=0;n<groups.length();n++){
+            JSONObject group=groups.optJSONObject(n);if(!group.optString("name").toLowerCase(Locale.ROOT).contains(query))continue;
+            button(list,"Group: "+group.optString("name"),()->openGroup(group.optString("id")),false);shown++;
+        }
         JSONArray bots=state.optJSONArray("bots");
         if(bots==null||bots.length()==0){
+            if(!query.isEmpty()){list.addView(muted("No conversations found",14));return;}
             LinearLayout hero=column();AgentStyle.card(hero);hero.setPadding(dp(18),dp(20),dp(18),dp(20));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(12),0,dp(12));hero.setLayoutParams(lp);
             hero.addView(text("Meet your local bots",22));
@@ -321,7 +321,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         // Flat conversations separated by inset rules
         for(int i=0;i<bots.length();i++){
-            JSONObject bot=bots.optJSONObject(i);
+            JSONObject bot=bots.optJSONObject(i);JSONObject recent=bot.optJSONObject("lastMessage");
+            String terms=bot.optString("name")+" "+bot.optString("role")+" "+(recent==null?"":recent.optString("text"));if(!terms.toLowerCase(Locale.ROOT).contains(query))continue;shown++;
             LinearLayout card=column();
             card.setPadding(dp(8),dp(18),dp(8),dp(18));
             card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));
@@ -363,6 +364,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
             LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(68),0,dp(8),0);list.addView(divider,rule);
         }
+        if(shown==0)list.addView(muted("No conversations found",14));
     }
     public void copyConversation(){
         if(detail==null)return;JSONArray messages=detail.optJSONArray("messages");StringBuilder text=new StringBuilder();if(messages!=null)for(int i=0;i<messages.length();i++){JSONObject message=messages.optJSONObject(i);if(message!=null)text.append(message.optString("role")).append(": ").append(message.optString("text")).append("\n\n");}
