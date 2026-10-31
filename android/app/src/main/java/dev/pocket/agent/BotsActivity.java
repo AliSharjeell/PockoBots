@@ -18,7 +18,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     static volatile boolean foreground;
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
-    private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
+    private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ChatScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="",pendingRead="";
     private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;private AgentIcon composerAction;private boolean chatBusy;private JSONObject currentJob;
     private int pendingMotion=0,navigationEpoch=0;private boolean animatePage;private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
@@ -145,8 +145,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));if(selected.isEmpty())dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
-        chatScroll=new ScrollView(this);thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
-        chatScroll.setOnScrollChangeListener((v,x,y,ox,oy)->{follow=y+chatScroll.getHeight()-chatScroll.getPaddingTop()-chatScroll.getPaddingBottom()>=thread.getHeight()-dp(60);if(follow)markChatRead();});
+        chatScroll=new ChatScrollView(this,atEnd->{follow=atEnd;if(atEnd)markChatRead();});thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
+
         
         // Cupertino Telegram ChatBottomBar matching 6xingyv/compound
         LinearLayout bottomBarContainer=column();
@@ -216,7 +216,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         LinearLayout bottomShade=column();bottomShade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);View feather=new View(this);feather.setBackground(edgeFade(false));bottomShade.addView(feather,new LinearLayout.LayoutParams(-1,0));View below=new View(this);below.setBackgroundColor((AgentStyle.BACK&0x00ffffff)|0x88000000);bottomShade.addView(below,new LinearLayout.LayoutParams(-1,0));viewport.addView(bottomShade,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         input.setPadding(dp(12),dp(16),dp(12),dp(4));input.setBackground(null);viewport.addView(input,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         int[] safe={controlsHeight+dp(8),0};
-        Runnable updatePadding=()->{if(feather.getLayoutParams().height!=input.getHeight())feather.setLayoutParams(new LinearLayout.LayoutParams(-1,input.getHeight()));if(below.getLayoutParams().height!=safe[1])below.setLayoutParams(new LinearLayout.LayoutParams(-1,safe[1]));int bottom=input.getHeight()+safe[1]+dp(8);if(scroll.getPaddingTop()!=safe[0]||scroll.getPaddingBottom()!=bottom){boolean atEnd=follow;scroll.setPadding(0,safe[0],0,bottom);if(atEnd)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));}};
+        Runnable updatePadding=()->{if(feather.getLayoutParams().height!=input.getHeight())feather.setLayoutParams(new LinearLayout.LayoutParams(-1,input.getHeight()));if(below.getLayoutParams().height!=safe[1])below.setLayoutParams(new LinearLayout.LayoutParams(-1,safe[1]));int bottom=input.getHeight()+safe[1]+dp(8);if(scroll.getPaddingTop()!=safe[0]||scroll.getPaddingBottom()!=bottom){boolean atEnd=follow;scroll.setPadding(0,safe[0],0,bottom);if(atEnd)scroll.requestLayout();}};
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(viewport,(view,insets)->{
             androidx.core.graphics.Insets bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()|androidx.core.view.WindowInsetsCompat.Type.displayCutout());int bottom=Math.max(bars.bottom,insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom);
             FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controls.getLayoutParams();position.leftMargin=dp(12)+bars.left;position.rightMargin=dp(12)+bars.right;position.topMargin=bars.top+dp(8);controls.setLayoutParams(position);
@@ -225,7 +225,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             safe[0]=position.topMargin+controlsHeight;safe[1]=bottom;updatePadding.run();return androidx.core.view.WindowInsetsCompat.CONSUMED;
         });
         input.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updatePadding.run());
-        viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));});androidx.core.view.ViewCompat.requestApplyInsets(viewport);
+        viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.requestLayout();});androidx.core.view.ViewCompat.requestApplyInsets(viewport);
     }
     private void dock(){
         int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:(screen.equals("Settings")||settingsChild())?3:0;
@@ -385,7 +385,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         String id=selected;
         request("POST","/bots/"+id+"/messages",json("text",replyQuote.isEmpty()?value:replyQuote+"\n\n"+value),v->{
             replyQuote="";if(replyBanner!=null){replyBanner.setVisibility(View.GONE);replyBanner.removeAllViews();}
-            if(id.equals(selected)&&composer!=null)composer.setText("");
+            if(id.equals(selected)&&composer!=null){composer.setText("");if(chatScroll!=null)chatScroll.latest();}
             draft="";getSharedPreferences("bot-chats",0).edit().remove("draft-"+id).apply();
             request("POST","/bots/"+id+"/resume",json(),r->refresh(false));
         });
@@ -423,7 +423,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void renderThread(){
         if(thread==null||detail==null||!screen.equals("Chat"))return;
-        int old=chatScroll.getScrollY();boolean scroll=follow;thread.removeAllViews();
+        chatScroll.beginUpdate();thread.removeAllViews();
         JSONObject bot=detail.optJSONObject("bot");JSONArray messages=detail.optJSONArray("messages");
         for(int i=0;i<messages.length();i++){
             JSONObject message=messages.optJSONObject(i);
@@ -485,7 +485,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(paused)button(controls,"Settings",this::showSetup,false);
         }
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
-        chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);if(follow)markChatRead();});
+        chatScroll.finishUpdate();
     }
     String workspaceFilesTitle(){JSONObject bot=detail==null?null:detail.optJSONObject("bot");return (bot==null?"Workspace":bot.optString("name","Bot"))+" files";}
     private String toolLabel(JSONObject tool){
@@ -518,7 +518,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             }
         }else activity.addView(muted(count>0?count+" tool calls - tap to expand":"Thinking saved - tap to expand",11));
         if(expanded&&tools!=null)for(int i=Math.max(0,count-8);i<count;i++)addFileChanges(activity,tools.optJSONObject(i));
-        View panel=GlassControls.wrap(activity,20f,false);LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(!working&&!expanded?Math.min(dp(280),getResources().getDisplayMetrics().widthPixels-dp(72)):-1,-2);size.setMargins(dp(12),dp(6),dp(12),dp(10));thread.addView(panel,size);
+        View panel=GlassControls.wrap(activity,20f,false);LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(!working&&!expanded?Math.min(dp(280),getResources().getDisplayMetrics().widthPixels-dp(72)):-1,-2);size.gravity=Gravity.CENTER_HORIZONTAL;size.setMargins(dp(12),dp(6),dp(12),dp(10));thread.addView(panel,size);
     }
     private void updateComposerAction(){
         if(composerAction==null||composer==null)return;boolean text=!composer.getText().toString().trim().isEmpty(),stop=chatBusy&&!text;composerAction.setSymbol(stop?"stop":"send");composerAction.setContentDescription(stop?"Stop current task":"Send to bot");composerAction.setEnabled(stop||text);
