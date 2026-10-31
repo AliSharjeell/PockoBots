@@ -14,7 +14,7 @@ export type Bot = { id: string; name: string; avatar: string; accent: string; pe
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
   created: number; updated: number; groupId?: string; groupMessageId?: string; sourceBotId?: string; replyToJobId?: string; mobileTaskId?: string; phoneTaskId?: string; phoneArming?: boolean; error?: string; output?: string };
 type Message = { id: string; botId: string; role: "user" | "assistant" | "system"; text: string; time: number; jobId?: string };
-export type BotAlert = { id: string; botId: string; botName: string; text: string; urgent: boolean; created: number; acknowledged: boolean };
+export type BotAlert = { id: string; botId: string; botName: string; botAvatar?: string;botAccent?:string;text: string; urgent: boolean; created: number; acknowledged: boolean };
 
 /** Durable bot inboxes and queues. One run per bot; at most two bot runs total. */
 export class Bots {
@@ -111,7 +111,7 @@ export class Bots {
     if (urgent && !bot.allowUrgent) throw Error("Ringing alerts are disabled for this bot. Use a normal notification instead.");
     if (urgent && this.alerts.some(a => a.botId === id && a.urgent && Date.now() - a.created < 600000)) throw Error("This bot already rang within the last ten minutes");
     if (this.pendingAlerts().filter(a => a.botId === id).length >= 10) throw Error("This bot has too many unread alerts");
-    const alert: BotAlert = { id: randomUUID(), botId: id, botName: bot.name, text: this.redact(text.trim()), urgent, created: Date.now(), acknowledged: false };
+    const alert: BotAlert = { id: randomUUID(), botId: id, botName: bot.name,botAvatar:bot.avatar,botAccent:bot.accent, text: this.redact(text.trim()), urgent, created: Date.now(), acknowledged: false };
     this.alerts.push(alert); const finished = this.alerts.filter(a => a.acknowledged); const trim = new Set(finished.slice(0, Math.max(0, finished.length - 100)).map(a => a.id)); this.alerts = this.alerts.filter(a => !trim.has(a.id));
     this.message(id, "assistant", (urgent ? "Priority alert: " : "Notification: ") + alert.text); await this.changed(); return alert;
   }
