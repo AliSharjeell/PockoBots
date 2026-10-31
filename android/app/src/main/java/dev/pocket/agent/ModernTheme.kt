@@ -30,13 +30,13 @@ object PockoColors {
     val LightBorder = Color(0xFFE2E8F0)
 
     // Accents & Gradients
-    val PrimaryBlue = Color(0xFF3B82F6)
-    val PrimaryIndigo = Color(0xFF4F46E5)
+    val PrimaryBlue = Color(0xFF007AFF)
+    val PrimaryIndigo = Color(0xFF007AFF)
     val AccentCyan = Color(0xFF06B6D4)
     val EmeraldReady = Color(0xFF10B981)
     val AmberWorking = Color(0xFFF59E0B)
     val RoseAttention = Color(0xFFF43F5E)
-    val VioletAccent = Color(0xFF8B5CF6)
+    val VioletAccent = Color(0xFF007AFF)
 
     val PrimaryGradient = Brush.linearGradient(
         listOf(PrimaryIndigo, PrimaryBlue)
@@ -47,7 +47,7 @@ object PockoColors {
     )
 
     val GlassBorderGradient = Brush.linearGradient(
-        listOf(Color(0xFF3B82F6).copy(alpha = 0.35f), Color(0xFF8B5CF6).copy(alpha = 0.15f), Color(0xFF27272A))
+        listOf(Color(0xFF007AFF).copy(alpha = 0.35f), Color(0xFF007AFF).copy(alpha = 0.15f), Color(0xFF27272A))
     )
 
     // Text Colors

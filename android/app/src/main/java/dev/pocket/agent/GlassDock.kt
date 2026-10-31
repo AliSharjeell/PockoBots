@@ -77,6 +77,7 @@ fun GlassDockBar(
     ) {
         Row(
             modifier = Modifier
+                .widthIn(max = 300.dp)
                 .fillMaxWidth()
                 .shadow(
                     elevation = if (dark) 16.dp else 8.dp,

@@ -14,7 +14,7 @@ final class AgentStyle {
     // Deep obsidian dark tokens and clean minimal porcelain light tokens
     static int BACK=Color.rgb(9,9,11), PANEL=Color.rgb(24,24,27), BORDER=Color.rgb(39,39,42),
         TEXT=Color.rgb(248,250,252), MUTED=Color.rgb(161,161,170), WHITE=Color.rgb(255,255,255),
-        BLUE=Color.rgb(79,70,229), ACCENT=Color.rgb(6,182,212);
+        BLUE=Color.rgb(0,122,255), ACCENT=Color.rgb(6,182,212);
     static boolean dark=true;
 
     static void applyTheme(Context context){
@@ -26,7 +26,7 @@ final class AgentStyle {
         TEXT=dark?0xffF8FAFC:0xff0F172A;
         MUTED=dark?0xffA1A1AA:0xff64748B;
         WHITE=dark?0xffFFFFFF:0xff0F172A;
-        BLUE=dark?0xff4F46E5:0xff4338CA;
+        BLUE=0xff007AFF;
     }
 
     static int dp(Context context,int value){return Math.round(value*context.getResources().getDisplayMetrics().density);}

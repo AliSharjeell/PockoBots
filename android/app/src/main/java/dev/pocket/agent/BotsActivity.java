@@ -51,7 +51,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         
         BloubView logo=new BloubView(this);
         logo.setShapeId("squircle");
-        logo.setColorHex("#4F46E5");
+        logo.setColorHex("#007AFF");
         logo.setExpressionId("heureux");
         center.addView(logo,new LinearLayout.LayoutParams(dp(84),dp(84)));
         
@@ -116,7 +116,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             View avatar;
             if(bot.optString("avatar","").startsWith("bloub:")){
                 String[] parts=bot.optString("avatar").split(":");BloubView bloub=new BloubView(this);
-                if(parts.length>1)bloub.setShapeId(parts[1]);bloub.setColorHex(bot.optString("accent","#4F46E5"));
+                if(parts.length>1)bloub.setShapeId(parts[1]);bloub.setColorHex(bot.optString("accent","#007AFF"));
                 if(parts.length>2)bloub.setExpressionId(parts[2]);avatar=bloub;
             }else{
                 TextView chip=text(bot.optString("avatar",bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT)),13);
@@ -333,7 +333,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 String[] parts=bot.optString("avatar").split(":");
                 BloubView bloub=new BloubView(this);
                 if(parts.length>1)bloub.setShapeId(parts[1]);
-                bloub.setColorHex(bot.optString("accent","#4F46E5"));
+                bloub.setColorHex(bot.optString("accent","#007AFF"));
                 if(parts.length>2)bloub.setExpressionId(parts[2]);
                 avatarView=bloub;
             }else{
@@ -409,7 +409,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(!user&&ChatCards.render(this,thread,value,markdown))return;
         String botName=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("name"):"";
         String botAvatar=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("avatar",""):"";
-        String botAccent=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("accent","#4F46E5"):"#4F46E5";
+        String botAccent=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("accent","#007AFF"):"#007AFF";
         CompoundMessaging.renderBubble(this,thread,value,user,isFirst,isLast,botName,botAvatar,botAccent,markdown,time,(author,snippet)->{
             setReplyQuote(author,snippet);
         });
@@ -485,7 +485,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});
     }
-    private int accent(String value){try{return android.graphics.Color.parseColor(value);}catch(Exception e){return 0xff4F46E5;}}
+    private int accent(String value){try{return android.graphics.Color.parseColor(value);}catch(Exception e){return 0xff007AFF;}}
     private void editBot(JSONObject bot){
         boolean create=bot==null;
 
@@ -624,7 +624,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         EditText avatar=null,accent=null,personality=null;
         if(!create){
             avatar=field(form,"Bot icon (emoji or initials)",bot.optString("avatar"),false);
-            accent=field(form,"Accent color",bot.optString("accent","#4F46E5"),false);
+            accent=field(form,"Accent color",bot.optString("accent","#007AFF"),false);
             personality=field(form,"Personality",bot.optString("personality"),false);
             personality.setSingleLine(false);
             button(form,"Tools, alerts & routines",()->botOptions(bot),false);
