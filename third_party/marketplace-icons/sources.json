@@ -23,17 +23,19 @@
   },
   {
     "id": "atlassian",
-    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/atlassian.svg",
-    "brandSource": "https://atlassian.design/resources/logo-library",
-    "license": "CC0-1.0 (Simple Icons asset)",
-    "resource": "brand_atlassian"
+    "source": "https://www.atlassian.com/favicon.ico",
+    "brandSource": "https://atlassian.design/foundations/logos",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "resource": "brand_atlassian",
+    "sha256": "43baad43fa76aa0cf465221172dd48c8acee360fcb2852d191aed588e23daf19"
   },
   {
     "id": "brave-search",
-    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/brave.svg",
-    "brandSource": "https://brave.com/brave-branding-assets",
-    "license": "CC0-1.0 (Simple Icons asset)",
-    "resource": "brand_brave_search"
+    "source": "https://brave.com/static-assets/images/cropped-brave_appicon_release-192x192.png",
+    "brandSource": "https://brave.com/brave-branding-assets/",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "resource": "brand_brave_search",
+    "sha256": "97567c070955e885787eb1e45768d0e977a88c4b42de6985072b338f29d61552"
   },
   {
     "id": "canva",
@@ -169,10 +171,11 @@
   },
   {
     "id": "railway",
-    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/railway.svg",
-    "brandSource": "https://railway.app",
-    "license": "CC0-1.0 (Simple Icons asset)",
-    "resource": "brand_railway"
+    "source": "https://railway.app/favicon.ico",
+    "brandSource": "https://railway.com",
+    "license": "Vendor favicon / brand mark; all rights remain with vendor",
+    "resource": "brand_railway",
+    "sha256": "f87bf44ce28a2ed2b3587d560013b87ae86ac4c43c0c01441b6d0275b93a6052"
   },
   {
     "id": "render",
