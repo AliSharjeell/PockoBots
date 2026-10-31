@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -303,7 +304,7 @@ fun ModernMarketplaceContent(
                             color = PockoColors.AccentCyan,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = (-0.06).em
                         )
                     }
                 }
@@ -361,7 +362,7 @@ fun ModernMarketplaceContent(
                     color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    letterSpacing = (-0.06).em
                 )
             }
         }

@@ -1,6 +1,7 @@
 <resources>
     <style name="AppThemeBase" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">@font/inter</item>
+        <item name="android:letterSpacing">-0.06</item>
         <item name="android:colorAccent">#F4F4F5</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#09090B</item>
@@ -10,6 +11,7 @@
     </style>
     <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">@font/inter</item>
+        <item name="android:letterSpacing">-0.06</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
     <style name="AppTheme" parent="AppThemeBase" />

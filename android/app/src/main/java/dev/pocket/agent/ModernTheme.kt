@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 
 object PockoColors {
     // Dark Theme - Deep Obsidian & Sleek Slates
@@ -96,21 +97,21 @@ fun PockoTheme(
     val family = FontFamily(Font(R.font.inter))
     val base = Typography()
     val typography = base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = family),
-        displayMedium = base.displayMedium.copy(fontFamily = family),
-        displaySmall = base.displaySmall.copy(fontFamily = family),
-        headlineLarge = base.headlineLarge.copy(fontFamily = family),
-        headlineMedium = base.headlineMedium.copy(fontFamily = family),
-        headlineSmall = base.headlineSmall.copy(fontFamily = family),
-        titleLarge = base.titleLarge.copy(fontFamily = family),
-        titleMedium = base.titleMedium.copy(fontFamily = family),
-        titleSmall = base.titleSmall.copy(fontFamily = family),
-        bodyLarge = base.bodyLarge.copy(fontFamily = family),
-        bodyMedium = base.bodyMedium.copy(fontFamily = family),
-        bodySmall = base.bodySmall.copy(fontFamily = family),
-        labelLarge = base.labelLarge.copy(fontFamily = family),
-        labelMedium = base.labelMedium.copy(fontFamily = family),
-        labelSmall = base.labelSmall.copy(fontFamily = family)
+        displayLarge = base.displayLarge.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        displayMedium = base.displayMedium.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        displaySmall = base.displaySmall.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        headlineLarge = base.headlineLarge.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        headlineMedium = base.headlineMedium.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        headlineSmall = base.headlineSmall.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        titleLarge = base.titleLarge.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        titleMedium = base.titleMedium.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        titleSmall = base.titleSmall.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        bodyLarge = base.bodyLarge.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        bodyMedium = base.bodyMedium.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        bodySmall = base.bodySmall.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        labelLarge = base.labelLarge.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        labelMedium = base.labelMedium.copy(fontFamily = family, letterSpacing = (-0.06).em),
+        labelSmall = base.labelSmall.copy(fontFamily = family, letterSpacing = (-0.06).em)
     )
     MaterialTheme(
         colorScheme = colorScheme,

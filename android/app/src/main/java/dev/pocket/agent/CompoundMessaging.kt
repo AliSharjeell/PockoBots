@@ -101,6 +101,8 @@ object CompoundMessaging {
                     avatarSlot.addView(bloub, FrameLayout.LayoutParams(avatarSize, avatarSize))
                 } else {
                     val fallback = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
                         val initial = if (botAvatar.isNotEmpty()) botAvatar.take(2).uppercase() else botName.take(1).uppercase()
                         this.text = initial
                         setTextColor(0xFFFFFFFF.toInt())
@@ -131,6 +133,8 @@ object CompoundMessaging {
         // Show bot name on first message of cluster
         if (!isUser && isFirstInGroup && botName.isNotEmpty()) {
             val nameView = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
                 this.text = botName
                 textSize = 11f
                 typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
@@ -171,6 +175,8 @@ object CompoundMessaging {
 
         // Message text
         val messageText = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
             textSize = 14f
             typeface = AgentStyle.font(ctx)
             if (isUser) {
@@ -191,6 +197,8 @@ object CompoundMessaging {
         }
 
         val timeView = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
             typeface = AgentStyle.font(ctx)
             this.text = timeFormat.format(Date(timestamp))
             textSize = 10f
@@ -204,6 +212,8 @@ object CompoundMessaging {
 
         if (isUser) {
             val checkView = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
                 this.text = " ✓✓"
                 textSize = 10f
                 setTextColor(0xCCFFFFFF.toInt())
@@ -275,6 +285,8 @@ object CompoundMessaging {
         val emojis = arrayOf("👍", "❤️", "🔥", "😂", "💡", "👏")
         for (emoji in emojis) {
             val emojiBtn = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
                 this.text = emoji
                 textSize = 26f
                 setPadding(dp(ctx, 8), dp(ctx, 4), dp(ctx, 8), dp(ctx, 4))
@@ -301,6 +313,8 @@ object CompoundMessaging {
         }
 
         val btnReply = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
             this.text = "↩  Reply"
             textSize = 14f
             typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
@@ -315,6 +329,8 @@ object CompoundMessaging {
         actionRow.addView(btnReply)
 
         val btnCopy = TextView(ctx).apply {
+                letterSpacing = -0.06f
+                typeface = AgentStyle.font(ctx)
             this.text = "📋  Copy"
             textSize = 14f
             typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)

@@ -53,7 +53,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         TextView title=new TextView(this);
         title.setText("Pocko Bots");
         title.setTextColor(AgentStyle.TEXT);
-        title.setTextSize(26);
+        title.setTextSize(26);title.setLetterSpacing(-0.06f);
         title.setTypeface(AgentStyle.font(this),Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-2,-2);
@@ -63,7 +63,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         TextView sub=new TextView(this);
         sub.setText(subtitle!=null&&!subtitle.isEmpty()?subtitle:"Starting your local bots...");
         sub.setTextColor(AgentStyle.MUTED);
-        sub.setTextSize(14);
+        sub.setTextSize(14);sub.setLetterSpacing(-0.06f);
         sub.setTypeface(AgentStyle.font(this));
         sub.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(-2,-2);
@@ -590,7 +590,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(!job.optString("error").isEmpty())card.addView(muted(job.optString("error"),12));
             if(job.optBoolean("phoneArming")){
                 card.addView(muted("Waiting for phone access. Enable setup permissions and unlock your device.",12));
-                button(card,"Open setup",this::showSetup,false);
+                button(card,"Open Settings",this::showSetup,false);
             }
             button(card,"Cancel task",()->request("POST","/bots/"+selected+"/jobs/"+job.optString("id")+"/cancel",json(),v->refresh(false)),false);
             thread.addView(card);
@@ -605,7 +605,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             LinearLayout controls=row();thread.addView(controls);
             boolean resume=paused||!bot.optBoolean("enabled");
             button(controls,resume?"Resume bot":"Pause bot",()->request("POST","/bots/"+selected+(resume?"/resume":"/pause"),json(),v->refresh(false)),false);
-            if(paused)button(controls,"Setup & permissions",this::showSetup,false);
+            if(paused)button(controls,"Settings",this::showSetup,false);
         }
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.post(()->{if(scroll)chatScroll.fullScroll(View.FOCUS_DOWN);else chatScroll.scrollTo(0,old);});

@@ -56,6 +56,7 @@ final class AgentStyle {
         view.setTextColor(TEXT);
         view.setTextSize(size);
         view.setTypeface(font(context));
+        view.setLetterSpacing(-0.06f);
         return view;
     }
 
@@ -64,6 +65,7 @@ final class AgentStyle {
         view.setAllCaps(false);
         view.setTextSize(13);
         view.setTypeface(font(context),Typeface.BOLD);
+        view.setLetterSpacing(-0.06f);
         view.setTextColor(primary?0xffffffff:TEXT);
         view.setMinHeight(dp(context,44));
         view.setMinimumHeight(dp(context,44));
@@ -85,6 +87,7 @@ final class AgentStyle {
         view.setTextColor(TEXT);
         view.setHintTextColor(MUTED);
         view.setTypeface(font(context));
+        view.setLetterSpacing(-0.06f);
         view.setPadding(dp(context,14),dp(context,12),dp(context,14),dp(context,12));
         view.setBackground(surface(context,PANEL,16,true));
     }

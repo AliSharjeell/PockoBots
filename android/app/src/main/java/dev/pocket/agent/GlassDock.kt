@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -181,7 +182,7 @@ fun GlassDockBar(
                             color = contentTint,
                             fontSize = 11.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            letterSpacing = 0.2.sp
+                            letterSpacing = (-0.06).em
                         )
                     }
                 }
