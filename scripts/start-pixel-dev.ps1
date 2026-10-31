@@ -1,4 +1,4 @@
-param([string]$Serial = 'emulator-5554', [string]$Avd = 'Pixel_10_Pro_XL')
+param([string]$Serial = 'emulator-5554', [string]$Avd = 'Pixel_10_Pro_XL', [switch]$Visible)
 $ErrorActionPreference = 'Stop'
 $pixelSdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:LOCALAPPDATA 'Android/Sdk' }
 $pixelAdb = Join-Path $pixelSdk 'platform-tools/adb.exe'
@@ -30,7 +30,7 @@ function Wait-Pixel([bool]$Booted) {
 function Start-Pixel([string]$Stage, [string]$Kernel = '') {
     $pixelArguments = @('-avd', $Avd, '-port', $pixelPort, '-no-snapshot-load', '-no-snapshot-save', '-grpc-use-token')
     if ($Kernel) { $pixelArguments += @('-qemu', '-append', ('"' + $Kernel + '"')) }
-    Start-Process -FilePath $pixelEmulator -WindowStyle Hidden -ArgumentList $pixelArguments `
+    Start-Process -FilePath $pixelEmulator -WindowStyle $(if ($Visible) { 'Normal' } else { 'Hidden' }) -ArgumentList $pixelArguments `
         -RedirectStandardOutput "$env:TEMP/pocket-$Avd-$Stage.out.log" `
         -RedirectStandardError "$env:TEMP/pocket-$Avd-$Stage.err.log"
 }
