@@ -217,7 +217,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(index==1)showScreen("Marketplace");
             if(index==2){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
             if(index==3)showScreen("Settings");
-        }),new LinearLayout.LayoutParams(-1,dp(70)));
+        }),new LinearLayout.LayoutParams(-1,dp(78)));
     }
     private void newConversation(){
         ModernSheet.newConversation(this,()->editBot(null),this::createGroup);

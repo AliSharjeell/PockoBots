@@ -72,7 +72,7 @@ fun GlassDockBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
