@@ -49,6 +49,9 @@ class BloubView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
+    var workBlink: Float = 1f
+        set(value) { field = value; invalidate() }
+
     private val path = Path()
 
     override fun onDraw(canvas: Canvas) {
@@ -88,7 +91,10 @@ class BloubView @JvmOverloads constructor(
         eyePaint.color = if (luminance > 0.65) 0xFF0A0A0C.toInt() else 0xFFFFFFFF.toInt()
 
         // 5. Draw Eyes based on expression
+        canvas.save()
+        canvas.scale(1f, workBlink, cx, cy)
         drawEyes(canvas, cx, cy, radius)
+        canvas.restore()
     }
 
     private fun drawBody(canvas: Canvas, cx: Float, cy: Float, r: Float) {

@@ -10,7 +10,7 @@ import java.util.Locale;
 
 /** The bot's own avatar gently breathes and tilts while its task is running. */
 final class WorkingAvatarView extends FrameLayout {
-    private final View image;private boolean working;private ValueAnimator animation;
+    private final View image;private boolean working,ticking;
     WorkingAvatarView(BotsActivity app,JSONObject bot,int textSize){
         super(app);setClipChildren(false);setClipToPadding(false);
         String avatar=bot.optString("avatar","");
@@ -22,12 +22,15 @@ final class WorkingAvatarView extends FrameLayout {
         addView(image,new FrameLayout.LayoutParams(-1,-1));setContentDescription(bot.optString("name")+" avatar");
     }
     void setWorking(boolean value){if(working==value)return;working=value;if(value&&isAttachedToWindow())start();else if(!value)stop();}
-    private void start(){
-        if(animation!=null||!ValueAnimator.areAnimatorsEnabled())return;
-        animation=ValueAnimator.ofFloat(0,1);animation.setDuration(1800);animation.setRepeatCount(ValueAnimator.INFINITE);
-        animation.addUpdateListener(value->{double phase=SystemClock.uptimeMillis()%1800/1800d*Math.PI*2;float scale=.98f+.04f*(float)((Math.sin(phase)+1)/2);image.setScaleX(scale);image.setScaleY(scale);image.setRotation(3f*(float)Math.sin(phase));});animation.start();
-    }
-    private void stop(){if(animation!=null){animation.cancel();animation=null;}image.setScaleX(1);image.setScaleY(1);image.setRotation(0);}
+    private final Runnable frame=new Runnable(){public void run(){
+        if(!working||!isAttachedToWindow()||getWindowVisibility()!=VISIBLE){ticking=false;return;}
+        long now=SystemClock.uptimeMillis();double phase=now%1700/1700d*Math.PI*2;float wave=(float)Math.sin(phase);float scale=.96f+.075f*(wave+1)/2;
+        image.setScaleX(scale);image.setScaleY(1.025f-.04f*(wave+1)/2);image.setRotation(9f*wave);image.setTranslationY(-AgentStyle.dp(getContext(),3)*(float)Math.cos(phase));
+        if(image instanceof BloubView){long blink=now%3100;((BloubView)image).setWorkBlink(blink<150?Math.max(.12f,Math.abs(blink-75)/75f):1f);}postDelayed(this,33);
+    }};
+    private void start(){if(ticking)return;ticking=true;post(frame);}
+    private void stop(){removeCallbacks(frame);ticking=false;image.setScaleX(1);image.setScaleY(1);image.setRotation(0);image.setTranslationY(0);if(image instanceof BloubView)((BloubView)image).setWorkBlink(1f);}
+    @Override protected void onWindowVisibilityChanged(int visibility){super.onWindowVisibilityChanged(visibility);if(image!=null){if(visibility==VISIBLE&&working)start();else stop();}}
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();if(working)start();}
     @Override protected void onDetachedFromWindow(){stop();super.onDetachedFromWindow();}
 }

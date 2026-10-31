@@ -1,8 +1,8 @@
 import {randomUUID} from 'node:crypto';
 
 export type ToolProgress={id:string;name:string;input:string;output:string;status:'running'|'done'|'error'|'interrupted'};
-export type RunProgress={id:string;status:'working'|'completed'|'paused'|'stopped'|'failed';updated:number;text:string;thinking:string;thoughts:Record<string,string>;tools:ToolProgress[]};
-export function newProgress():RunProgress{return {id:randomUUID(),status:'working',updated:Date.now(),text:'',thinking:'',thoughts:{},tools:[]};}
+export type RunProgress={id:string;status:'working'|'completed'|'paused'|'stopped'|'failed';started?:number;updated:number;text:string;thinking:string;thoughts:Record<string,string>;tools:ToolProgress[]};
+export function newProgress():RunProgress{return {id:randomUUID(),status:'working',started:Date.now(),updated:Date.now(),text:'',thinking:'',thoughts:{},tools:[]};}
 export function updateProgress(progress:RunProgress,event:any,redact:(text:string)=>string,message?:any){
  const safe=(value:unknown,max:number)=>redact(typeof value==='string'?value:JSON.stringify(value??'')).slice(0,max);
  if(event.type==='message_update'||event.type==='message_end'){
