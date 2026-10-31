@@ -27,6 +27,7 @@ final class AgentIcon extends View {
             case "plus":resource=R.drawable.lucide_plus;break;
             case "back":resource=R.drawable.lucide_arrow_left;break;
             case "send":resource=R.drawable.lucide_send;break;
+            case "phone":resource=R.drawable.lucide_phone;break;
             case "pause":resource=R.drawable.lucide_pause;break;
             case "play":resource=R.drawable.lucide_play;break;
             case "open":resource=R.drawable.lucide_external_link;break;
