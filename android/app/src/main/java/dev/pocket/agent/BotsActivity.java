@@ -39,7 +39,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     void requestQuiet(String method,String path,JSONObject data,Result done,Runnable failed){requestQuiet(method,path,data,done,failed,false);}
     private void requestQuiet(String method,String path,JSONObject data,Result done,Runnable failed,boolean showError){if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){android.util.Log.e("POCKET_AGENT","done callback error",e);error(e);}});}catch(Exception e){android.util.Log.e("POCKET_AGENT","request error: "+method+" "+path,e);main.post(()->{if(!isDestroyed()){failed.run();if(showError)error(e);}});}});}
     void terminalInput(String id,JSONObject data){AgentApi connection=api;if(connection==null)return;inputs.execute(()->{try{connection.request("POST","/terminals/"+id+"/input",data);}catch(Exception e){main.post(()->{if(!isDestroyed())error(e);});}});}
-    void error(Exception e){new AlertDialog.Builder(this).setTitle("Pocket Agent").setMessage(e.getMessage()).setPositiveButton("OK",null).show();}
+    void error(Exception e){new AlertDialog.Builder(this).setTitle("PockoBots").setMessage(e.getMessage()).setPositiveButton("OK",null).show();}
     void openUrl(String url){try{Uri parsed=Uri.parse(url);if(!Arrays.asList("http","https").contains(parsed.getScheme()))throw new IllegalArgumentException("Use an HTTP or HTTPS link");startActivity(new Intent(Intent.ACTION_VIEW,parsed));}catch(Exception e){error(e);}}
     private void showLoadingScreen(String subtitle){
         FrameLayout loading=new FrameLayout(this);
@@ -56,7 +56,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         center.addView(logo,new LinearLayout.LayoutParams(dp(84),dp(84)));
         
         TextView title=new TextView(this);
-        title.setText("Pocko Bots");
+        title.setText("PockoBots");
         title.setTextColor(AgentStyle.TEXT);
         title.setTextSize(26);title.setLetterSpacing(-0.06f);
         title.setTypeface(AgentStyle.font(this),Typeface.BOLD);

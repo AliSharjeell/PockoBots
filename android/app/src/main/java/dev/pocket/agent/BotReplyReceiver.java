@@ -18,7 +18,7 @@ public class BotReplyReceiver extends BroadcastReceiver {
             api.request("PUT","/bots/engine",new JSONObject().put("enabled",true));api.request("POST","/bots/"+id+"/messages",new JSONObject().put("text",text));api.request("POST","/bots/"+id+"/resume",new JSONObject());
             if(text.equals(context.getSharedPreferences("bot-chats",Context.MODE_PRIVATE).getString("draft-"+id,"")))context.getSharedPreferences("bot-chats",Context.MODE_PRIVATE).edit().remove("draft-"+id).apply();
             context.getSystemService(NotificationManager.class).cancel(id.hashCode());
-        }catch(Exception e){context.getSystemService(NotificationManager.class).notify(id.hashCode(),BotNotifications.message(context,id,"Reply saved","Open Pocket Agent to send your saved reply."));}
+        }catch(Exception e){context.getSystemService(NotificationManager.class).notify(id.hashCode(),BotNotifications.message(context,id,"Reply saved","Open PockoBots to send your saved reply."));}
         finally{if(pending!=null)pending.finish();}},"bot-notification-reply").start();
     }
 }

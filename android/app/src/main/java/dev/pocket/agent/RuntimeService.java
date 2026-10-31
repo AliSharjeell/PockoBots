@@ -32,7 +32,7 @@ public class RuntimeService extends Service {
         Intent stop = new Intent(this, RuntimeService.class).setAction("stop");
         PendingIntent stopIntent = PendingIntent.getService(this, 1, stop, PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, "runtime")
-            .setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("Pocket Agent")
+            .setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("PockoBots")
             .setContentText("Your local coding environment is running")
             .setContentIntent(content).addAction(new Notification.Action.Builder(null, "Stop environment", stopIntent).build())
             .setOngoing(true).build();

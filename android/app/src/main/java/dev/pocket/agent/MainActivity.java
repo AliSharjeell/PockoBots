@@ -79,7 +79,7 @@ public class MainActivity extends Activity {
             return insets.consumeSystemWindowInsets();
         });
         LinearLayout brand=row();brand.setGravity(Gravity.CENTER_VERTICAL);brand.setPadding(dp(10),dp(12),dp(10),dp(10));
-        TextView wordmark=label("Pocket Agent",18);wordmark.setTypeface(AgentStyle.font(this),Typeface.BOLD);brand.addView(wordmark,new LinearLayout.LayoutParams(0,-2,1));
+        TextView wordmark=label("PockoBots",18);wordmark.setTypeface(AgentStyle.font(this),Typeface.BOLD);brand.addView(wordmark,new LinearLayout.LayoutParams(0,-2,1));
         TextView context=label(mode.equals("Coding")?projectName:"Mobile Use",11);context.setTextColor(AgentStyle.MUTED);context.setSingleLine(true);context.setMaxWidth(dp(150));brand.addView(context);page.addView(brand);
         LinearLayout top=row();top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(4),0,dp(4),dp(12));page.addView(top);
         top.addView(new AgentIcon(this,tab.equals("Settings")?"back":"menu",tab.equals("Settings")?"Back":"Open navigation",() -> {if(tab.equals("Settings"))show(mode.equals("Mobile Use")?"Tasks":project.isEmpty()?"Projects":"Chat");else openDrawer();}),new LinearLayout.LayoutParams(dp(44),dp(44)));
@@ -108,7 +108,7 @@ public class MainActivity extends Activity {
         if(drawer!=null)return;drawer=new FrameLayout(this);drawer.setBackgroundColor(0x99000000);shellRoot.addView(drawer,new FrameLayout.LayoutParams(-1,-1));drawer.setOnClickListener(v -> closeDrawer());
         LinearLayout panel=column();panel.setClickable(true);panel.setBackgroundColor(AgentStyle.BACK);panel.setPadding(dp(12),dp(24),dp(12),dp(16));
         FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(dp(304),getResources().getDisplayMetrics().widthPixels-dp(48)),-1,Gravity.LEFT);drawer.addView(panel,position);
-        LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);TextView title=label("Pocket Agent",20);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(new AgentIcon(this,"close","Close navigation",this::closeDrawer),new LinearLayout.LayoutParams(dp(44),dp(44)));panel.addView(heading);
+        LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);TextView title=label("PockoBots",20);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(new AgentIcon(this,"close","Close navigation",this::closeDrawer),new LinearLayout.LayoutParams(dp(44),dp(44)));panel.addView(heading);
         drawerRow(panel,"＋  "+(mode.equals("Mobile Use")?"New task":"New chat"),false,() -> {closeDrawer();if(mode.equals("Mobile Use")){mobileTask="";prefs().edit().remove("mobile-task").apply();show("Tasks");}else if(!project.isEmpty())newChat();else createProject();});
         ScrollView scroll=new ScrollView(this);LinearLayout list=column();scroll.addView(list);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         list.addView(label("Recent",14));
@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
     }
     private void setup() {
         LinearLayout page=column();page.setPadding(dp(24),dp(40),dp(24),dp(24));page.setBackgroundColor(AgentStyle.BACK);
-        page.addView(label("Pocket Agent",28));page.addView(label("Your projects and coding tools, on your phone.",17));
+        page.addView(label("PockoBots",28));page.addView(label("Your projects and coding tools, on your phone.",17));
         setupStatus=label(RuntimeService.status,15);page.addView(setupStatus);page.addView(new ProgressBar(this));
         button(page,"Retry setup",() -> { startForegroundService(new Intent(this,RuntimeService.class));waitForRuntime(); });
         button(page,"View setup log",() -> {try {new AlertDialog.Builder(this).setTitle("Environment log").setMessage(Io.text(new File(getFilesDir(),"runtime.log"))).setPositiveButton("Close",null).show();}catch(Exception e){error(e);}});
@@ -183,27 +183,27 @@ public class MainActivity extends Activity {
         LinearLayout permissions=row();permissionCard.addView(permissions);
         button(permissions,"Accessibility",() -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         button(permissions,"Floating pill",() -> startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()))));
-        String ready=com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null?"Accessibility connected":"Enable Pocket Agent · Mobile Use in Accessibility";
+        String ready=com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null?"Accessibility connected":"Enable PockoBots · Mobile Use in Accessibility";
         TextView permissionHint=label(ready+(android.provider.Settings.canDrawOverlays(this)?" · Floating permission ready":" · Allow display over other apps"),11);permissionHint.setTextColor(AgentStyle.MUTED);permissionCard.addView(permissionHint);
         if(com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null&&android.provider.Settings.canDrawOverlays(this))permissionCard.setVisibility(View.GONE);
         mobileDetails=column();content.addView(mobileDetails);
         if(!mobileTask.isEmpty())request("GET","/mobile/tasks/"+mobileTask,null,value -> renderMobileTask((JSONObject)value));
         LinearLayout composer=row();composer.setGravity(Gravity.CENTER_VERTICAL);composer.setPadding(dp(4),dp(4),dp(4),dp(4));composer.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,28,true));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(dp(4),dp(8),dp(4),dp(12));body.addView(composer,params);
         composer.addView(new AgentIcon(this,"plus","New mobile task",() -> {mobileTask="";prefs().edit().remove("mobile-task").apply();show("Tasks");}),new LinearLayout.LayoutParams(dp(44),dp(44)));
-        mobilePrompt=new EditText(this);AgentStyle.input(mobilePrompt);mobilePrompt.setBackgroundColor(Color.TRANSPARENT);mobilePrompt.setMinLines(1);mobilePrompt.setMaxLines(5);mobilePrompt.setHint("Ask Pocket Agent to use your phone…");mobilePrompt.setText(mobileDraft);composer.addView(mobilePrompt,new LinearLayout.LayoutParams(0,-2,1));
+        mobilePrompt=new EditText(this);AgentStyle.input(mobilePrompt);mobilePrompt.setBackgroundColor(Color.TRANSPARENT);mobilePrompt.setMinLines(1);mobilePrompt.setMaxLines(5);mobilePrompt.setHint("Ask PockoBots to use your phone…");mobilePrompt.setText(mobileDraft);composer.addView(mobilePrompt,new LinearLayout.LayoutParams(0,-2,1));
         AgentIcon start=new AgentIcon(this,"send","Start task",this::beginMobileTask);start.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,28,false));composer.addView(start,new LinearLayout.LayoutParams(dp(44),dp(44)));
     }
     private void beginMobileTask(){
             String goal=mobilePrompt.getText().toString().trim();if(goal.isEmpty()){mobilePrompt.setError("Describe a task first");return;}
             if(!mobileReady())return;
-            new AlertDialog.Builder(this).setTitle("Start Mobile Use?").setMessage("Pocket Agent will read the visible screen, send observations to your configured model, and tap or type for this task. It continues outside this app. Pause or stop from the floating pill or notification. Enter passwords and payment details only in the target app.")
+            new AlertDialog.Builder(this).setTitle("Start Mobile Use?").setMessage("PockoBots will read the visible screen, send observations to your configured model, and tap or type for this task. It continues outside this app. Pause or stop from the floating pill or notification. Enter passwords and payment details only in the target app.")
                 .setPositiveButton("Start",(dialog,which) -> request("POST","/mobile/tasks",json("prompt",goal),value -> {
                     mobileTask=((JSONObject)value).optString("id");prefs().edit().putString("mobile-task",mobileTask).apply();mobileDraft="";mobilePrompt.setText("");startMobile(mobileTask,true);
                 })).setNegativeButton("Cancel",null).show();
     }
     private boolean mobileReady(){
-        if(com.artemis.helper.ArtemisAccessibilityService.getInstance()==null){new AlertDialog.Builder(this).setTitle("Enable Mobile Use accessibility").setMessage("In Android Accessibility settings, enable Pocket Agent · Mobile Use. Android requires you to grant this permission yourself.").setPositiveButton("Open settings",(d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))).setNegativeButton("Cancel",null).show();return false;}
-        if(!android.provider.Settings.canDrawOverlays(this)){new AlertDialog.Builder(this).setTitle("Allow the floating pill").setMessage("Allow Pocket Agent to display over other apps so you can follow progress, pause, and reply without returning here.").setPositiveButton("Open settings",(d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())))).setNegativeButton("Cancel",null).show();return false;}return true;
+        if(com.artemis.helper.ArtemisAccessibilityService.getInstance()==null){new AlertDialog.Builder(this).setTitle("Enable Mobile Use accessibility").setMessage("In Android Accessibility settings, enable PockoBots · Mobile Use. Android requires you to grant this permission yourself.").setPositiveButton("Open settings",(d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))).setNegativeButton("Cancel",null).show();return false;}
+        if(!android.provider.Settings.canDrawOverlays(this)){new AlertDialog.Builder(this).setTitle("Allow the floating pill").setMessage("Allow PockoBots to display over other apps so you can follow progress, pause, and reply without returning here.").setPositiveButton("Open settings",(d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())))).setNegativeButton("Cancel",null).show();return false;}return true;
     }
     private void startMobile(String id,boolean run){
         if(!mobileReady())return;AgentApi connection=api;
@@ -249,7 +249,7 @@ public class MainActivity extends Activity {
         chatScroll.setOnScrollChangeListener((v,x,y,oldx,oldy) -> followChat=y+chatScroll.getHeight()>=messages.getHeight()-dp(50));
         LinearLayout composer=row();composer.setGravity(Gravity.CENTER_VERTICAL);composer.setPadding(dp(4),dp(4),dp(4),dp(4));composer.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,28,true));LinearLayout.LayoutParams composerParams=new LinearLayout.LayoutParams(-1,-2);composerParams.setMargins(dp(4),dp(8),dp(4),dp(12));body.addView(composer,composerParams);
         composer.addView(new AgentIcon(this,"plus","New chat",this::newChat),new LinearLayout.LayoutParams(dp(44),dp(44)));
-        prompt=new EditText(this);AgentStyle.input(prompt);prompt.setBackgroundColor(Color.TRANSPARENT);prompt.setHint("Ask Pocket Agent…");prompt.setMinLines(1);prompt.setMaxLines(5);composer.addView(prompt,new LinearLayout.LayoutParams(0,-2,1));
+        prompt=new EditText(this);AgentStyle.input(prompt);prompt.setBackgroundColor(Color.TRANSPARENT);prompt.setHint("Ask PockoBots…");prompt.setMinLines(1);prompt.setMaxLines(5);composer.addView(prompt,new LinearLayout.LayoutParams(0,-2,1));
         composer.addView(new AgentIcon(this,"stop","Stop agent",() -> {if(!session.isEmpty())request("POST","/sessions/"+session+"/stop",json(),v -> refreshChat());}),new LinearLayout.LayoutParams(dp(40),dp(44)));
         AgentIcon send=new AgentIcon(this,"send","Send",() -> {String text=prompt.getText().toString().trim();if(text.isEmpty())return;
             if(session.isEmpty())request("POST","/sessions",json("projectId",project),value -> {setSession((JSONObject)value);sendPrompt(text);});else sendPrompt(text);});send.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,28,false));composer.addView(send,new LinearLayout.LayoutParams(dp(44),dp(44)));

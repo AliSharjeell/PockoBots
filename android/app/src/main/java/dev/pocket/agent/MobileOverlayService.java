@@ -57,7 +57,7 @@ public class MobileOverlayService extends Service {
     private Notification notification(String value){
         Intent open=new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId"));
         Notification.Builder builder=new Notification.Builder(this,"mobile-tasks").setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("Pocket Agent · Mobile Use").setContentText(value).setOngoing(true)
+            .setContentTitle("PockoBots · Mobile Use").setContentText(value).setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this,2,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
         for(String action:new String[]{"pause","stop"})builder.addAction(new Notification.Action.Builder(null,action.equals("pause")?"Pause":"Stop",
             PendingIntent.getService(this,action.equals("pause")?3:4,new Intent(this,MobileOverlayService.class).setAction(action),PendingIntent.FLAG_IMMUTABLE)).build());
@@ -72,7 +72,7 @@ public class MobileOverlayService extends Service {
             if(status.equals("waiting")&&!previous.equals("waiting"))expanded=true;
             String changed=task.toString();if(!signature.equals(changed)){signature=changed;render();}
             notifications.notify(2,notification(status.equals("waiting")?"Your reply is needed":status+" · "+task.optInt("steps")+" steps"));
-        });}catch(Exception e){main.post(() -> {if(!closing){MobileAccess.authorize(false);task=new JSONObject();try{task.put("status","paused").put("error","Connection lost. Reopen Pocket Agent to reconnect.");}catch(Exception ignored){}render();}});}
+        });}catch(Exception e){main.post(() -> {if(!closing){MobileAccess.authorize(false);task=new JSONObject();try{task.put("status","paused").put("error","Connection lost. Reopen PockoBots to reconnect.");}catch(Exception ignored){}render();}});}
     }
     private void call(String endpoint,JSONObject body,Runnable done){
         String selected=id;requests.execute(() -> {try{api.request("POST","/mobile/tasks/"+selected+"/"+endpoint,body);main.post(done);}
