@@ -81,7 +81,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         loading.addView(center,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         setContentView(loading);
     }
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Setup";showLoadingScreen("Starting your local bots...");}
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);AgentStyle.applyTheme(this);if(!AgentStyle.dark)setTheme(R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);workspace=new BotWorkspace(this);markdown=new ChatMarkdown(this);selected=getIntent().getStringExtra("botId");if(selected==null||!selected.matches("[0-9a-f-]{36}"))selected="";if(saved!=null){selected=saved.getString("bot",selected);screen=saved.getString("screen","Chat");}if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))screen="Settings";if(screen.equals("Setup"))screen="Settings";showLoadingScreen("Starting your local bots...");}
     @Override protected void onSaveInstanceState(Bundle out){out.putString("bot",selected);out.putString("screen",screen);super.onSaveInstanceState(out);}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);String id=intent.getStringExtra("botId");if(id!=null&&id.matches("[0-9a-f-]{36}")){if(api==null)selected=id;else open(id);}}
     @Override protected void onResume(){super.onResume();visible=true;getSharedPreferences("bot-runtime",0).edit().putBoolean("enabled",true).apply();startForegroundService(new Intent(this,RuntimeService.class).putExtra("botsEnabled",true));connect();}
@@ -91,7 +91,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
     private void open(String id){saveDraft();replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
-    void showSetup(){showScreen("Setup");}
+    void showSetup(){showScreen("Settings");}
     private void showScreen(String next){if(page!=null){getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(page.getWindowToken(),0);page.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
         workspace.stop();page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
@@ -148,7 +148,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
-        if(screen.equals("Setup")){setup();return;}
         if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
@@ -224,6 +223,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         new AlertDialog.Builder(this).setTitle("New conversation").setItems(new String[]{"Create bot","Create group"},(d,n)->{
             if(n==0)editBot(null);else createGroup();
         }).show();
+    }
+    void settingsConnections(LinearLayout content){
+        content.addView(text("Connections & sharing",20));
+        button(content,"MCP connections",this::connections,false);
+        button(content,"Servers & sharing",()->showScreen("Servers"),false);
     }
     void chooseAppearance(){appearance();}
     void openMainTerminal(){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
@@ -827,9 +831,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }).setNegativeButton("Cancel",null).show();
     }
     private boolean accessibility(){return com.artemis.helper.ArtemisAccessibilityService.getInstance()!=null;}
-    private void setup(){
-        body.removeAllViews();ScrollView scroll=new ScrollView(this);LinearLayout content=column();scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
-        content.addView(text("Set up your local bots",22));content.addView(muted("Every bot can code, browse and operate your phone. Shell commands and priority ringing are enabled by default; you can change them in each bot's preferences.",13));
+    void permissionSettings(LinearLayout content){
+        content.addView(text("Permissions & background",20));content.addView(muted("Every bot can code, browse and operate your phone. Shell commands and priority ringing are enabled by default; you can change them in each bot's preferences.",13));
         content.addView(text("Shell commands: allowed by default",14));content.addView(text("Priority ringing alerts: allowed by default",14));
         content.addView(muted("Alerts can ring while locked. Answer shows the message and uses an installed offline Android voice. Phone actions require an unlocked screen.",12));
         boolean notifications=getSystemService(NotificationManager.class).areNotificationsEnabled();
@@ -839,11 +842,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         button(content,"Android voice data",()->{try{startActivity(new Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA));}catch(ActivityNotFoundException e){Toast.makeText(this,"Install an offline voice in Android text-to-speech settings",Toast.LENGTH_LONG).show();}},false);
         button(content,(accessibility()?"Enabled: ":"Enable: ")+"Phone accessibility",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),false);
         button(content,(Settings.canDrawOverlays(this)?"Allowed: ":"Allow: ")+"Floating island",()->startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()))),false);
-        button(content,"Model / BYOK settings",()->showScreen("Settings"),false);
         content.addView(muted("Android requires you to grant these permissions in its own settings. Missing phone permissions do not block coding. Bots continue outside the app; Android battery restrictions still apply.",12));
-        button(content,"Continue to bots",()->{getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");},true);
+        if(!getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))button(content,"Continue to Home",()->{getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");},true);
     }
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Setup"))setup();}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Settings"))showScreen("Settings");}
     @Override public void onBackPressed(){if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
     private void connections(){
         request("GET","/connectors",null,value -> {
