@@ -41,7 +41,7 @@ export class Bots {
     this.messages.push({ id: randomUUID(), botId, role, text: this.redact(text).slice(0, 24000), time: Date.now(), jobId });
     const own = this.messages.filter(m => m.botId === botId); if (own.length > 200) { const remove = new Set(own.slice(0, own.length - 200).map(m => m.id)); this.messages = this.messages.filter(m => !remove.has(m.id)); }
   }
-  list() { return this.records.map(bot => { const jobs = this.jobs.filter(j => j.botId === bot.id); return { ...bot, lastMessage: this.messages.filter(m => m.botId === bot.id).at(-1), unreadCount: this.unreadCount(bot), active: jobs.find(j => ["arming", "running", "waiting"].includes(j.status)), queued: jobs.filter(j => j.status === "queued").length }; }); }
+  list() { return this.records.map(bot => { const jobs = this.jobs.filter(j => j.botId === bot.id);const progress=this.sessions.progress(bot.sessionId); return { ...bot, lastMessage: this.messages.filter(m => m.botId === bot.id).at(-1), unreadCount: this.unreadCount(bot), progress: progress?{status:progress.status,updated:progress.updated,tool:progress.tools.find(t=>t.status==="running")?.name,text:progress.text.slice(0,180)}:undefined, active: jobs.find(j => ["arming", "running", "waiting"].includes(j.status)), queued: jobs.filter(j => j.status === "queued").length }; }); }
   private unreadCount(bot: Bot) {
     const messages=this.messages.filter(m=>m.botId===bot.id),readIndex=messages.findIndex(m=>m.id===bot.lastReadMessageId);
     return messages.slice(readIndex+1).filter(m=>m.role==="assistant").length;

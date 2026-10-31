@@ -28,14 +28,14 @@ export class SubscriptionProviders {
  constructor(private launcher:(command:string)=>{command:string;args:string[]} = command=>({command,args:[]})) {}
  private base="http://127.0.0.1:8787";
  private apiToken="";
- private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal}>();
+ private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal;onActivity?:(event:any)=>void}>();
  configure(base:string,token:string){this.base=base;this.apiToken=token;}
  async status(){return Promise.all(providerCatalog.map(async p=>{if(!p.supported)return {...p,installed:false,authenticated:false};const version=await probe(p.command,["--version"]);let authenticated:boolean|null=null;if(version.code===0&&(p.id==="codex"||p.id==="claude")){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}else if(version.code===0){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}return {...p,installed:version.code===0,authenticated,version:version.code===0?version.text.trim().slice(0,100):"",note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};}));}
- async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");return tool.execute(randomUUID(),input.arguments||{},run.signal);}
- async run(id:string,options:{cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void}){
+ async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");const callId=randomUUID();run.onActivity?.({type:"tool_execution_start",toolCallId:callId,toolName:tool.name,args:input.arguments||{}});try{const result=await tool.execute(callId,input.arguments||{},run.signal);run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result,isError:!!(result as any).isError});return result;}catch(error){run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result:"Tool failed",isError:true});throw error;}}
+ async run(id:string,options:{cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}){
   const p=provider(id);if(!p.supported)throw Error(p.reason);if(options.signal.aborted)throw Error("Cancelled");
   const runId=randomUUID(),secret=randomBytes(32).toString("hex"),directory=join(tmpdir(),"pockobots-provider-"+runId);await mkdir(directory,{recursive:true,mode:0o700});
-  this.runs.set(runId,{secret,tools:options.tools,signal:options.signal});
+  this.runs.set(runId,{secret,tools:options.tools,signal:options.signal,onActivity:options.onActivity});
   try{
    const helper=join(directory,"bridge.cjs"),configPath=join(directory,"mcp.json");await writeFile(helper,bridgeSource,{mode:0o600});
    const environment={POCKO_PROVIDER_API:this.base,POCKO_PROVIDER_RUN:runId,POCKO_PROVIDER_BRIDGE_TOKEN:secret,POCKO_PROVIDER_API_TOKEN:this.apiToken};const mcp={command:process.execPath,args:[helper],env:environment};
@@ -45,12 +45,12 @@ export class SubscriptionProviders {
    if(id==="claude")args=["-p","--output-format","stream-json","--verbose","--allowedTools","Bash,Read,Edit,Write,Glob,Grep,mcp__pockobots__*","--mcp-config",configPath,...(model?["--model",model]:[])];
    if(id==="opencode"){env.OPENCODE_CONFIG_CONTENT=JSON.stringify({permission:"allow",mcp:{pockobots:{type:"local",command:[process.execPath,helper],environment,enabled:true,timeout:600000}}});args=["run","--format","json",...(model?["--model",model]:[]),"--",options.prompt];}
    if(id==="gemini"){const config=join(directory,"gemini.json");await writeFile(config,JSON.stringify({mcpServers:{pockobots:{...mcp,timeout:600000,trust:true}}}),{mode:0o600});env.GEMINI_CLI_SYSTEM_SETTINGS_PATH=config;args=["--prompt",options.prompt,"--output-format","stream-json","--approval-mode","yolo",...(model?["--model",model]:[])];}
-   const launcher=this.launcher(p.command); return await executeProvider(launcher.command,[...launcher.args,...args],{cwd:options.cwd,env,prompt:["codex","claude"].includes(id)?options.prompt:undefined,signal:options.signal,onText:options.onText});
+   const launcher=this.launcher(p.command); return await executeProvider(launcher.command,[...launcher.args,...args],{cwd:options.cwd,env,prompt:["codex","claude"].includes(id)?options.prompt:undefined,signal:options.signal,onText:options.onText,onActivity:options.onActivity});
   }finally{this.runs.delete(runId);await rm(directory,{recursive:true,force:true});}
  }
 }
 
-/** Parse only user-facing text; never persist a raw provider event or reasoning trace. */
+/** Extract assistant prose separately from structured progress events. */
 export function providerText(event:any):string|undefined {
  if(event.type==="result"&&typeof event.result==="string")return event.result;
  if(event.type==="item.completed"&&event.item?.type==="agent_message")return event.item.text;
@@ -59,11 +59,22 @@ export function providerText(event:any):string|undefined {
  if(event.type==="assistant"&&Array.isArray(event.message?.content))return event.message.content.filter((p:any)=>p.type==="text").map((p:any)=>p.text).join("\n");
  return undefined;
 }
-export function executeProvider(command:string,args:string[],options:{cwd:string;env:NodeJS.ProcessEnv;prompt?:string;signal:AbortSignal;onText?:(text:string)=>void}):Promise<string>{
+/** Accept only structured vendor activity, not arbitrary stderr or an invented thought stream. */
+export function providerActivity(event:any):any[]{
+ const item=event.item;
+ if(item&&["item.started","item.updated","item.completed"].includes(event.type)){
+  if(item.type==="reasoning"&&typeof item.text==="string")return [{type:"thinking",id:item.id,text:item.text}];
+  if(item.type==="command_execution"&&typeof item.command==="string")return [{type:event.type==="item.completed"?"tool_execution_end":"tool_execution_start",toolCallId:item.id,toolName:"bash",args:{command:item.command},result:item.aggregated_output,isError:item.exit_code!=null&&item.exit_code!==0}];
+ }
+ if(event.type==="assistant"&&Array.isArray(event.message?.content))return event.message.content.flatMap((part:any)=>part.type==="thinking"&&typeof part.thinking==="string"?[{type:"thinking",id:event.message.id,text:part.thinking}]:part.type==="tool_use"&&!String(part.name).startsWith("mcp__pockobots__")?[{type:"tool_execution_start",toolCallId:part.id,toolName:part.name,args:part.input}]:[]);
+ if(event.type==="user"&&Array.isArray(event.message?.content))return event.message.content.filter((part:any)=>part.type==="tool_result").map((part:any)=>({type:"tool_execution_end",toolCallId:part.tool_use_id,result:part.content,isError:part.is_error===true}));
+ return [];
+}
+export function executeProvider(command:string,args:string[],options:{cwd:string;env:NodeJS.ProcessEnv;prompt?:string;signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}):Promise<string>{
  return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:options.cwd,env:options.env,detached:process.platform!=="win32",stdio:["pipe","pipe","pipe"]});let pending="",answer="",providerFailed=false,settled=false,stopped=false;let force:ReturnType<typeof setTimeout>|undefined;
  const kill=()=>{stopped=true;try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGTERM");else child.kill();}catch{}if(!force){force=setTimeout(()=>{try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGKILL");else child.kill("SIGKILL");}catch{}},2000);force.unref();}};
  const abort=()=>kill();const timer=setTimeout(kill,3600000);timer.unref();options.signal.addEventListener("abort",abort,{once:true});
- const accept=(line:string)=>{try{const event=JSON.parse(line);if(event.type==="turn.failed"||event.type==="result"&&(event.is_error===true||event.status==="error"))providerFailed=true;const text=providerText(event);if(text){answer=(event.type==="message"&&event.delta===true?answer+text:text).slice(-30000);options.onText?.(answer);}}catch{}};
+ const accept=(line:string)=>{try{const event=JSON.parse(line);for(const activity of providerActivity(event))options.onActivity?.(activity);if(event.type==="turn.failed"||event.type==="result"&&(event.is_error===true||event.status==="error"))providerFailed=true;const text=providerText(event);if(text){answer=(event.type==="message"&&event.delta===true?answer+text:text).slice(-30000);options.onText?.(answer);}}catch{}};
  child.stdout.on("data",b=>{pending+=b.toString();if(pending.length>2000000){pending="";kill();return;}let newline;while((newline=pending.indexOf("\n"))>=0){accept(pending.slice(0,newline));pending=pending.slice(newline+1);}});
  child.stderr.on("data",()=>{});
  const finish=(failure?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(force&&!stopped)clearTimeout(force);options.signal.removeEventListener("abort",abort);if(failure)reject(failure);else if(!answer||providerFailed)reject(Error("Provider ended without a successful text result. Check its account and project activity."));else resolve(answer);};
