@@ -150,7 +150,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         if(!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)){
             String[] tabs={"Chat","Terminal","Files"};
-            page.addView(GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index])),new LinearLayout.LayoutParams(-1,dp(86)));
+            page.addView(GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index])),new LinearLayout.LayoutParams(-1,dp(60)));
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);

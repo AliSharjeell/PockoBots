@@ -62,7 +62,8 @@ fun GlassDockBar(
     dark: Boolean = true,
     selectedIndex: Int = 0,
     onTabSelected: (Int) -> Unit = {},
-    tabs: List<DockTabItem> = DockTabs
+    tabs: List<DockTabItem> = DockTabs,
+    compact: Boolean = false
 ) {
     val backdrop = rememberCanvasBackdrop {
         drawRect(
@@ -79,15 +80,15 @@ fun GlassDockBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 6.dp),
+            .padding(start = 14.dp, top = if (compact) 6.dp else 14.dp, end = 14.dp, bottom = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
-                .widthIn(max = 300.dp)
+                .widthIn(max = if (compact) 216.dp else 300.dp)
                 .fillMaxWidth()
                 .shadow(
-                    elevation = if (dark) 16.dp else 8.dp,
+                    elevation = if (compact) 6.dp else if (dark) 16.dp else 8.dp,
                     shape = RoundedCornerShape(32.dp),
                     spotColor = if (dark) Color(0xFF000000) else Color(0x33000000)
                 )
@@ -125,7 +126,7 @@ fun GlassDockBar(
                     shape = RoundedCornerShape(32.dp)
                 )
                 .padding(4.dp)
-                .height(58.dp),
+                .height(if (compact) 40.dp else 58.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEachIndexed { index, tab ->
@@ -174,14 +175,14 @@ fun GlassDockBar(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Box(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(if (compact) 20.dp else 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 painter = painterResource(if (selected) tab.selectedIcon else tab.icon),
                                 contentDescription = null,
                                 tint = contentTint,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(if (compact) 20.dp else 24.dp)
                             )
                         }
                     }
@@ -208,7 +209,8 @@ object GlassDock {
                         dark = dark,
                         selectedIndex = selected,
                         onTabSelected = { action.accept(it) },
-                        tabs = tabs
+                        tabs = tabs,
+                        compact = tabs == WorkspaceTabs
                     )
                 }
             }
