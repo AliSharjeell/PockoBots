@@ -175,6 +175,7 @@ export async function createApp(options: {
   app.get("/api/bots/:id", (req, res) => res.type("json").send(redact(bots.state(req.params.id))));
   app.put("/api/bots/:id", async (req, res) => res.json(await bots.update(req.params.id, req.body)));
   app.delete("/api/bots/:id", async (req, res) => { await bots.remove(req.params.id); res.json({ ok: true }); });
+  app.post("/api/bots/:id/read", async (req,res)=>res.json(await bots.markRead(req.params.id,req.body.messageId)));
   app.post("/api/bots/:id/messages", async (req, res) => res.status(202).json(await bots.enqueue(req.params.id, req.body.text)));
   app.delete("/api/bots/:id/messages", async (req, res) => { await bots.clearMessages(req.params.id); res.json({ ok: true }); });
   app.post("/api/bots/:id/pause", async (req, res) => { await bots.pause(req.params.id); res.json({ ok: true }); });

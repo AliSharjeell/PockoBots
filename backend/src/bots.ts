@@ -8,7 +8,7 @@ import type { Connectors } from "./connectors.js";
 
 export type Bot = { id: string; name: string; avatar: string; accent: string; personality: string; role: string; memory: string; kind: "unified" | "coding" | "phone" | "browser"; projectId: string; sessionId: string;
   enabled: boolean; allowShell: boolean; allowUrgent: boolean; connectors: string[]; intervalMinutes: number; heartbeat: string; nextWake: number;
-  dailyLimit: number; day: string; runs: number; created: number };
+  dailyLimit: number; day: string; runs: number; created: number; lastReadMessageId?: string };
 export type BotJob = { id: string; botId: string; text: string; source: "user" | "routine" | "bot"; depth: number; status: "queued" | "arming" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
   created: number; updated: number; groupId?: string; groupMessageId?: string; sourceBotId?: string; replyToJobId?: string; mobileTaskId?: string; phoneTaskId?: string; phoneArming?: boolean; error?: string; output?: string };
 type Message = { id: string; botId: string; role: "user" | "assistant" | "system"; text: string; time: number; jobId?: string };
@@ -29,7 +29,7 @@ export class Bots {
     const data = await this.store.read<any>("bots", { schema: 2, enabled: true, bots: [], jobs: [], messages: [] });
     this.enabled = data.schema === 2 ? data.enabled : true; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
     if (data.schema !== 2) for (const bot of this.records) Object.assign(bot, { kind: "unified", allowShell: true, allowUrgent: true, dailyLimit: 0 });
-    for (const bot of this.records) { bot.avatar ??= "bot"; bot.accent ??= "#3B76FF"; bot.personality ??= ""; }
+    for (const bot of this.records) { bot.avatar ??= "bot"; bot.accent ??= "#3B76FF"; bot.personality ??= ""; bot.lastReadMessageId ??= this.messages.filter(m=>m.botId===bot.id).at(-1)?.id || ""; }
     for (const job of this.jobs) { job.phoneArming = false; }
     for (const job of this.jobs) if (["running", "arming", "waiting"].includes(job.status)) { job.status = "paused"; job.error = "Runtime restarted. Review and resume this task."; }
     await this.persist();
@@ -41,7 +41,19 @@ export class Bots {
     this.messages.push({ id: randomUUID(), botId, role, text: this.redact(text).slice(0, 24000), time: Date.now(), jobId });
     const own = this.messages.filter(m => m.botId === botId); if (own.length > 200) { const remove = new Set(own.slice(0, own.length - 200).map(m => m.id)); this.messages = this.messages.filter(m => !remove.has(m.id)); }
   }
-  list() { return this.records.map(bot => { const jobs = this.jobs.filter(j => j.botId === bot.id); return { ...bot, lastMessage: this.messages.filter(m => m.botId === bot.id).at(-1), active: jobs.find(j => ["arming", "running", "waiting"].includes(j.status)), queued: jobs.filter(j => j.status === "queued").length }; }); }
+  list() { return this.records.map(bot => { const jobs = this.jobs.filter(j => j.botId === bot.id); return { ...bot, lastMessage: this.messages.filter(m => m.botId === bot.id).at(-1), unreadCount: this.unreadCount(bot), active: jobs.find(j => ["arming", "running", "waiting"].includes(j.status)), queued: jobs.filter(j => j.status === "queued").length }; }); }
+  private unreadCount(bot: Bot) {
+    const messages=this.messages.filter(m=>m.botId===bot.id),readIndex=messages.findIndex(m=>m.id===bot.lastReadMessageId);
+    return messages.slice(readIndex+1).filter(m=>m.role==="assistant").length;
+  }
+  async markRead(id: string, messageId: unknown) {
+    const bot=this.get(id),messages=this.messages.filter(m=>m.botId===id);
+    if(typeof messageId!=="string")throw Error("Choose a message to mark read");
+    const index=messages.findIndex(m=>m.id===messageId);if(index<0)throw Error("Message not found in this bot's conversation");
+    const previous=messages.findIndex(m=>m.id===bot.lastReadMessageId);
+    if(index>previous){bot.lastReadMessageId=messageId;await this.changed();}
+    return {unreadCount:this.unreadCount(bot)};
+  }
   get(id: string) { const bot = this.records.find(b => b.id === id); if (!bot) throw Error("Bot not found"); return bot; }
   getJob(id: string) { return this.jobs.find(job => job.id === id); }
   jobsForGroup(id: string) { return this.jobs.filter(job => job.groupId === id); }
@@ -72,7 +84,7 @@ export class Bots {
     const project = await this.projects.create("bot-" + id.slice(0, 8)); const session = await this.sessions.create(project.id);
     const bot: Bot = { id, name: b.name.trim(), avatar: b.avatar, accent: b.accent, personality: this.redact(b.personality), role: b.role, memory: "", kind: b.kind, projectId: project.id, sessionId: session.id, enabled: true,
       allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, connectors: [...new Set<string>(b.connectors)], intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat,
-      nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
+      nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now(), lastReadMessageId: "" };
     this.records.push(bot); this.message(id, "system", `${bot.name} is ready. I can code, use your phone and browser, and work in my own workspace.`); await this.changed(); return bot;
   }
   async clearMessages(id: string) {
@@ -81,6 +93,7 @@ export class Bots {
       throw Error("Finish or cancel this bot's pending tasks before clearing messages");
     const clearing = this.sessions.clearMessages(bot.sessionId);
     this.messages = this.messages.filter(message => message.botId !== id);
+    bot.lastReadMessageId="";
     await clearing;
     await this.changed();
   }
