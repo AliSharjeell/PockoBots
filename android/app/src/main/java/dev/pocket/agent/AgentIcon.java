@@ -13,6 +13,8 @@ final class AgentIcon extends View {
         int resource;
         switch(name){
             case "menu":resource=R.drawable.lucide_menu;break;
+            case "sun":resource=R.drawable.phosphor_sun;break;
+            case "moon":resource=R.drawable.phosphor_moon;break;
             case "search":resource=R.drawable.lucide_search;break;
             case "more":resource=R.drawable.lucide_ellipsis_vertical;break;
             case "plus":resource=R.drawable.lucide_plus;break;

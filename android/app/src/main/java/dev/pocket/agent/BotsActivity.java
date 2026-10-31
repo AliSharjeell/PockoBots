@@ -97,7 +97,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
     private void open(String id){saveDraft();replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
-    void showSetup(){showScreen("Settings");}
+    void showSetup(){showScreen("Permissions");}
+    void showSettingsPage(String name){showScreen(name);}
+    void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
+    void showAdvancedConnections(){connections();}
+    private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers").contains(screen);}
+    private void toggleAppearance(){getSharedPreferences("appearance",0).edit().putString("theme",AgentStyle.dark?"light":"dark").apply();recreate();}
+
     private void showScreen(String next){if(page!=null){getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(page.getWindowToken(),0);page.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
         workspace.stop();dockOverlay=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
@@ -105,8 +111,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         
         FrameLayout header=new FrameLayout(this);
         boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
-        if(!selected.isEmpty()){
-            AgentIcon back=new AgentIcon(this,"back","Back to messages",()->open(""));
+        if(!selected.isEmpty()||settingsChild()){
+            AgentIcon back=new AgentIcon(this,"back",settingsChild()?"Back to Settings":"Back to messages",()->{if(settingsChild())showScreen("Settings");else open("");});
             header.addView(back,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.START|Gravity.CENTER_VERTICAL));
         }
         if(botHeader){
@@ -129,11 +135,12 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);header.addView(identity,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         }else{
-            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen;
-            TextView name=text(title,28);
+            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen;
+            TextView name=text(title,settingsChild()?22:28);
             name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),800,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
-            titlePosition.leftMargin=selected.isEmpty()?dp(4):dp(50);header.addView(name,titlePosition);
+            titlePosition.leftMargin=selected.isEmpty()&&!settingsChild()?dp(4):dp(50);header.addView(name,titlePosition);
+            if(screen.equals("Settings")){AgentIcon appearance=new AgentIcon(this,AgentStyle.dark?"sun":"moon",AgentStyle.dark?"Use light mode":"Use dark mode",this::toggleAppearance);header.addView(appearance,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));}
             if(selected.isEmpty()&&screen.equals("Chat")){
                 AgentIcon create=new AgentIcon(this,"plus","New conversation",this::newConversation);
                 header.addView(create,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
@@ -217,7 +224,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         page.addView(bottomBarContainer);
     }
     private void dock(){
-        int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:screen.equals("Settings")?3:0;
+        int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:(screen.equals("Settings")||settingsChild())?3:0;
         dockOverlay=new FrameLayout(this);View fade=new View(this);fade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{android.graphics.Color.TRANSPARENT,(AgentStyle.BACK&0x00ffffff)|0x99000000,AgentStyle.BACK}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
         dockOverlay.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{

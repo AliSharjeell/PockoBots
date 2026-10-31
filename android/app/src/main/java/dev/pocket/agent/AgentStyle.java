@@ -18,8 +18,8 @@ final class AgentStyle {
     static boolean dark=true;
 
     static void applyTheme(Context context){
-        String choice=context.getSharedPreferences("appearance",0).getString("theme","system");
-        dark=choice.equals("dark")||choice.equals("system")&&(context.getResources().getConfiguration().uiMode&48)==32;
+        String choice=context.getSharedPreferences("appearance",0).getString("theme","dark");
+        dark=!choice.equals("light");
         BACK=dark?0xff09090B:0xffF8FAFC;
         PANEL=dark?0xff18181B:0xffFFFFFF;
         BORDER=dark?0xff27272A:0xffE2E8F0;
