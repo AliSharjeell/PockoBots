@@ -7,7 +7,7 @@ import android.view.View;
 
 /** Licensed Lucide outline icons shared with the Compose navigation dock. */
 final class AgentIcon extends View {
-    private Drawable icon;private int iconTint;private String symbol="";
+    private Drawable icon;private int glyphSize=21;void setGlyphSize(int size){glyphSize=size;invalidate();}private int iconTint;private String symbol="";
     void setIconTint(int color){iconTint=color;invalidate();}
     AgentIcon(Context context,String name,String description,Runnable action){
         super(context);
@@ -40,7 +40,7 @@ final class AgentIcon extends View {
         icon=getContext().getDrawable(resource).mutate();invalidate();
     }
     @Override protected void onDraw(Canvas canvas){
-        super.onDraw(canvas);int size=AgentStyle.dp(getContext(),21);
+        super.onDraw(canvas);int size=AgentStyle.dp(getContext(),glyphSize);
         int left=(getWidth()-size)/2,top=(getHeight()-size)/2;
         icon.setTint(iconTint==0?AgentStyle.TEXT:iconTint);icon.setBounds(left,top,left+size,top+size);icon.draw(canvas);
     }
