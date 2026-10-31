@@ -361,7 +361,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             copy.addView(preview);
             item.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
             LinearLayout metadata=column();metadata.setGravity(Gravity.END);metadata.setPadding(0,dp(4),0,0);
-            if(last!=null&&last.optLong("time")>0){long timestamp=last.optLong("time");String format=android.text.format.DateUtils.isToday(timestamp)?"h:mm a":"MMM d";TextView time=muted(new java.text.SimpleDateFormat(format,Locale.getDefault()).format(new Date(timestamp)),10);time.setPadding(0,0,0,dp(7));time.setSingleLine(true);metadata.addView(time);}
+            if(last!=null&&last.optLong("time")>0){long timestamp=last.optLong("time");String format=android.text.format.DateUtils.isToday(timestamp)?"h:mm a":"MMM d";TextView time=muted(new java.text.SimpleDateFormat(format,Locale.getDefault()).format(new Date(timestamp)),10);time.setPadding(0,0,0,dp(7));time.setGravity(Gravity.END);time.setSingleLine(true);metadata.addView(time);}
             LinearLayout indicators=row();indicators.setGravity(Gravity.END);
             int unread=bot.optInt("unreadCount");if(unread>0){TextView badge=text(unread>99?"99+":String.valueOf(unread),11);badge.setTypeface(AgentStyle.font(this),Typeface.BOLD);badge.setTextColor(0xffffffff);badge.setGravity(Gravity.CENTER);badge.setPadding(dp(6),0,dp(6),0);badge.setMinWidth(dp(22));badge.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,12,false));badge.setContentDescription(unread+" unread messages");indicators.addView(badge,new LinearLayout.LayoutParams(-2,dp(22)));}
             metadata.addView(indicators,new LinearLayout.LayoutParams(-1,dp(24)));item.addView(metadata,new LinearLayout.LayoutParams(dp(62),-2));
