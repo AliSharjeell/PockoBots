@@ -184,8 +184,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 }).setNegativeButton("Cancel",null).show();
             });
         });
-        attach.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,22,true));
-        bottomRow.addView(attach,new LinearLayout.LayoutParams(dp(42),dp(42)));
+        bottomRow.addView(GlassControls.wrap(attach,22f,false),new LinearLayout.LayoutParams(dp(42),dp(42)));
 
         View space1=new View(this);
         bottomRow.addView(space1,new LinearLayout.LayoutParams(dp(8),dp(1)));
@@ -198,21 +197,20 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         composer=new EditText(this);
         AgentStyle.input(composer);
-        composer.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        composer.setBackgroundColor(android.graphics.Color.TRANSPARENT);composer.setTextColor(0xffffffff);composer.setHintTextColor(0xb3ffffff);
         String botHint=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("name"):"bot";
         composer.setHint("Message "+botHint+"...");
         composer.setMaxLines(5);
         composer.setText(getSharedPreferences("bot-chats",0).getString("draft-"+selected,draft));
         inputCapsule.addView(composer,new LinearLayout.LayoutParams(0,-2,1));
-        bottomRow.addView(inputCapsule,new LinearLayout.LayoutParams(0,-2,1));
+        bottomRow.addView(GlassControls.wrap(inputCapsule,24f,false),new LinearLayout.LayoutParams(0,-2,1));
 
         View space2=new View(this);
         bottomRow.addView(space2,new LinearLayout.LayoutParams(dp(8),dp(1)));
 
         // Right: Cupertino Telegram Send Button
         AgentIcon send=new AgentIcon(this,"send","Send to bot",this::send);
-        send.setBackground(AgentStyle.surface(this,0xFF007AFF,22,false));
-        bottomRow.addView(send,new LinearLayout.LayoutParams(dp(42),dp(42)));
+        bottomRow.addView(GlassControls.wrap(send,22f,true),new LinearLayout.LayoutParams(dp(42),dp(42)));
 
         bottomBarContainer.addView(bottomRow,new LinearLayout.LayoutParams(-1,-2));
         floatChatControls(header,workspaceTabs,bottomBarContainer);
