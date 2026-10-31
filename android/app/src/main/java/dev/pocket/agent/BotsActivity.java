@@ -17,7 +17,7 @@ import java.util.concurrent.*;
 public class BotsActivity extends androidx.activity.ComponentActivity {
     private final Handler main=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newFixedThreadPool(3),inputs=Executors.newSingleThreadExecutor();
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
-    private LinearLayout page,body,thread,replyBanner;private FrameLayout root,drawer;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
+    private LinearLayout page,body,thread,replyBanner;private FrameLayout root;private EditText composer;private ScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="";
     private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
@@ -97,45 +97,43 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         workspace.stop();page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
         page.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),dp(8)+insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
         
-        // Modern top bar
-        LinearLayout header=row();header.setPadding(0,dp(4),0,dp(6));
-        AgentIcon navButton=new AgentIcon(this,selected.isEmpty()?"menu":"back",selected.isEmpty()?"Open menu":"Back to messages",()->{if(selected.isEmpty())menu();else open("");});
-        header.addView(navButton,new LinearLayout.LayoutParams(dp(42),dp(42)));
-        
-        LinearLayout identity=column();identity.setPadding(dp(10),0,dp(6),0);
-        if(!selected.isEmpty()&&detail!=null&&detail.optJSONObject("bot")!=null){
-            JSONObject bot=detail.optJSONObject("bot");
-            LinearLayout botRow=row();
-            View chipView;
-            if(bot.optString("avatar","").startsWith("bloub:")){
-                String[] parts=bot.optString("avatar").split(":");
-                BloubView bloub=new BloubView(this);
-                if(parts.length>1)bloub.setShapeId(parts[1]);
-                bloub.setColorHex(bot.optString("accent","#4F46E5"));
-                if(parts.length>2)bloub.setExpressionId(parts[2]);
-                chipView=bloub;
-            }else{
-                TextView chip=new TextView(this);chip.setText(bot.optString("avatar",bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT)));
-                chip.setTextColor(0xffffffff);chip.setTextSize(13);chip.setTypeface(AgentStyle.font(this),Typeface.BOLD);chip.setGravity(Gravity.CENTER);
-                chip.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),10,false));
-                chipView=chip;
-            }
-            botRow.addView(chipView,new LinearLayout.LayoutParams(dp(28),dp(28)));
-            TextView name=text(bot.optString("name"),17);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
-            botRow.addView(name);identity.addView(botRow);
-            identity.addView(muted(bot.optJSONObject("active")!=null?"● Working":bot.optBoolean("enabled")?"● Ready":"● Paused",11));
-        }else{
-            String title=screen.equals("Chat")?"Pocko Bots":screen.equals("Setup")?"Setup & permissions":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")&&selected.isEmpty()?"Main terminal":screen.equals("Settings")?"Settings":detail==null?screen:detail.optJSONObject("bot").optString("name");
-            TextView name=text(title,19);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);identity.addView(name);
+        FrameLayout header=new FrameLayout(this);
+        boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
+        if(!selected.isEmpty()){
+            AgentIcon back=new AgentIcon(this,"back","Back to messages",()->open(""));
+            header.addView(back,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.START|Gravity.CENTER_VERTICAL));
         }
-        header.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
-        
-        // Right tool action button supporting both "Open sidebar" and "Conversation tools"
-        AgentIcon tools=new AgentIcon(this,selected.isEmpty()?"plus":"settings",selected.isEmpty()?"New conversation":"Conversation tools",()->{if(selected.isEmpty())newConversation();else menu();});
-        header.addView(tools,new LinearLayout.LayoutParams(dp(42),dp(42)));
-        View altTools=new View(this);altTools.setContentDescription("Conversation tools");altTools.setOnClickListener(v->menu());
-        header.addView(altTools,new LinearLayout.LayoutParams(0,dp(42)));
-        page.addView(header);
+        if(botHeader){
+            JSONObject bot=detail.optJSONObject("bot");
+            LinearLayout identity=row();identity.setPadding(dp(12),dp(7),dp(12),dp(7));
+            identity.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,24,true));
+            identity.setContentDescription("Bot profile");identity.setFocusable(true);identity.setOnClickListener(v->editBot(bot));
+            View avatar;
+            if(bot.optString("avatar","").startsWith("bloub:")){
+                String[] parts=bot.optString("avatar").split(":");BloubView bloub=new BloubView(this);
+                if(parts.length>1)bloub.setShapeId(parts[1]);bloub.setColorHex(bot.optString("accent","#4F46E5"));
+                if(parts.length>2)bloub.setExpressionId(parts[2]);avatar=bloub;
+            }else{
+                TextView chip=text(bot.optString("avatar",bot.optString("name","?").substring(0,1).toUpperCase(Locale.ROOT)),13);
+                chip.setGravity(Gravity.CENTER);chip.setPadding(0,0,0,0);chip.setTextColor(0xffffffff);
+                chip.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),10,false));avatar=chip;
+            }
+            identity.addView(avatar,new LinearLayout.LayoutParams(dp(28),dp(28)));
+            TextView name=text(bot.optString("name"),17);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
+            name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            identity.addView(name);header.addView(identity,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
+        }else{
+            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Main terminal":screen;
+            TextView name=text(title,screen.equals("Chat")?24:19);
+            name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),screen.equals("Chat")?900:700,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
+            FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
+            titlePosition.leftMargin=selected.isEmpty()?dp(4):dp(50);header.addView(name,titlePosition);
+            if(selected.isEmpty()&&screen.equals("Chat")){
+                AgentIcon create=new AgentIcon(this,"plus","New conversation",this::newConversation);
+                header.addView(create,new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
+            }
+        }
+        page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
 
         if(!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)){
             LinearLayout tabs=AgentStyle.segment(this);
@@ -149,7 +147,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             page.addView(tabs,tlp);
         }
 
-        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);drawer=null;setContentView(root);
+        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
         if(screen.equals("Setup")){setup();return;}
         if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
@@ -226,50 +224,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         new AlertDialog.Builder(this).setTitle("New conversation").setItems(new String[]{"Create bot","Create group"},(d,n)->{
             if(n==0)editBot(null);else createGroup();
         }).show();
-    }
-    private void menu(){
-        if(drawer!=null){root.removeView(drawer);drawer=null;return;}
-        drawer=new FrameLayout(this);
-        drawer.setBackgroundColor(0xaa000000);
-        root.addView(drawer,new FrameLayout.LayoutParams(-1,-1));
-        drawer.setOnClickListener(v->{root.removeView(drawer);drawer=null;});
-        
-        LinearLayout panel=column();
-        panel.setClickable(true);
-        panel.setBackgroundColor(AgentStyle.BACK);
-        panel.setPadding(dp(16),dp(32),dp(16),dp(24));
-        drawer.addView(panel,new FrameLayout.LayoutParams(Math.min(dp(300),getResources().getDisplayMetrics().widthPixels-dp(40)),-1));
-        
-        TextView title=text("Pocko Bots",22);
-        title.setTypeface(AgentStyle.font(this),Typeface.BOLD);
-        panel.addView(title);
-        panel.addView(muted("Local AI on your phone",11));
-        
-        LinearLayout actions=row();actions.setPadding(0,dp(12),0,dp(8));
-        button(actions,"All bots",()->{menu();open("");},false);
-        button(actions,"Create bot",()->{menu();editBot(null);},true);
-        panel.addView(actions);
-        
-        ScrollView recent=new ScrollView(this);
-        LinearLayout list=column();
-        recent.addView(list);
-        panel.addView(recent,new LinearLayout.LayoutParams(-1,0,1));
-        
-        JSONArray bots=state.optJSONArray("bots");
-        if(bots!=null)for(int i=0;i<bots.length();i++){
-            JSONObject bot=bots.optJSONObject(i);
-            button(list,bot.optString("name"),()->{menu();open(bot.optString("id"));},false);
-        }
-        
-        View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
-        panel.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
-        
-        button(panel,"Main terminal",()->{menu();openMainTerminal();},false);
-        button(panel,"Servers & sharing",()->{menu();showScreen("Servers");},false);
-        button(panel,"MCP connections",()->{menu();connections();},false);
-        if(!selected.isEmpty())button(panel,"Select MCP tools for this bot",()->{menu();selectConnections();},false);
-        button(panel,"Settings",()->{menu();showScreen("Settings");},false);
-        button(panel,"Setup & permissions",()->{menu();showSetup();},false);
     }
     void chooseAppearance(){appearance();}
     void openMainTerminal(){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
@@ -890,7 +844,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         button(content,"Continue to bots",()->{getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");},true);
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(screen.equals("Setup"))setup();}
-    @Override public void onBackPressed(){if(drawer!=null){menu();return;}if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
+    @Override public void onBackPressed(){if(!screen.equals("Chat")){showScreen("Chat");return;}if(!selected.isEmpty())open("");else super.onBackPressed();}
     private void connections(){
         request("GET","/connectors",null,value -> {
             JSONArray list=(JSONArray)value;LinearLayout form=column();form.setPadding(dp(12),0,dp(12),dp(12));
