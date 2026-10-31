@@ -187,7 +187,7 @@ object CompoundMessaging {
                 markdown.set(this, text)
             }
         }
-        bubbleLayout.addView(messageText)
+        if (isUser || !ChatCards.render(activity, bubbleLayout, text, markdown)) bubbleLayout.addView(messageText)
 
         // Bottom metadata row: Timestamp
         val metaRow = LinearLayout(ctx).apply {

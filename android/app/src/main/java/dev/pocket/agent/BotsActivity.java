@@ -148,9 +148,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
 
+        View workspaceTabs=null;
         if(!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)){
             String[] tabs={"Chat","Terminal","Files"};
-            page.addView(GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index])),new LinearLayout.LayoutParams(-1,dp(60)));
+            workspaceTabs=GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index]));page.addView(workspaceTabs,new LinearLayout.LayoutParams(-1,dp(60)));
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
@@ -158,7 +159,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(selected.isEmpty()){inbox();dock();return;}
         
         chatScroll=new ScrollView(this);thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
-        chatScroll.setOnScrollChangeListener((v,x,y,ox,oy)->{follow=y+chatScroll.getHeight()>=thread.getHeight()-dp(60);if(follow)markChatRead();});
+        chatScroll.setOnScrollChangeListener((v,x,y,ox,oy)->{follow=y+chatScroll.getHeight()-chatScroll.getPaddingTop()-chatScroll.getPaddingBottom()>=thread.getHeight()-dp(60);if(follow)markChatRead();});
         
         // Cupertino Telegram ChatBottomBar matching 6xingyv/compound
         LinearLayout bottomBarContainer=column();
@@ -214,7 +215,21 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         bottomRow.addView(send,new LinearLayout.LayoutParams(dp(42),dp(42)));
 
         bottomBarContainer.addView(bottomRow,new LinearLayout.LayoutParams(-1,-2));
-        page.addView(bottomBarContainer);
+        floatChatControls(header,workspaceTabs,bottomBarContainer);
+    }
+    private android.graphics.drawable.GradientDrawable edgeFade(boolean top){
+        int color=AgentStyle.BACK&0x00ffffff;
+        int[] colors=top?new int[]{AgentStyle.BACK,color|0xdd000000,color}:new int[]{color,color|0xcc000000,AgentStyle.BACK};
+        return new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,colors);
+    }
+    private void floatChatControls(View header,View tabs,LinearLayout input){
+        page.removeView(header);if(tabs!=null)page.removeView(tabs);page.removeView(body);
+        FrameLayout viewport=new FrameLayout(this);page.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));viewport.addView(body,new FrameLayout.LayoutParams(-1,-1));
+        int controlsHeight=dp(tabs==null?56:116);ScrollView scroll=chatScroll;scroll.setClipToPadding(false);scroll.setPadding(0,controlsHeight,0,dp(82));
+        FrameLayout top=new FrameLayout(this);top.setBackground(edgeFade(true));LinearLayout controls=column();controls.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));if(tabs!=null)controls.addView(tabs,new LinearLayout.LayoutParams(-1,dp(60)));top.addView(controls,new FrameLayout.LayoutParams(-1,-2));viewport.addView(top,new FrameLayout.LayoutParams(-1,controlsHeight+dp(28),Gravity.TOP));
+        input.setPadding(0,dp(24),0,dp(4));input.setBackground(edgeFade(false));viewport.addView(input,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        input.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int inset=b-t+dp(8);if(inset!=scroll.getPaddingBottom()){boolean atEnd=follow;scroll.setPadding(0,controlsHeight,0,inset);if(atEnd)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));}});
+        viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));});
     }
     private void dock(){
         int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:(screen.equals("Settings")||settingsChild())?3:0;
@@ -410,7 +425,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void bubble(String value,boolean user,boolean isFirst,boolean isLast){bubble(value,user,isFirst,isLast,System.currentTimeMillis());}
     private void bubble(String value,boolean user,boolean isFirst,boolean isLast,long time){
-        if(!user&&ChatCards.render(this,thread,value,markdown))return;
         String botName=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("name"):"";
         String botAvatar=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("avatar",""):"";
         String botAccent=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("accent","#007AFF"):"#007AFF";
