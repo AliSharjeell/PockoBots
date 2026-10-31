@@ -73,7 +73,7 @@ final class MarketplaceUi {
     }
     private View addControl(JSONObject item){
         boolean added=connection(item)!=null,busy=pending.contains(item.optString("id"));
-        Button button=new Button(app);button.setText(busy?"...":added?"Added":"Add");AgentStyle.button(button,!added);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription((added?"Configure ":"Add ")+item.optString("name"));button.setTextColor(added?AgentStyle.TEXT:0xffffffff);button.setOnClickListener(v->{if(added)options(item);else connect(item);});return GlassControls.wrap(button,22f,!added);
+        boolean needsSignIn=added&&connection(item).optBoolean("oauth")&&!connection(item).optString("authStatus").equals("authorized");Button button=new Button(app);button.setText(busy?"...":needsSignIn?"Sign in":added?"Added":"Add");AgentStyle.button(button,!added||needsSignIn);button.setTextSize(12);button.setTypeface(AgentStyle.font(app),Typeface.NORMAL);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);button.setPadding(dp(12),0,dp(12),0);button.setEnabled(!busy);button.setContentDescription((added?"Configure ":"Add ")+item.optString("name"));button.setTextColor(added?AgentStyle.TEXT:0xffffffff);button.setOnClickListener(v->{if(needsSignIn)signIn(item,connection(item));else if(added)options(item);else connect(item);});return GlassControls.wrap(button,22f,!added);
     }
     private void connect(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
@@ -104,14 +104,15 @@ final class MarketplaceUi {
         if(!sheet.dialog.isShowing())return;app.marketplaceRequest("GET","/connectors/"+connection.optString("id")+"/oauth/status",null,value->{
             if(!sheet.dialog.isShowing())return;JSONObject auth=(JSONObject)value;String state=auth.optString("status");
             if(state.equals("authorized")){finished[0]=true;sheet.dialog.dismiss();show(body);check(item,connection);return;}
-            if(state.equals("waiting")){progress.setVisibility(View.GONE);code.setText(auth.optString("userCode"));status.setText("Copy this one-time code, then authorize GitHub CLI on GitHub's own page. Return here after signing in.");open.setEnabled(true);}
+            if(state.equals("waiting")){progress.setVisibility(View.GONE);code.setText(auth.optString("userCode"));status.setText("Copy this one-time code, then approve GitHub CLI and repository access on GitHub's page. Organization repositories may require SSO or admin approval. Return here after signing in.");open.setEnabled(true);}
             if(state.equals("failed")||state.equals("cancelled")){progress.setVisibility(View.GONE);status.setText(auth.optString("message","Sign-in cancelled. Close and retry when ready."));open.setEnabled(false);finished[0]=true;return;}
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->pollGitHub(item,connection,sheet,status,code,progress,open,finished),1500);
         },error->{if(sheet.dialog.isShowing()){status.setText("Reconnecting to sign-in...");new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->pollGitHub(item,connection,sheet,status,code,progress,open,finished),2500);}});
     }
     private void check(JSONObject item,JSONObject c){
+        if(item.optString("id").equals("github")){request("POST","/github/cli/setup",app.json(),result->{pending.remove(item.optString("id"));show(body);Sheet ready=new Sheet("GitHub CLI is ready");ready.content.addView(muted("Every bot can use your signed-in GitHub account with gh. Repository access follows the permissions you granted GitHub CLI, including organization policies. Restart any existing terminal to use gh there.",13));ready.action("Open Terminal",()->{ready.dialog.dismiss();app.openMainTerminal();},true);ready.action("Manage GitHub access",()->app.openUrl("https://github.com/settings/applications"),false);ready.show();});return;}
         pending.add(item.optString("id"));show(body);
-        request("POST","/connectors/"+c.optString("id")+"/test",app.json(),result->{pending.remove(item.optString("id"));show(body);JSONObject checked=(JSONObject)result;JSONArray tools=checked.optJSONArray("tools");message("Connected to "+item.optString("name"),(tools==null?0:tools.length())+" tools are available. Choose this connection in your bot's profile to let it use this app.");});
+        request("POST","/connectors/"+c.optString("id")+"/test",app.json(),result->{pending.remove(item.optString("id"));show(body);JSONObject checked=(JSONObject)result;JSONArray tools=checked.optJSONArray("tools");message("Connected to "+item.optString("name"),(tools==null?0:tools.length())+" tools are available. All bots can discover and use this app.");});
     }
     private void configure(JSONObject item){
         if(item.optString("availability").equals("external-host-required")){help(item);return;}
@@ -136,6 +137,7 @@ final class MarketplaceUi {
         if(c==null)sheet.action("Connect",()->{sheet.dialog.dismiss();connect(item);},true);
         else{
             if(c.optBoolean("oauth"))sheet.action(c.optString("authStatus").equals("authorized")?"Sign in again":"Sign in",()->{sheet.dialog.dismiss();signIn(item,c);},true);
+            if(item.optString("id").equals("github")){sheet.action("Enable GitHub CLI for all bots",()->{sheet.dialog.dismiss();check(item,c);},false);sheet.action("Manage repository access",()->app.openUrl("https://github.com/settings/applications"),false);}
             sheet.action("Check connection",()->{sheet.dialog.dismiss();check(item,c);},false);
         }
         sheet.action("Configure",()->{sheet.dialog.dismiss();configure(item);},false);sheet.action("Connection help",()->{sheet.dialog.dismiss();help(item);},false);
