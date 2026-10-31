@@ -481,23 +481,18 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(12),0,dp(12));hero.setLayoutParams(lp);
             hero.addView(text("Meet your local bots",22));
             hero.addView(muted("Give a bot a name and instructions. Every bot can code, browse and use your phone directly on this device.",14));
-            button(hero,"Create bot",()->editBot(null),true);
+            hero.addView(muted("Tap + to create a bot or group.",13));
             list.addView(hero);
             return;
         }
 
-        // Quick action banner
-        LinearLayout actions=row();actions.setPadding(0,dp(4),0,dp(8));
-        button(actions,"+ Create bot",()->editBot(null),true);
-        button(actions,"New group",this::createGroup,false);
-        list.addView(actions);
-
-        // Bot cards
+        // Flat conversations separated by inset rules
         for(int i=0;i<bots.length();i++){
             JSONObject bot=bots.optJSONObject(i);
-            LinearLayout card=column();AgentStyle.card(card);
-            card.setPadding(dp(14),dp(12),dp(14),dp(12));
-            LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-1,-2);clp.setMargins(0,dp(5),0,dp(5));card.setLayoutParams(clp);
+            LinearLayout card=column();
+            card.setPadding(dp(8),dp(18),dp(8),dp(18));
+            card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));
+            android.util.TypedValue ripple=new android.util.TypedValue();getTheme().resolveAttribute(android.R.attr.selectableItemBackground,ripple,true);card.setBackgroundResource(ripple.resourceId);
             
             LinearLayout item=row();
             View avatarView;
@@ -521,14 +516,6 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             TextView name=text(bot.optString("name"),16);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             title.addView(name,new LinearLayout.LayoutParams(0,-2,1));
             
-            boolean active=bot.optJSONObject("active")!=null;
-            boolean enabled=bot.optBoolean("enabled",true);
-            TextView statusBadge=text(active?"Working":enabled?"Ready":"Paused",11);
-            statusBadge.setTypeface(AgentStyle.font(this),Typeface.BOLD);
-            statusBadge.setPadding(dp(8),dp(2),dp(8),dp(2));
-            int badgeColor=active?0x33F59E0B:enabled?0x3310B981:0x3364748B;
-            statusBadge.setBackground(AgentStyle.surface(this,badgeColor,10,false));
-            title.addView(statusBadge);
             copy.addView(title);
             
             JSONObject last=bot.optJSONObject("lastMessage");
@@ -540,6 +527,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             card.addView(item);
             card.setOnClickListener(v->open(bot.optString("id")));
             list.addView(card);
+            View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
+            LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(68),0,dp(8),0);list.addView(divider,rule);
         }
     }
     public void copyConversation(){
