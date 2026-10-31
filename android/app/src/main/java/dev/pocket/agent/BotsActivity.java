@@ -903,7 +903,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             for(int i=0;i<list.length();i++){
                 JSONObject c=list.optJSONObject(i);
                 button(form,c.optString("name")+" · "+c.optString("transport"),() -> new AlertDialog.Builder(this).setTitle(c.optString("name")).setItems(new String[]{"Sign in with OAuth","Test connection","Edit","Remove"},(d,n) -> {
-                    if(n==0)request("POST","/connectors/"+c.optString("id")+"/oauth/start",json(),r->openUrl(((JSONObject)r).optString("authorizationUrl")));
+                    if(n==0)request("POST","/connectors/"+c.optString("id")+"/oauth/start",json(),r->{JSONObject auth=(JSONObject)r;String url=auth.optString("authorizationUrl");if(!url.isEmpty())openUrl(url);else if("authorized".equals(auth.optString("status")))Toast.makeText(this,"Already signed in. Test the connection to load its tools.",Toast.LENGTH_LONG).show();else throw new IllegalStateException("The connector did not provide a sign-in link.");});
                     if(n==1)request("POST","/connectors/"+c.optString("id")+"/test",json(),r -> new AlertDialog.Builder(this).setTitle("Connected").setMessage(((JSONObject)r).optJSONArray("tools").length()+" tools available").setPositiveButton("OK",null).show());
                     if(n==2)connectionForm(c);
                     if(n==3)request("DELETE","/connectors/"+c.optString("id"),null,r -> {refresh(false);});
