@@ -106,8 +106,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
     private void showScreen(String next){if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
-        workspace.stop();dockOverlay=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),dp(8));
-        page.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),dp(8)+insets.getSystemWindowInsetBottom());if(dockOverlay!=null){FrameLayout.LayoutParams dockParams=(FrameLayout.LayoutParams)dockOverlay.getLayoutParams();dockParams.bottomMargin=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();dockOverlay.setLayoutParams(dockParams);}return insets.consumeSystemWindowInsets();});
+        workspace.stop();dockOverlay=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
+        page.setOnApplyWindowInsetsListener((v,insets)->{int navigation=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();int bottom=selected.isEmpty()?Math.max(0,insets.getSystemWindowInsetBottom()-navigation):dp(8)+insets.getSystemWindowInsetBottom();v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),bottom);positionDock(navigation);return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
         boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
@@ -249,7 +249,12 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             if(index==2){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
             if(index==3)showScreen("Settings");
         }),new FrameLayout.LayoutParams(-1,dp(78),Gravity.BOTTOM));
-        FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(-1,dp(112),Gravity.BOTTOM);WindowInsets insets=root.getRootWindowInsets();if(insets!=null)position.bottomMargin=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();root.addView(dockOverlay,position);
+        FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(-1,dp(112),Gravity.BOTTOM);root.addView(dockOverlay,position);WindowInsets insets=root.getRootWindowInsets();if(insets!=null)positionDock(Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom());
+    }
+    private void positionDock(int navigation){
+        if(dockOverlay==null||dockOverlay.getLayoutParams()==null)return;
+        FrameLayout.LayoutParams frame=(FrameLayout.LayoutParams)dockOverlay.getLayoutParams();frame.height=dp(112)+navigation;frame.bottomMargin=0;dockOverlay.setLayoutParams(frame);
+        View bar=dockOverlay.getChildAt(1);if(bar!=null){FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)bar.getLayoutParams();position.bottomMargin=navigation;bar.setLayoutParams(position);}
     }
     private void newConversation(){
         ModernSheet.newConversation(this,()->editBot(null),this::createGroup);
