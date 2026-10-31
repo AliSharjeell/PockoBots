@@ -31,7 +31,7 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
         drawRect(Brush.linearGradient(when {
             primary -> listOf(Color(0xFF005DD6), Color(0xFF168CFF), Color(0xFF0063DE))
             dark -> listOf(Color(0xFF171719), Color(0xFF202022), Color(0xFF141416))
-            else -> listOf(Color(0xFF6B6B6E), Color(0xFF555558), Color(0xFF626265))
+            else -> listOf(Color(0xFFF4F4F5), Color(0xFFFFFFFF), Color(0xFFE4E4E7))
         }))
     }
     this.drawBackdrop(
@@ -53,7 +53,7 @@ object GlassControls {
     fun wrap(content: View, corner: Float, primary: Boolean): View {
         val outerParams = content.layoutParams
         content.background = null
-        if (content is AgentIcon) content.setIconTint(android.graphics.Color.WHITE)
+        if (content is AgentIcon) content.setIconTint(if (primary) android.graphics.Color.WHITE else AgentStyle.TEXT)
         return GlassControlFrame(content, corner, primary).apply { if (outerParams != null) layoutParams = outerParams }
     }
 }

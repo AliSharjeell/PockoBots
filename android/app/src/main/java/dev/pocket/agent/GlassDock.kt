@@ -90,14 +90,14 @@ fun GlassDockBar(
                 val tabActiveBg by animateColorAsState(
                     targetValue = when {
                         selected && dark -> Color.White.copy(alpha = 0.09f)
-                        selected && !dark -> Color.White.copy(alpha = 0.18f)
+                        selected && !dark -> Color(0xFF18181B).copy(alpha = 0.06f)
                         else -> Color.Transparent
                     },
                     animationSpec = tween(durationMillis = 200),
                     label = "tabBg"
                 )
 
-                val contentTint = Color.White
+                val contentTint = if (dark) Color.White else Color(0xFF18181B)
 
                 Box(
                     modifier = Modifier

@@ -131,7 +131,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 chip.setBackground(AgentStyle.surface(this,accent(bot.optString("accent")),10,false));avatar=chip;
             }
             identity.addView(avatar,new LinearLayout.LayoutParams(dp(28),dp(28)));
-            TextView name=text(bot.optString("name"),17);name.setTextColor(0xffffffff);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
+            TextView name=text(bot.optString("name"),17);name.setTextColor(AgentStyle.TEXT);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);header.addView(GlassControls.wrap(identity,24f,false),new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         }else{
@@ -197,7 +197,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
         composer=new EditText(this);
         AgentStyle.input(composer);
-        composer.setBackgroundColor(android.graphics.Color.TRANSPARENT);composer.setTextColor(0xffffffff);composer.setHintTextColor(0xb3ffffff);
+        composer.setBackgroundColor(android.graphics.Color.TRANSPARENT);composer.setTextColor(AgentStyle.TEXT);composer.setHintTextColor(AgentStyle.MUTED);
         String botHint=detail!=null&&detail.optJSONObject("bot")!=null?detail.optJSONObject("bot").optString("name"):"bot";
         composer.setHint("Message "+botHint+"...");
         composer.setMaxLines(5);

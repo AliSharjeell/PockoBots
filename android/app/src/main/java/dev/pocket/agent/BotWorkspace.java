@@ -25,7 +25,7 @@ final class BotWorkspace {
     void show(LinearLayout parent,String tab,String id){stop();body=parent;body.removeAllViews();project=id;screen=tab;if(tab.equals("Terminal"))terminal();else if(tab.equals("Files"))files();else if(tab.equals("Settings"))settingsHome();else if(tab.equals("BYOK"))settings();else if(tab.equals("Subscriptions"))subscriptions();else if(tab.equals("Connections"))connectionsPage();else if(tab.equals("Permissions"))app.permissionSettings(scrolling());else if(tab.equals("Servers"))servers();}
     private String scope(){return project.isEmpty()?"root":project;}
     private void terminalButton(LinearLayout parent,String label,Runnable action){
-        Button key=button(parent,label,action);key.setTextColor(0xffffffff);parent.removeView(key);parent.addView(GlassControls.wrap(key,22f,false));
+        Button key=button(parent,label,action);key.setTextColor(AgentStyle.TEXT);parent.removeView(key);parent.addView(GlassControls.wrap(key,22f,false));
     }
     private void terminal(){
         final int epoch=generation;final String key="shell-"+scope();terminalId=app.getSharedPreferences("bot-tools",0).getString(key,"");
