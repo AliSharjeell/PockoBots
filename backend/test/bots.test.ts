@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createApp } from "../src/server.js";
@@ -112,4 +112,10 @@ test("unified bot defaults are unlimited and migrate existing profiles without l
  await bots.close();const data:any=await store.read("bots",{});delete data.schema;data.bots[0].kind="phone";data.bots[0].dailyLimit=24;data.bots[0].allowShell=false;await store.write("bots",data);
  bots=make();await bots.init();const migrated=bots.get(bot.id);assert.equal(migrated.kind,"unified");assert.equal(migrated.projectId,bot.projectId);assert.equal(migrated.sessionId,bot.sessionId);assert.equal(migrated.allowShell,true);assert.equal(migrated.dailyLimit,0);assert.equal(bots.state(bot.id).messages.length>0,true);
  }finally{await bots.close();await rm(root,{recursive:true,force:true});}
+});
+
+test("clearing a bot conversation preserves its workspace and rejects pending work",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"pocko-clear-chat-"));const runtime=await createApp({stateDir:join(root,"state"),workspace:join(root,"projects")});
+ try{await runtime.bots.engine(false);const bot=await runtime.bots.create({name:"Archive test"});const file=join(root,"projects","bot-"+bot.id.slice(0,8),"keep.txt");await writeFile(file,"Keep my project");const job=await runtime.bots.enqueue(bot.id,"Do this later");await assert.rejects(runtime.bots.clearMessages(bot.id),/pending tasks/);assert.equal(runtime.bots.state(bot.id).messages.length,2);await runtime.bots.cancel(bot.id,job.id);await runtime.bots.clearMessages(bot.id);assert.equal(runtime.bots.state(bot.id).messages.length,0);assert.equal(runtime.sessions.state(bot.sessionId).messages.length,0);assert.equal(await readFile(file,"utf8"),"Keep my project");const persisted=JSON.parse(await readFile(join(root,"state","bots.json"),"utf8"));assert.equal(persisted.messages.length,0);assert.equal(runtime.bots.get(bot.id).projectId,bot.projectId);}
+ finally{await runtime.close();await rm(root,{recursive:true,force:true});}
 });

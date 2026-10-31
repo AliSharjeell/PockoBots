@@ -91,6 +91,14 @@ export class Sessions {
     await this.persist();
     return s;
   }
+  async clearMessages(id: string) {
+    this.state(id);
+    if (this.busy.has(id)) throw Error("Stop the active agent first");
+    this.records.get(id)!.messages = [];
+    this.agents.delete(id);
+    this.cliStreaming.delete(id);
+    await this.persist();
+  }
   async remove(id: string) {
     if (this.busy.has(id)) throw Error("Stop the active agent first");
     this.records.delete(id);

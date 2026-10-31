@@ -75,6 +75,15 @@ export class Bots {
       nextWake: Date.now() + b.intervalMinutes * 60000, dailyLimit: b.dailyLimit, day: "", runs: 0, created: Date.now() };
     this.records.push(bot); this.message(id, "system", `${bot.name} is ready. I can code, use your phone and browser, and work in my own workspace.`); await this.changed(); return bot;
   }
+  async clearMessages(id: string) {
+    const bot = this.get(id);
+    if (this.sessions.state(bot.sessionId).busy || this.jobs.some(j => j.botId === id && ["queued", "arming", "running", "waiting", "paused"].includes(j.status)))
+      throw Error("Finish or cancel this bot's pending tasks before clearing messages");
+    const clearing = this.sessions.clearMessages(bot.sessionId);
+    this.messages = this.messages.filter(message => message.botId !== id);
+    await clearing;
+    await this.changed();
+  }
   async update(id: string, input: any) {
     const bot = this.get(id); if (this.jobs.some(j => j.botId === id && ["running", "arming", "waiting"].includes(j.status))) throw Error("Pause this bot before changing its role or connections");
     const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), avatar: b.avatar, accent: b.accent, personality: this.redact(b.personality), role: b.role, connectors: b.connectors, allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
