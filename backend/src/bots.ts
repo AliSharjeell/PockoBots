@@ -1,3 +1,4 @@
+import {researchTools} from "./research-tools.js";
 import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import type { Store } from "./storage.js";
@@ -138,7 +139,7 @@ export class Bots {
   phoneRequest() { if (!this.enabled) return null; const j = this.jobs.find(j => (j.status === "arming" || j.phoneArming) && ["arming", "running", "waiting"].includes(j.status) && this.get(j.botId).enabled); return j ? { taskId: j.phoneTaskId || j.mobileTaskId, botName: this.get(j.botId).name } : null; }
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
-    const tools = await this.connectors.tools(bot.connectors);
+    const tools = [...await this.connectors.tools(bot.connectors),...researchTools(()=>this.store.read("device-location",{enabled:false}))];
     tools.push({ name: "notify_user", label: "Notify the owner", description: "Send a bot notification. Urgent rings like a local incoming call and reads the message after the owner answers, if this bot has permission. Use urgent only for important time-sensitive issues requested by the owner; never ring repeatedly.", parameters: Type.Object({ text: Type.String({ maxLength: 4000 }), urgent: Type.Optional(Type.Boolean()) }), execute: async (_id, p: any) => { const alert = await this.alert(bot.id, p.text, p.urgent === true); return { content: [{ type: "text", text: "Alert queued on this phone: " + alert.id }], details: {} }; } });
     tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
