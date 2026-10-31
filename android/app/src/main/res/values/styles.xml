@@ -8,5 +8,9 @@
         <item name="android:windowBackground">#09090B</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+    <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
     <style name="AppTheme" parent="AppThemeBase" />
 </resources>

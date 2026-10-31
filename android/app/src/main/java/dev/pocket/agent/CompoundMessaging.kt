@@ -105,7 +105,7 @@ object CompoundMessaging {
                         this.text = initial
                         setTextColor(0xFFFFFFFF.toInt())
                         textSize = 12f
-                        typeface = Typeface.DEFAULT_BOLD
+                        typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
                         gravity = Gravity.CENTER
                         background = GradientDrawable().apply {
                             shape = GradientDrawable.OVAL
@@ -133,7 +133,7 @@ object CompoundMessaging {
             val nameView = TextView(ctx).apply {
                 this.text = botName
                 textSize = 11f
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
                 setTextColor(if (isDark) 0xFFA1A1AA.toInt() else 0xFF71717A.toInt())
                 setPadding(dp(ctx, 12), 0, dp(ctx, 12), dp(ctx, 3))
             }
@@ -172,6 +172,7 @@ object CompoundMessaging {
         // Message text
         val messageText = TextView(ctx).apply {
             textSize = 14f
+            typeface = AgentStyle.font(ctx)
             if (isUser) {
                 setTextColor(0xFFFFFFFF.toInt())
                 this.text = text
@@ -190,6 +191,7 @@ object CompoundMessaging {
         }
 
         val timeView = TextView(ctx).apply {
+            typeface = AgentStyle.font(ctx)
             this.text = timeFormat.format(Date(timestamp))
             textSize = 10f
             if (isUser) {
@@ -205,7 +207,7 @@ object CompoundMessaging {
                 this.text = " ✓✓"
                 textSize = 10f
                 setTextColor(0xCCFFFFFF.toInt())
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
             }
             metaRow.addView(checkView)
         }
@@ -301,7 +303,7 @@ object CompoundMessaging {
         val btnReply = TextView(ctx).apply {
             this.text = "↩  Reply"
             textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
             setTextColor(0xFF007AFF.toInt())
             setPadding(dp(ctx, 16), dp(ctx, 8), dp(ctx, 16), dp(ctx, 8))
             isClickable = true
@@ -315,7 +317,7 @@ object CompoundMessaging {
         val btnCopy = TextView(ctx).apply {
             this.text = "📋  Copy"
             textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = Typeface.create(AgentStyle.font(ctx), Typeface.BOLD)
             setTextColor(if (isDark) 0xFFD4D4D8.toInt() else 0xFF3F3F46.toInt())
             setPadding(dp(ctx, 16), dp(ctx, 8), dp(ctx, 16), dp(ctx, 8))
             isClickable = true
