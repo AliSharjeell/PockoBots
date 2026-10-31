@@ -24,6 +24,18 @@ account. Live subscription logins, Google Workspace OAuth, arbitrary hidden
 LinkedIn/Instagram sessions and physical ARM64 devices remain unverified.
 
 
+Both v0.6 debug APKs build and pass APK signature verification. Each APK contains
+only its selected native ABI and runtime archive. The regular x86_64 app was
+updated with adb install -r, its existing bot/avatar remained visible, and its
+packaged runtime reached the inbox without a setup error. The QA packages were
+removed after screenshots and probe results were collected. No app-data reset
+or emulator wipe was used. Connect a real model in Settings before real tasks.
+
+| Local artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| pockobots-v0.6.0-x86_64-debug.apk | 289706294 | 438671fa53f16e0f09dea5a0995d163060bbbc7d377646ac1bab34778d2a8db8 |
+| pockobots-v0.6.0-arm64-debug.apk | 269385025 | b174330c27c0c322b8194055236a3b6e50b245d383bcba932adf4e12a3ef7737 |
+
 ## Unified bots v0.5.0 - 2026-10-28
 
 All 20 backend tests pass under Linux Node 22.23.3. New coverage verifies one
