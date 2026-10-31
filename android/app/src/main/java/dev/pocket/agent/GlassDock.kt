@@ -109,7 +109,7 @@ fun GlassDockBar(
                             if (selected && dark) {
                                 Modifier.border(
                                     width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.10f),
+                                    color = Color.White.copy(alpha = 0.04f),
                                     shape = RoundedCornerShape(26.dp)
                                 )
                             } else Modifier

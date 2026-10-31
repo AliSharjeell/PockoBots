@@ -41,8 +41,8 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
         onDrawSurface = { drawRect(Color.White.copy(alpha = (if (dark) .035f else .12f) + highlight)) }
     ).border(
         1.dp,
-        Brush.verticalGradient(if (dark) listOf(Color.White.copy(alpha = .14f), Color.White.copy(alpha = .05f))
-            else listOf(Color.White.copy(alpha = .35f), Color(0xFFDDE3EC).copy(alpha = .2f))),
+        Brush.verticalGradient(if (dark) listOf(Color.White.copy(alpha = .06f), Color.White.copy(alpha = .02f))
+            else listOf(Color.White.copy(alpha = .16f), Color(0xFFDDE3EC).copy(alpha = .08f))),
         RoundedCornerShape(corner)
     )
 }
