@@ -76,7 +76,7 @@ fun GlassDockBar(
                 .widthIn(max = if (compact) 216.dp else 300.dp)
                 .fillMaxWidth()
                 .shadow(
-                    elevation = if (compact) 6.dp else if (dark) 16.dp else 8.dp,
+                    elevation = if (!dark) 0.dp else if (compact) 6.dp else 16.dp,
                     shape = RoundedCornerShape(32.dp),
                     spotColor = if (dark) Color(0xFF000000) else Color(0x33000000)
                 )

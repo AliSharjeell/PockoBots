@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
@@ -34,10 +35,10 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
             else -> listOf(Color(0xFFF4F4F5), Color(0xFFFFFFFF), Color(0xFFE4E4E7))
         }))
     }
-    this.drawBackdrop(
+    this.clip(RoundedCornerShape(corner)).drawBackdrop(
         backdrop = backdrop,
         shape = { RoundedCornerShape(corner) },
-        effects = { blur(10.dp.toPx()); lens(18.dp.toPx(), 26.dp.toPx()) },
+        effects = { blur(10.dp.toPx()); lens((if (dark) 18.dp else 8.dp).toPx(), (if (dark) 26.dp else 12.dp).toPx()) },
         onDrawSurface = { drawRect(Color.White.copy(alpha = (if (dark) .035f else .12f) + highlight)) }
     ).border(
         1.dp,
@@ -53,6 +54,9 @@ object GlassControls {
     fun wrap(content: View, corner: Float, primary: Boolean): View {
         val outerParams = content.layoutParams
         content.background = null
+        content.elevation = 0f
+        content.translationZ = 0f
+        content.stateListAnimator = null
         if (content is AgentIcon) content.setIconTint(if (primary) android.graphics.Color.WHITE else AgentStyle.TEXT)
         return GlassControlFrame(content, corner, primary).apply { if (outerParams != null) layoutParams = outerParams }
     }
@@ -67,6 +71,9 @@ private class GlassControlFrame(content: View, corner: Float, primary: Boolean) 
         setContent { Box(Modifier.fillMaxSize().pockoGlass(AgentStyle.dark, corner.dp, primary, pressed.value)) }
     }
     init {
+        elevation = 0f
+        translationZ = 0f
+        stateListAnimator = null
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         // A zero-sized layout param keeps the decorative layer out of wrap-content sizing.
         addView(glass, LayoutParams(0, 0))
