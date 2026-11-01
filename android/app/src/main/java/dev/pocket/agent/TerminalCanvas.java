@@ -63,6 +63,7 @@ final class TerminalCanvas extends View {
     int rows() { return emulator.mRows; }
     void latchControl(boolean value) { control=value; }
     private void sendKeyboard(String text) {
+        topRow=0;invalidate();
         if(control&&!text.isEmpty()) {
             control=false;input.controlUsed();char first=text.charAt(0);
             if(first=='?')first=127;else if(first>='@'&&first<='_'||first>='a'&&first<='z')first=(char)(first&31);
@@ -87,7 +88,7 @@ final class TerminalCanvas extends View {
             int delta = (int)((touchY - event.getY()) / cellHeight);
             if (delta != 0) {
                 topRow = Math.max(-emulator.getScreen().getActiveTranscriptRows(), Math.min(0, topRow + delta));
-                touchY = event.getY(); dragged = true; invalidate();
+                touchY = event.getY(); dragged = true;cancelLongPress(); invalidate();
             }
         }
         // Let View dispatch taps and long presses, including transcript copying.
@@ -122,6 +123,7 @@ final class TerminalCanvas extends View {
     }
     @Override public boolean onKeyDown(int code, KeyEvent event) {
         if (code == KeyEvent.KEYCODE_BACK) return super.onKeyDown(code, event);
+        topRow=0;invalidate();
         boolean ctrl=control||event.isCtrlPressed();if(control){control=false;input.controlUsed();}
         int mods = (ctrl ? KeyHandler.KEYMOD_CTRL : 0) | (event.isAltPressed() ? KeyHandler.KEYMOD_ALT : 0) | (event.isShiftPressed() ? KeyHandler.KEYMOD_SHIFT : 0);
         String sequence = KeyHandler.getCode(code, mods, emulator.isCursorKeysApplicationMode(), emulator.isKeypadApplicationMode());
@@ -134,6 +136,7 @@ final class TerminalCanvas extends View {
         return super.onKeyDown(code, event);
     }
     void paste() {
+        topRow=0;invalidate();
         ClipboardManager clipboard = getContext().getSystemService(ClipboardManager.class);
         if (clipboard.hasPrimaryClip()) emulator.paste(clipboard.getPrimaryClip().getItemAt(0).coerceToText(getContext()).toString());
     }
