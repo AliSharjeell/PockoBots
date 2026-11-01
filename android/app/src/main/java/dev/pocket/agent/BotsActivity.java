@@ -20,8 +20,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private AgentApi api;private JSONObject state=new JSONObject(),detail;private String selected="",screen="Chat",draft="",signature="";
     private LinearLayout page,body,thread,replyBanner,homeResults;private FrameLayout root,dockOverlay;private EditText composer;private ChatScrollView chatScroll;private boolean visible,polling,follow=true;
     private String replyQuote="",homeSearchQuery="",pendingRead="";
-    private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;private AgentIcon composerAction;private boolean chatBusy;private JSONObject currentJob;
-    private android.graphics.Rect conversationOrigin;private int conversationMotion;private String returningBot="",originBot="";private int pendingMotion=0,navigationEpoch=0;private boolean animatePage;private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
+    private final ArrayList<String> messageRows=new ArrayList<>();private View jumpToLatest;private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;private AgentIcon composerAction;private boolean chatBusy;private JSONObject currentJob;
+    private int pendingMotion=0,navigationEpoch=0;private boolean animatePage;private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
     interface Result {void done(Object value)throws Exception;}
     void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
         if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){failed.accept(e.getMessage());}});}catch(Exception e){main.post(()->{if(!isDestroyed())failed.accept(e.getMessage());});}});
@@ -41,7 +41,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     void requestQuiet(String method,String path,JSONObject data,Result done,Runnable failed){requestQuiet(method,path,data,done,failed,false);}
     private void requestQuiet(String method,String path,JSONObject data,Result done,Runnable failed,boolean showError){if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){android.util.Log.e("POCKET_AGENT","done callback error",e);error(e);}});}catch(Exception e){android.util.Log.e("POCKET_AGENT","request error: "+method+" "+path,e);main.post(()->{if(!isDestroyed()){failed.run();if(showError)error(e);}});}});}
     void terminalInput(String id,JSONObject data){AgentApi connection=api;if(connection==null)return;inputs.execute(()->{try{connection.request("POST","/terminals/"+id+"/input",data);}catch(Exception e){android.util.Log.w("POCKET_AGENT","Terminal input unavailable; keeping the active shell view");}});}
-    void error(Exception e){new AlertDialog.Builder(this).setTitle("PockoBots").setMessage(e.getMessage()).setPositiveButton("OK",null).show();}
+    void error(Exception e){AgentSheet.message(this,"PockoBots",e.getMessage());}
     void openUrl(String url){try{Uri parsed=Uri.parse(url);if(!Arrays.asList("http","https").contains(parsed.getScheme()))throw new IllegalArgumentException("Use an HTTP or HTTPS link");startActivity(new Intent(Intent.ACTION_VIEW,parsed));}catch(Exception e){error(e);}}
     private void showLoadingScreen(String subtitle){
         FrameLayout loading=new FrameLayout(this);
@@ -91,7 +91,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
-    private void open(String id){conversationMotion=0;animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
+    private void open(String id){animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
@@ -101,9 +101,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
 
     private void showScreen(String next){pendingMotion=0;animatePage=!(next.equals("Chat")&&selected.isEmpty());if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
-        FrameLayout previousPage=root;int morph=conversationMotion;conversationMotion=0;if(previousPage!=null)for(int i=previousPage.getChildCount()-1;i>=0;i--)if(previousPage.getChildAt(i) instanceof LoadingSkeleton)previousPage.removeViewAt(i);
         navigationEpoch++;if(animatePage){UiMotion.change(findViewById(android.R.id.content),pendingMotion);animatePage=false;}
-        workspace.stop();dockOverlay=null;headerAvatar=null;composerAction=null;chatBusy=false;currentJob=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
+        workspace.stop();messageRows.clear();jumpToLatest=null;dockOverlay=null;headerAvatar=null;composerAction=null;chatBusy=false;currentJob=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
         page.setOnApplyWindowInsetsListener((v,insets)->{int navigation=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();int bottom=selected.isEmpty()?Math.max(0,insets.getSystemWindowInsetBottom()-navigation):dp(8)+insets.getSystemWindowInsetBottom();v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),bottom);positionDock(navigation);return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
@@ -142,11 +141,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             workspaceTabs=GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index]));page.addView(workspaceTabs,new LinearLayout.LayoutParams(-1,dp(60)));
         }
 
-        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);ViewGroup window=findViewById(android.R.id.content);if(morph!=0&&previousPage!=null&&previousPage.getParent()==window)UiMotion.conversation(window,previousPage,root,conversationOrigin,morph<0,"bot-row-"+returningBot);else setContentView(root);
+        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
         if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,"");if(selected.isEmpty())dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
-        chatScroll=new ChatScrollView(this,atEnd->{follow=atEnd;if(atEnd)markChatRead();});thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
+        chatScroll=new ChatScrollView(this,atEnd->{follow=atEnd;if(jumpToLatest!=null)jumpToLatest.setVisibility(atEnd?View.GONE:View.VISIBLE);if(atEnd)markChatRead();});thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
 
         
         // Cupertino Telegram ChatBottomBar matching 6xingyv/compound
@@ -216,8 +215,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         FrameLayout top=new FrameLayout(this);top.setBackground(edgeFade(true));LinearLayout controls=column();controls.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));if(tabs!=null)controls.addView(tabs,new LinearLayout.LayoutParams(-1,dp(60)));top.addView(controls,new FrameLayout.LayoutParams(-1,-2));viewport.addView(top,new FrameLayout.LayoutParams(-1,controlsHeight+dp(24),Gravity.TOP));
         LinearLayout bottomShade=column();bottomShade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);View feather=new View(this);feather.setBackground(edgeFade(false));bottomShade.addView(feather,new LinearLayout.LayoutParams(-1,0));View below=new View(this);below.setBackgroundColor((AgentStyle.BACK&0x00ffffff)|0x88000000);bottomShade.addView(below,new LinearLayout.LayoutParams(-1,0));viewport.addView(bottomShade,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         input.setPadding(dp(12),dp(16),dp(12),dp(4));input.setBackground(null);viewport.addView(input,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        AgentIcon down=new AgentIcon(this,"down","Jump to latest message",()->chatScroll.latest());View jump=GlassControls.wrap(down,24f,false);jumpToLatest=jump;jump.setVisibility(follow?View.GONE:View.VISIBLE);FrameLayout.LayoutParams jumpPosition=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);viewport.addView(jump,jumpPosition);
         int[] safe={controlsHeight+dp(8),0};
-        Runnable updatePadding=()->{if(feather.getLayoutParams().height!=input.getHeight())feather.setLayoutParams(new LinearLayout.LayoutParams(-1,input.getHeight()));if(below.getLayoutParams().height!=safe[1])below.setLayoutParams(new LinearLayout.LayoutParams(-1,safe[1]));int bottom=input.getHeight()+safe[1]+dp(8);if(scroll.getPaddingTop()!=safe[0]||scroll.getPaddingBottom()!=bottom){boolean atEnd=follow;scroll.setPadding(0,safe[0],0,bottom);if(atEnd)scroll.requestLayout();}};
+        Runnable updatePadding=()->{if(feather.getLayoutParams().height!=input.getHeight())feather.setLayoutParams(new LinearLayout.LayoutParams(-1,input.getHeight()));if(below.getLayoutParams().height!=safe[1])below.setLayoutParams(new LinearLayout.LayoutParams(-1,safe[1]));int bottom=input.getHeight()+safe[1]+dp(8);FrameLayout.LayoutParams jumpParams=(FrameLayout.LayoutParams)jump.getLayoutParams();if(jumpParams.bottomMargin!=bottom+dp(8)){jumpParams.bottomMargin=bottom+dp(8);jump.setLayoutParams(jumpParams);}if(scroll.getPaddingTop()!=safe[0]||scroll.getPaddingBottom()!=bottom){boolean atEnd=follow;scroll.setPadding(0,safe[0],0,bottom);if(atEnd)scroll.requestLayout();}};
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(viewport,(view,insets)->{
             androidx.core.graphics.Insets bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()|androidx.core.view.WindowInsetsCompat.Type.displayCutout());int bottom=Math.max(bars.bottom,insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom);
             FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controls.getLayoutParams();position.leftMargin=dp(12)+bars.left;position.rightMargin=dp(12)+bars.right;position.topMargin=bars.top+dp(8);controls.setLayoutParams(position);
@@ -424,9 +424,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void renderThread(){
         if(thread==null||detail==null||!screen.equals("Chat"))return;
-        chatScroll.beginUpdate();thread.removeAllViews();
+        chatScroll.beginUpdate();
         JSONObject bot=detail.optJSONObject("bot");JSONArray messages=detail.optJSONArray("messages");
-        for(int i=0;i<messages.length();i++){
+        ArrayList<String> nextRows=new ArrayList<>();for(int i=0;i<messages.length();i++)nextRows.add(messages.optJSONObject(i).toString()+"|"+(i>0?messages.optJSONObject(i-1).optString("role"):"")+"|"+(i+1<messages.length()?messages.optJSONObject(i+1).optString("role"):"")+"|"+bot.optString("avatar")+"|"+bot.optString("accent"));
+        int stable=0;while(stable<messageRows.size()&&stable<nextRows.size()&&stable<thread.getChildCount()&&messageRows.get(stable).equals(nextRows.get(stable)))stable++;if(thread.getChildCount()>stable)thread.removeViews(stable,thread.getChildCount()-stable);messageRows.clear();messageRows.addAll(nextRows);
+        for(int i=stable;i<messages.length();i++){
             JSONObject message=messages.optJSONObject(i);
             boolean welcome=i==0&&message.optString("role").equals("system")&&message.optString("jobId").isEmpty();
             if(message.optString("role").equals("system")&&!welcome){

@@ -19,11 +19,11 @@ final class ChatScrollView extends ScrollView {
         scrollTo(0,following?end():position);updating=false;layingOut=false;
         if(following)this.changed.accept(true);
     }
-    @Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);if(userScrolling&&!layingOut&&!updating){following=y>=end()-AgentStyle.dp(getContext(),24);changed.accept(following);}}
+    @Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);if(userScrolling&&!layingOut){if(updating)savedY=y;following=y>=end()-1;changed.accept(following);}}
     @Override public boolean onInterceptTouchEvent(MotionEvent event){
         if(event.getActionMasked()==MotionEvent.ACTION_DOWN){downY=event.getY();userScrolling=false;}
         if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&Math.abs(event.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()){
-            userScrolling=true;updating=false;if(event.getY()>downY){following=false;changed.accept(false);}
+            userScrolling=true;if(updating)savedY=getScrollY();if(event.getY()>downY&&end()>0){following=false;changed.accept(false);}
         }
         return super.onInterceptTouchEvent(event);
     }
