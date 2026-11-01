@@ -165,7 +165,7 @@ This mode uses a separate QA package and excludes the Linux runtime assets. Its
 host never starts the runtime or loads account data. The test skips the owner's
 normal package and exercises seven navigation/theme replacements with real
 Compose glass controls, checking their lifecycle and saved-state owners. It also
-checks opening/closing the conversation transform, pinning streamed chat text,
+checks pinning streamed chat text, near-bottom manual scrolling,
 manual chat history and terminal scrollback through empty/incremental polls.
 `uiRegressionOnly` is rejected unless `qaInstall` is also supplied. Build again
 without either property before installing the normal app.

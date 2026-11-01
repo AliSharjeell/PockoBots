@@ -10,6 +10,15 @@ import static org.junit.Assert.*;
 
 public class ConversationViewportTest {
     private Activity host(android.app.Instrumentation inst){String app=inst.getTargetContext().getPackageName();org.junit.Assume.assumeTrue(app.endsWith(".qa"));return inst.startActivitySync(new Intent().setClassName(app,"dev.pocket.agent.UiMotionRegressionActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
+    @Test public void aSmallManualScrollAndMovementDuringStreamingAreNeverOverwritten() throws Exception {
+        android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();Activity activity=host(inst);ChatScrollView[] scroll={null};TextView[] text={null};int[] expected={0};
+        try{
+            inst.runOnMainSync(()->{scroll[0]=new ChatScrollView(activity,value->{});text[0]=new TextView(activity);text[0].setHeight(9000);scroll[0].addView(text[0]);activity.setContentView(scroll[0]);});inst.waitForIdleSync();Thread.sleep(180);
+            inst.runOnMainSync(()->{long t=android.os.SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(t,t,0,100,100,0),move=MotionEvent.obtain(t,t+50,2,100,300,0);scroll[0].onInterceptTouchEvent(down);scroll[0].onInterceptTouchEvent(move);down.recycle();move.recycle();scroll[0].scrollTo(0,scroll[0].getScrollY()-8);assertFalse("Even eight pixels above the end is history",scroll[0].isFollowing());scroll[0].beginUpdate();text[0].setHeight(9600);scroll[0].scrollBy(0,-30);expected[0]=scroll[0].getScrollY();scroll[0].finishUpdate();});inst.waitForIdleSync();Thread.sleep(180);
+            inst.runOnMainSync(()->{assertEquals("Preserve finger movement after the stream snapshot",expected[0],scroll[0].getScrollY());assertFalse(scroll[0].isFollowing());scroll[0].latest();});inst.waitForIdleSync();Thread.sleep(180);
+            inst.runOnMainSync(()->{assertTrue(scroll[0].isFollowing());assertEquals(text[0].getHeight()-scroll[0].getHeight(),scroll[0].getScrollY());});
+        }finally{inst.runOnMainSync(activity::finish);}
+    }
     @Test public void chatStartsAtEndFollowsStreamingAndPreservesManualHistoryPosition() throws Exception {
         android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();Activity activity=host(inst);ChatScrollView[] scroll={null};LinearLayout[] thread={null};
         try{

@@ -46,7 +46,7 @@ test("bots keep FIFO inboxes, isolate roles, run selected MCP tools and restore 
     const done=await until(()=>call("GET",`/bots/${alpha.id}`),s=>s.jobs.length===2&&s.jobs.every((j:any)=>j.status==="completed"));assert.equal(done.messages.filter((m:any)=>m.role==="assistant").length,2);assert.ok(calls>=1);
     assert.deepEqual(done.jobs.map((j:any)=>j.text),["First task","Second task"]);
     await until(()=>call("GET",`/bots/${beta.id}`),s=>s.jobs[0]?.status==="completed");
-    const betaRequest=prompts.find(p=>p.messages.some((m:any)=>String(m.content).includes("BETA_ROLE")));assert.ok(betaRequest);assert.ok(!betaRequest.tools.some((t:any)=>t.function.name.startsWith("mcp_")));
+    const betaRequest=prompts.find(p=>p.messages.some((m:any)=>String(m.content).includes("BETA_ROLE")));assert.ok(betaRequest);assert.ok(!betaRequest.tools.some((t:any)=>t.function.name.startsWith("mcp_")));assert.ok(betaRequest.messages.some((m:any)=>String(m.content).includes('Project directory: '+join(root,'workspace'))));
     await call("POST",`/bots/${alpha.id}/pause`,{});await call("POST",`/bots/${alpha.id}/messages`,{text:"Keep queued during pause"});await runtime.bots.tick();assert.equal((await call("GET",`/bots/${alpha.id}`)).jobs.at(-1).status,"queued");
     assert.ok((await readFile(join(root,"state/bots.json"),"utf8")).includes("Keep queued during pause"));
     await call("PUT","/bots/engine",{enabled:false});assert.equal((await call("GET","/bots")).enabled,false);

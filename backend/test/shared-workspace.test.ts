@@ -12,6 +12,8 @@ test('bots share files without relocating private projects and conflicting edits
  try{
   const privateProject=await projects.create('private-bot');await (await projects.workspace(privateProject.id)).write('keep.txt','private');
   const a=sharedWorkspaceTool(projects,async()=>{}),b=sharedWorkspaceTool(projects,async()=>{});
+  const info=await a.execute('info',{action:'info'});assert.equal(JSON.parse((info.content[0] as any).text).path,workspace.root);
+  const existing=await b.execute('existing',{action:'read',path:'private-bot/keep.txt'});assert.equal(JSON.parse((existing.content[0] as any).text).content,'private');
   await a.execute('a',{action:'write',path:'joint/index.html',content:'initial\n'});
   const read=await b.execute('b',{action:'read',path:'joint/index.html'});const value=JSON.parse((read.content[0] as any).text);assert.equal(value.content,'initial\n');
   const edits=await Promise.allSettled([a.execute('a',{action:'write',path:'joint/index.html',content:'first\n',expectedRevision:value.revision}),b.execute('b',{action:'write',path:'joint/index.html',content:'second\n',expectedRevision:value.revision})]);assert.equal(edits.filter(e=>e.status==='fulfilled').length,1);assert.equal(edits.filter(e=>e.status==='rejected').length,1);

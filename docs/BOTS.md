@@ -93,16 +93,15 @@ See [OpenBot research](OPENBOT_RESEARCH.md) for the inspected reference and orig
 implementation's license boundary.
 
 
-## Shared projects
+## One filesystem for every bot
 
-Every bot can use the same `/workspace/shared` directory on Android. In a bot's
-Files tab, tap **Shared** to browse or edit it; **Bot files** returns to that
-bot's private workspace. Existing projects are not moved.
+Every bot uses the same `/workspace` directory on Android. Files shows that
+one main directory, with no Shared/Bot files switch. Bot terminals start there
+as well, using separate shell sessions. New bots do not create isolated project
+directories. Existing project folders, including older `bot-*` folders and the
+older `shared` folder, stay intact and are accessible to all bots.
 
-Bots receive the `shared_workspace` tool for discovering the exact directory,
-listing, reading, writing and running commands there. Reads return a revision;
-writes can include `expectedRevision` to reject stale edits. Tool writes to the
-same file are serialized. Shell commands can also edit these files, so bots
-should coordinate work with their teammates and use Git when collaborating.
-Shared file tools retain traversal/symlink checks and the normal editor size
-limit. Shared shell commands retain the bot's shell approval setting.
+Bots should work inside named project folders and coordinate overlapping edits.
+The `shared_workspace` compatibility tool now points to this same main directory;
+reads return a revision and writes may include `expectedRevision` to reject
+stale edits. Its shell commands retain the bot's shell approval setting.
