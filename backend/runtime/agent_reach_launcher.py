@@ -39,11 +39,6 @@ def prepare():
                     if not target.is_relative_to(temporary.resolve()):
                         raise RuntimeError("Unsafe Agent-Reach archive path")
                 archive.extractall(temporary)
-            binary = temporary / "bin"
-            binary.mkdir()
-            script = binary / "yt-dlp"
-            script.write_text("#!/usr/bin/env python3\nfrom yt_dlp import main\nmain()\n", encoding="utf-8")
-            script.chmod(0o700)
             (temporary / ".ready").write_text(digest, encoding="ascii")
             try:
                 temporary.rename(destination)
@@ -55,7 +50,6 @@ def prepare():
                 shutil.rmtree(temporary)
     sys.path.insert(0, str(destination))
     os.environ["PYTHONPATH"] = str(destination)
-    os.environ["PATH"] = str(destination / "bin") + os.pathsep + os.environ.get("PATH", "")
     return lock
 
 

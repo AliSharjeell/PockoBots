@@ -89,5 +89,11 @@ bundle = output.getvalue()
 lock["bundleSha256"] = hashlib.sha256(bundle).hexdigest()
 DEST.mkdir(parents=True, exist_ok=True)
 (DEST / "agent-reach-vendor.zip").write_bytes(bundle)
+notices = [f"Agent-Reach {lock['version']}\n{lock['repository']}\nCommit: {lock['commit']}",
+           "Bundled dependency versions:\n" + "\n".join(f"{a['name']} {a['version']}" for a in lock['artifacts'])]
+for name, value in sorted(entries.items()):
+    if any(token in Path(name).name.lower() for token in ("license", "copying", "notice")) and not name.endswith('.py'):
+        notices.append(name + "\n" + value.decode('utf-8', errors='replace'))
+(DEST / "agent-reach-notices.txt").write_text("\n\n----\n\n".join(notices) + "\n", encoding="utf-8")
 LOCK.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
 print(f"Bundle: {len(bundle):,} bytes; {lock['bundleSha256']}")
