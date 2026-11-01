@@ -44,5 +44,5 @@ export class Projects {
     await workspace.init();
     return workspace;
   }
-  async shared(){const workspace=new Workspace(await this.root.path('shared',true));await workspace.init();return workspace;}
+  async shared(){return this.root;}
 }

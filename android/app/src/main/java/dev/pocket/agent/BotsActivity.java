@@ -91,7 +91,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
-    private void open(String id){boolean closing=id.isEmpty()&&!selected.isEmpty()&&screen.equals("Chat")&&selected.equals(originBot)&&conversationOrigin!=null;returningBot=selected;conversationMotion=closing?-1:!id.isEmpty()&&selected.isEmpty()&&screen.equals("Chat")&&conversationOrigin!=null&&id.equals(originBot)?1:0;pendingMotion=1;animatePage=!id.isEmpty()&&conversationMotion==0;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
+    private void open(String id){conversationMotion=0;animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
@@ -143,7 +143,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         }
 
         body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);ViewGroup window=findViewById(android.R.id.content);if(morph!=0&&previousPage!=null&&previousPage.getParent()==window)UiMotion.conversation(window,previousPage,root,conversationOrigin,morph<0,"bot-row-"+returningBot);else setContentView(root);
-        if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,selected.isEmpty()?"":detail.optJSONObject("bot").optString("projectId"));if(selected.isEmpty())dock();return;}
+        if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,"");if(selected.isEmpty())dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
         chatScroll=new ChatScrollView(this,atEnd->{follow=atEnd;if(atEnd)markChatRead();});thread=column();thread.setPadding(0,dp(4),0,dp(8));chatScroll.addView(thread);body.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));
@@ -366,7 +366,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             int unread=bot.optInt("unreadCount");if(unread>0){TextView badge=text(unread>99?"99+":String.valueOf(unread),11);badge.setTypeface(AgentStyle.font(this),Typeface.BOLD);badge.setTextColor(0xffffffff);badge.setGravity(Gravity.CENTER);badge.setPadding(dp(6),0,dp(6),0);badge.setMinWidth(dp(22));badge.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,12,false));badge.setContentDescription(unread+" unread messages");indicators.addView(badge,new LinearLayout.LayoutParams(-2,dp(22)));}
             metadata.addView(indicators,new LinearLayout.LayoutParams(-1,dp(24)));item.addView(metadata,new LinearLayout.LayoutParams(dp(62),-2));
             card.addView(item);
-            card.setTag("bot-row-"+bot.optString("id"));card.setOnClickListener(v->{android.graphics.Rect bounds=new android.graphics.Rect();if(card.getGlobalVisibleRect(bounds)){conversationOrigin=bounds;originBot=bot.optString("id");}open(bot.optString("id"));});
+            card.setTag("bot-row-"+bot.optString("id"));card.setOnClickListener(v->open(bot.optString("id")));
             list.addView(card);
             View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);
             LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,dp(1));rule.setMargins(dp(8),0,dp(8),0);list.addView(divider,rule);
@@ -488,6 +488,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         if(bot.optInt("intervalMinutes")>0)button(thread,"Run routine now",()->request("POST","/bots/"+selected+"/routine/run",json(),v->refresh(false)),false);
         chatScroll.finishUpdate();
     }
+    String terminalScope(){return selected.isEmpty()?"root":selected;}
     String workspaceFilesTitle(){JSONObject bot=detail==null?null:detail.optJSONObject("bot");return (bot==null?"Workspace":bot.optString("name","Bot"))+" files";}
     private String toolLabel(JSONObject tool){
         String name=tool.optString("name").replace('_',' '),detail="";try{JSONObject args=new JSONObject(tool.optString("input","{}"));detail=args.optString("command",args.optString("path",args.optString("query",args.optString("url",""))));}catch(Exception ignored){}return detail.isEmpty()?name:detail.replaceAll("\\s+"," ").trim();

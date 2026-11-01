@@ -152,14 +152,14 @@ export class Sessions {
       this.publish({ type: "approval", sessionId, id, tool, args });
     });
   }
-  async prompt(id: string, text: string, profile?: { instructions: string; tools: AgentTool<any>[] }) {
+  async prompt(id: string, text: string, profile?: { instructions: string; tools: AgentTool<any>[]; workspace?:'main' }) {
     const record = this.records.get(id);
     if (!record) throw Error("Session not found");
     if (this.busy.has(id)) throw Error("Agent is already running");
     if (typeof text !== "string" || !text.trim() || text.length > 32000)
       throw Error("Enter a prompt of at most 32000 characters");
     record.runError=undefined;if(record.pendingSteering?.length){text+="\n\nPending owner updates:\n"+record.pendingSteering.map(update=>update.text).join("\n").slice(-14000);record.pendingSteering=[];}const settings = { ...this.settings() };
-    const workspace = this.projects ? await this.projects.workspace(record.projectId) : this.workspace;
+    const workspace = profile?.workspace==='main'?this.workspace:this.projects ? await this.projects.workspace(record.projectId) : this.workspace;
     if (settings.executionProvider && settings.executionProvider !== "byok") {
       if (!this.trusted.has(id)) throw Error("Subscription agents require shell access. Enable it in this bot's preferences before starting.");
       if (record.title === "New conversation") record.title = text.slice(0, 50);
