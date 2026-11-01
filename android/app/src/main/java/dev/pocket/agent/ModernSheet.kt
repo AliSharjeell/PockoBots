@@ -45,6 +45,7 @@ data class SheetMenuItem(
     val icon: ImageVector,
     val iconColor: Color,
     val iconResource: Int? = null,
+    val textOnly: Boolean = false,
     val action: () -> Unit
 )
 
@@ -72,6 +73,7 @@ fun ModernSheetContent(
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             )
             .padding(horizontal = 20.dp, vertical = 14.dp)
+            .navigationBarsPadding()
     ) {
         // Drag Handle Pill
         Box(
@@ -126,6 +128,7 @@ fun ModernSheetContent(
                         .padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (!item.textOnly) {
                     // Icon Chip
                     Box(
                         modifier = Modifier
@@ -139,6 +142,8 @@ fun ModernSheetContent(
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
+
+                    }
 
                     Column(
                         modifier = Modifier.weight(1f)
@@ -159,7 +164,7 @@ fun ModernSheetContent(
                         }
                     }
 
-                    Icon(
+                    if (!item.textOnly) Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                         contentDescription = null,
                         tint = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
@@ -178,8 +183,8 @@ object ModernSheet {
     fun newConversation(activity: BotsActivity, createBot: Runnable, createGroup: Runnable) {
         val tint = Color(0xFF007AFF)
         show(activity, "New conversation", "", listOf(
-            SheetMenuItem("New bot", "Your own assistant and workspace", Icons.Rounded.SmartToy, tint, R.drawable.phosphor_robot_fill) { createBot.run() },
-            SheetMenuItem("New group", "Bring your bots into one chat", Icons.Rounded.Groups, tint, R.drawable.phosphor_users_three_fill) { createGroup.run() }
+            SheetMenuItem("New bot", "", Icons.Rounded.SmartToy, tint, textOnly = true) { createBot.run() },
+            SheetMenuItem("New group", "", Icons.Rounded.Groups, tint, textOnly = true) { createGroup.run() }
         ), AgentStyle.dark)
     }
     @JvmStatic
@@ -217,11 +222,13 @@ object ModernSheet {
         dialog.setCanceledOnTouchOutside(true)
         dialog.show()
         dialog.window?.apply {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(this, false)
+            decorView.setPadding(0,0,0,0)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
             setGravity(Gravity.BOTTOM)
             attributes?.windowAnimations = android.R.style.Animation_InputMethod
-            navigationBarColor = if (dark) android.graphics.Color.rgb(18,18,20) else android.graphics.Color.WHITE
+            navigationBarColor = android.graphics.Color.TRANSPARENT
             if(android.os.Build.VERSION.SDK_INT>=29)isNavigationBarContrastEnforced=false
             androidx.core.view.WindowInsetsControllerCompat(this,decorView).setAppearanceLightNavigationBars(!dark)
             setDimAmount(0.35f)
