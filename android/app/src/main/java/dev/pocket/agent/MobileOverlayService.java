@@ -22,7 +22,7 @@ public class MobileOverlayService extends Service {
     private WindowManager windows;private WindowManager.LayoutParams layout;private LinearLayout surface;
     private AgentApi api;private JSONObject task=new JSONObject();private String id="",signature="",draft="";
     private boolean expanded,attached,closing,suspended;private EditText answer;private float startX,startY;private int windowX,windowY;
-    private long armingUntil;
+    private long armingUntil;private int passThroughRequests;
     private NotificationManager notifications;private ChatMarkdown markdown;
     private WorkingAvatarView botAvatar;private JSONObject avatarBot=new JSONObject();private String avatarOwner="";private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
     @Override public void onCreate(){
@@ -83,7 +83,7 @@ public class MobileOverlayService extends Service {
     private void control(String action){armingUntil=0;MobileAccess.authorize(false);if(!id.isEmpty()&&api!=null)call(action,new JSONObject(),this::pollSoon);}
     private void pollSoon(){if(!closing&&!polling.isShutdown())polling.execute(this::poll);}
     private Button button(LinearLayout parent,String title,Runnable click,boolean primary){Button view=new Button(this);view.setText(title);AgentStyle.button(view,primary);parent.addView(view);view.setOnClickListener(v -> click.run());return view;}
-    private void icon(LinearLayout parent,String symbol,String description,Runnable action){AgentIcon view=new AgentIcon(this,symbol,description,action);view.setIconTint(0xfff4f4f5);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(44),dp(44));params.setMargins(dp(4),0,0,0);parent.addView(view,params);}
+    private void icon(LinearLayout parent,String symbol,String description,Runnable action){AgentIcon view=new AgentIcon(this,symbol,description,action);view.setIconTint(symbol.equals("close")?0xffff453a:0xfff4f4f5);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(44),dp(44));params.setMargins(dp(4),0,0,0);parent.addView(view,params);}
     private TextView markdownText(String value,int size){TextView view=text("",size);markdown.set(view,value);android.text.SpannableString links=new android.text.SpannableString(view.getText());for(android.text.style.URLSpan link:links.getSpans(0,links.length(),android.text.style.URLSpan.class)){int start=links.getSpanStart(link),end=links.getSpanEnd(link);links.removeSpan(link);links.setSpan(new android.text.style.ClickableSpan(){public void onClick(View widget){try{android.net.Uri uri=android.net.Uri.parse(link.getURL());if("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))startActivity(new Intent(Intent.ACTION_VIEW,uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}},start,end,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}view.setText(links);return view;}
     private TextView text(String value,int size){TextView view=AgentStyle.text(this,value,size);view.setPadding(0,dp(5),0,dp(5));view.setTextIsSelectable(true);return view;}
     private void render(){
@@ -95,7 +95,7 @@ public class MobileOverlayService extends Service {
         if(botAvatar==null)botAvatar=new WorkingAvatarView(this,avatarBot,16);if(botAvatar.getParent()!=null)((android.view.ViewGroup)botAvatar.getParent()).removeView(botAvatar);botAvatar.setWorking(status.equals("running")||status.equals("queued"));LinearLayout.LayoutParams avatarParams=new LinearLayout.LayoutParams(dp(34),dp(34));avatarParams.setMargins(0,0,dp(10),0);header.setClipChildren(false);header.addView(botAvatar,avatarParams);
         if(!status.equals("running"))shortTitle=botName+" \u00b7 "+shortTitle;
         LinearLayout captions=new LinearLayout(this);captions.setOrientation(LinearLayout.VERTICAL);ShimmerTextView pill=new ShimmerTextView(this,shortTitle);pill.active(status.equals("running")||status.equals("queued"));pill.setPadding(0,0,0,0);pill.setTypeface(AgentStyle.font(this),android.graphics.Typeface.BOLD);captions.addView(pill);
-        LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);TextView detail=text(status.equals("waiting")?"Needs reply":task.optInt("steps")+" steps",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,dp(3),dp(8),0);meta.addView(detail);boolean live=status.equals("running")||status.equals("queued")||status.equals("waiting");ElapsedTimeView elapsed=new ElapsedTimeView(this,task.optLong("created",System.currentTimeMillis()),task.optLong("updated",System.currentTimeMillis()),live);elapsed.setContentDescription("Task elapsed time");meta.addView(elapsed);captions.addView(meta);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);TextView detail=text(status.equals("waiting")?"Needs reply":task.optInt("steps")+" steps",10);detail.setTextIsSelectable(false);detail.setTextColor(AgentStyle.MUTED);detail.setPadding(0,0,dp(8),0);meta.addView(detail);boolean live=status.equals("running")||status.equals("queued")||status.equals("waiting");ElapsedTimeView elapsed=new ElapsedTimeView(this,task.optLong("created",System.currentTimeMillis()),task.optLong("updated",System.currentTimeMillis()),live);elapsed.setTextSize(10);elapsed.setPadding(0,0,0,0);elapsed.setIncludeFontPadding(detail.getIncludeFontPadding());elapsed.setContentDescription("Task elapsed time");meta.setPadding(0,dp(3),0,0);meta.setBaselineAligned(true);meta.addView(elapsed);captions.addView(meta);header.addView(captions,new LinearLayout.LayoutParams(0,-2,1));
         icon(header,expanded?"down":"up",expanded?"Collapse task panel":"Expand task panel",()->{expanded=!expanded;render();});
         if(expanded)icon(header,"close","Close panel and pause task",()->{control("pause");stopSelf();});surface.addView(header);
         View.OnTouchListener drag=(v,event) -> {
@@ -131,7 +131,7 @@ public class MobileOverlayService extends Service {
             if(!status.equals("completed")&&!status.equals("failed")&&!status.equals("stopped"))icon(controls,"stop","Stop task",() -> control("stop"));
             icon(controls,"open","Open bot chat",() -> startActivity(new Intent(this,BotsActivity.class).putExtra("botId",task.optString("ownerBotId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         }
-        layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);
+        layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended||passThroughRequests>0?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);
         int width=expanded?Math.min(dp(344),getResources().getDisplayMetrics().widthPixels-dp(24)):Math.min(dp(280),getResources().getDisplayMetrics().widthPixels-dp(24));
         surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int height=surface.getMeasuredHeight();
         boolean transition=targetWidth>0&&(renderedExpanded!=expanded||targetWidth!=width||Math.abs(targetHeight-height)>dp(16));renderedExpanded=expanded;targetWidth=width;targetHeight=height;
@@ -147,12 +147,14 @@ public class MobileOverlayService extends Service {
         int maxBottom=Math.max(dp(12),getResources().getDisplayMetrics().heightPixels-height-dp(12));
         layout.y=Math.max(dp(12),Math.min(maxBottom,layout.y));
     }
+    /** Let gestures reach the app without making the progress island disappear. */
+    public static void passThrough(boolean active){MobileOverlayService service=instance;if(service==null)return;CountDownLatch ready=new CountDownLatch(1);service.main.post(()->{try{service.passThroughRequests=Math.max(0,service.passThroughRequests+(active?1:-1));if(service.attached){if(service.passThroughRequests>0||service.suspended)service.layout.flags|=WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;else service.layout.flags&=~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;service.windows.updateViewLayout(service.surface,service.layout);}}finally{ready.countDown();}});try{ready.await(1,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
     /** Hide our own control surface while Artemis observes/acts, never the target app. */
     public static void suspendOverlay(boolean hide){
         MobileOverlayService service=instance;if(service==null||!service.attached)return;
         CountDownLatch ready=new CountDownLatch(1);service.main.post(() -> {try{
             if(service.attached){service.suspended=hide;service.surface.setAlpha(hide?0:1);if(hide)service.layout.flags|=WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                else service.layout.flags&=~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;service.windows.updateViewLayout(service.surface,service.layout);}
+                else if(service.passThroughRequests==0)service.layout.flags&=~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;service.windows.updateViewLayout(service.surface,service.layout);}
         }finally{ready.countDown();}});
         try{ready.await(1,TimeUnit.SECONDS);if(hide)Thread.sleep(60);}catch(InterruptedException e){Thread.currentThread().interrupt();}
     }
