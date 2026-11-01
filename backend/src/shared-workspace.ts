@@ -14,7 +14,7 @@ export function sharedWorkspaceTool(projects:Projects,run:(command:string,signal
    case 'info':result={path:workspace.root,sharedBy:'all bots'};break;
    case 'list':result=await workspace.list(p.path||'.');break;
    case 'read':{const content=await workspace.read(p.path);result={path:p.path,content,revision:revisions(content)};break;}
-   case 'write':{result=await serialWrite(await workspace.path(p.path,true),async()=>{let before='';try{before=await workspace.read(p.path);}catch(error:any){if(error.code!=='ENOENT')throw error;}if(p.expectedRevision&&p.expectedRevision!==revisions(before))throw Error('Shared file changed. Read the latest file and merge your edit before retrying.');await workspace.write(p.path,p.content);const change=fileChange('shared/'+p.path,before,p.content);if(change)changes=[change];return {path:p.path,saved:true,revision:revisions(p.content)};});break;}
+   case 'write':{result=await serialWrite(await workspace.path(p.path,true),async()=>{let before='';try{before=await workspace.read(p.path);}catch(error:any){if(error.code!=='ENOENT')throw error;}if(p.expectedRevision&&p.expectedRevision!==revisions(before))throw Error('File changed. Read the latest file and merge your edit before retrying.');await workspace.write(p.path,p.content);const change=fileChange(p.path,before,p.content);if(change)changes=[change];return {path:p.path,saved:true,revision:revisions(p.content)};});break;}
    case 'run':if(typeof p.command!=='string'||!p.command.trim())throw Error('Enter a shared directory command');result=await run(p.command,signal);break;
    default:throw Error('Unknown shared workspace action');
   }
