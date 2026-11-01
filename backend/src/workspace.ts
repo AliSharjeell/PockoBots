@@ -16,7 +16,7 @@ export class Workspace {
   }
   private within(path: string) {
     const r = relative(this.root, path);
-    if (r === ".." || r.startsWith("../") || isAbsolute(r))
+    if (r === ".." || r.startsWith("../") || r.startsWith("..\\") || isAbsolute(r))
       throw Error("Path is outside workspace");
     return path;
   }

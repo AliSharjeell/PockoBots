@@ -10,9 +10,10 @@ export class Projects {
   constructor(private store: Store, private root: Workspace) {}
   async init() {
     this.records = await this.store.read<Project[]>("projects", []);
+    await this.shared();
     // Adopt existing directories without moving user files.
     for (const entry of await readdir(this.root.root, { withFileTypes: true })) {
-      if (entry.isDirectory() && !entry.name.startsWith(".") &&
+      if (entry.isDirectory() && entry.name!=='shared' && !entry.name.startsWith(".") &&
           !this.records.some((p) => p.directory === entry.name)) {
         this.records.push({ id: randomUUID(), name: entry.name, directory: entry.name, created: Date.now() });
       }
@@ -37,9 +38,11 @@ export class Projects {
     return project;
   }
   async workspace(id?: string) {
+    if(id==='shared')return this.shared();
     if (!id) return this.root; // Preserve legacy browser conversations.
     const workspace = new Workspace(await this.root.path(this.get(id).directory));
     await workspace.init();
     return workspace;
   }
+  async shared(){const workspace=new Workspace(await this.root.path('shared',true));await workspace.init();return workspace;}
 }

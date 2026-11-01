@@ -60,6 +60,7 @@ export class Sessions {
     for (const s of records) {if(s.progress?.status==="working")interruptProgress(s.progress,"paused");this.records.set(s.id, s);}
     if(records.length)await this.persist();
   }
+  async runSharedCommand(command:string,signal?:AbortSignal){if(!this.projects)throw Error("Shared projects are unavailable");const shared=await this.projects.shared();return this.processes.run(command,shared.root,signal);}
   async persist() {
     await this.store.write("sessions", [...this.records.values()]);
   }
@@ -184,7 +185,7 @@ export class Sessions {
       },
       beforeToolCall: async (context, signal) => {
         if (
-          ["bash", "start_server", "stop_process", "share_port", "github_cli", "add_integration"].includes(
+          ["bash", "start_server", "stop_process", "share_port", "github_cli", "add_integration", "shared_workspace"].includes(
             context.toolCall.name,
           )
         ) {
