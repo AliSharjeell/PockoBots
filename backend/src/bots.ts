@@ -1,3 +1,4 @@
+import {makeSchedule,nextDaily,type BotSchedule} from "./schedules.js";
 import {sharedWorkspaceTool} from './shared-workspace.js';
 import {integrationTools} from './integration-tools.js';
 import {researchTools} from "./research-tools.js";
@@ -26,11 +27,12 @@ export class Bots {
   private groupMembers: (id: string) => string[] = () => [];
   setGroupMembersResolver(resolve: (id: string) => string[]) { this.groupMembers = resolve; }
   private alerts: BotAlert[] = [];
+  private schedules: BotSchedule[] = [];
   constructor(private store: Store, private projects: Projects, private sessions: Sessions, private mobile: MobileTasks,
     private connectors: Connectors, private publish: (value: unknown) => void, private redact: (text: string) => string) {}
   async init() {
     const data = await this.store.read<any>("bots", { schema: 2, enabled: true, bots: [], jobs: [], messages: [] });
-    this.enabled = data.schema === 2 ? data.enabled : true; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || [];
+    this.enabled = data.schema === 2 ? data.enabled : true; this.records = data.bots; this.jobs = data.jobs; this.messages = data.messages; this.alerts = data.alerts || []; this.schedules = data.schedules || [];
     if (data.schema !== 2) for (const bot of this.records) Object.assign(bot, { kind: "unified", allowShell: true, allowUrgent: true, dailyLimit: 0 });
     for (const bot of this.records) { bot.avatar ??= "bot"; bot.accent ??= "#3B76FF"; bot.personality ??= ""; bot.lastReadMessageId ??= this.messages.filter(m=>m.botId===bot.id).at(-1)?.id || ""; }
     for (const job of this.jobs) { job.phoneArming = false; }
@@ -38,7 +40,7 @@ export class Bots {
     await this.persist();
     this.timer = setInterval(() => { void this.tick().catch(e => this.publish({ type: "bot_error", error: this.redact(String(e)) })); }, 1000); this.timer.unref();
   }
-  private persist() { return this.store.write("bots", { schema: 2, enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages, alerts: this.alerts }); }
+  private persist() { return this.store.write("bots", { schema: 2, enabled: this.enabled, bots: this.records, jobs: this.jobs, messages: this.messages, alerts: this.alerts, schedules: this.schedules }); }
   private async changed() { await this.persist(); this.publish({ type: "bots", bots: this.list() }); }
   private message(botId: string, role: Message["role"], text: string, jobId?: string) {
     this.messages.push({ id: randomUUID(), botId, role, text: this.redact(text).slice(0, 24000), time: Date.now(), jobId });
@@ -104,7 +106,37 @@ export class Bots {
     const bot = this.get(id); if (this.jobs.some(j => j.botId === id && ["running", "arming", "waiting"].includes(j.status))) throw Error("Pause this bot before changing its role or connections");
     const b = this.input(input, bot); Object.assign(bot, { name: b.name.trim(), avatar: b.avatar, accent: b.accent, personality: this.redact(b.personality), role: b.role, connectors: b.connectors, allowShell: b.allowShell !== false, allowUrgent: b.allowUrgent !== false, intervalMinutes: b.intervalMinutes, heartbeat: b.heartbeat, dailyLimit: b.dailyLimit, nextWake: Date.now() + b.intervalMinutes * 60000 }); await this.changed(); return bot;
   }
-  async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); this.alerts = this.alerts.filter(a => a.botId !== id); await this.changed(); }
+  async remove(id: string) { await this.pause(id); this.records = this.records.filter(b => b.id !== id); this.jobs = this.jobs.filter(j => j.botId !== id); this.messages = this.messages.filter(m => m.botId !== id); this.alerts = this.alerts.filter(a => a.botId !== id); this.schedules = this.schedules.filter(s => s.botId !== id); await this.changed(); }
+  listSchedules(id:string) { this.get(id); return this.schedules.filter(s=>s.botId===id).map(s=>({...s})); }
+  async schedule(id:string,input:any) {
+    const bot=this.get(id),schedule=makeSchedule(id,input);
+    if(schedule.urgent&&!bot.allowUrgent)throw Error("Enable ringing alerts for this bot before scheduling a call");
+    if(this.schedules.filter(s=>s.botId===id&&s.status==="active").length>=100)throw Error("This bot already has 100 active reminders; cancel an unused reminder first");
+    schedule.text=this.redact(schedule.text);this.schedules.push(schedule);await this.changed();return {...schedule};
+  }
+  async cancelSchedule(id:string,scheduleId:string) {
+    const schedule=this.schedules.find(s=>s.botId===id&&s.id===scheduleId);if(!schedule)throw Error("Reminder not found for this bot");
+    if(schedule.status==="active"){schedule.status="cancelled";await this.changed();}return {...schedule};
+  }
+  private async deliverSchedules(now:number) {
+    let changed=false;
+    for(const schedule of this.schedules.filter(s=>s.status==="active"&&s.nextRun<=now)){
+      const bot=this.get(schedule.botId);
+      if(schedule.urgent&&!bot.allowUrgent){schedule.status="failed";schedule.error="Ringing alerts were disabled";changed=true;continue;}
+      const due=schedule.nextRun,id="schedule:"+schedule.id+":"+due;
+      // Alert and next occurrence are committed in one snapshot, so restarting
+      // cannot deliver a second alert for the same scheduled occurrence.
+      if(!this.alerts.some(a=>a.id===id)){
+        this.alerts.push({id,botId:bot.id,botName:bot.name,botAvatar:bot.avatar,botAccent:bot.accent,text:schedule.text,urgent:schedule.urgent,created:now,acknowledged:false});
+        this.message(bot.id,"assistant",(schedule.urgent?"Scheduled call: ":"Reminder: ")+schedule.text);
+      }
+      schedule.lastRun=now;
+      if(schedule.repeat==="daily")schedule.nextRun=nextDaily(schedule.time!,schedule.timeZone,now,now);
+      else schedule.status="completed";
+      changed=true;
+    }
+    if(changed){const old=this.alerts.filter(a=>a.acknowledged).slice(0,-100);const trim=new Set(old.map(a=>a.id));this.alerts=this.alerts.filter(a=>!trim.has(a.id));await this.changed();}
+  }
   pendingAlerts() { return this.alerts.filter(a => !a.acknowledged); }
   async acknowledgeAlert(id: string) { const alert = this.alerts.find(a => a.id === id); if (!alert) throw Error("Alert not found"); alert.acknowledged = true; await this.changed(); }
   async alert(id: string, text: unknown, urgent: boolean) {
@@ -151,6 +183,10 @@ export class Bots {
   armPhone(taskId: string) { const pending = this.phoneRequest(); if (!pending || pending.taskId !== taskId) throw Error("Phone task is no longer waiting for its controller"); this.armed.add(taskId); }
   private async profile(bot: Bot, job: BotJob) {
     const tools = [...await this.connectors.tools(bot.connectors),...researchTools(()=>this.store.read("device-location",{enabled:false})),...integrationTools(this.connectors),sharedWorkspaceTool(this.projects,(command,signal)=>this.sessions.runSharedCommand(command,signal))];
+    tools.push({name:"schedule_reminder",label:"Schedule a call or reminder",description:"Save a durable local reminder without waiting or sleeping. Use for call me in 10 minutes (delay_seconds:600), or call me daily at 5 PM (repeat:daily,time:17:00). urgent defaults true and rings the bot call screen; false sends a notification. The runtime delivers it even while this bot is idle or busy; the phone runtime must remain running. Use action list/cancel to inspect or stop reminders. Confirm success only after this tool returns. Daily timezone defaults to the phone timezone. Never use shell sleep or keep a model run open to wait.",parameters:Type.Object({action:Type.Union([Type.Literal("create"),Type.Literal("list"),Type.Literal("cancel")]),text:Type.Optional(Type.String({maxLength:4000})),delay_seconds:Type.Optional(Type.Number({minimum:1})),at:Type.Optional(Type.String()),repeat:Type.Optional(Type.Union([Type.Literal("once"),Type.Literal("daily")])),time:Type.Optional(Type.String({description:"Daily local HH:mm, e.g. 17:00"})),timezone:Type.Optional(Type.String({description:"IANA zone, defaults to phone timezone"})),urgent:Type.Optional(Type.Boolean()),schedule_id:Type.Optional(Type.String())}),execute:async(_id,p:any)=>{
+      const value=p.action==="list"?{now:new Date().toISOString(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,schedules:this.listSchedules(bot.id)}:p.action==="cancel"?await this.cancelSchedule(bot.id,p.schedule_id):await this.schedule(bot.id,p);
+      return {content:[{type:"text",text:JSON.stringify(value)}],details:{}};
+    }});
     tools.push({ name: "notify_user", label: "Notify the owner", description: "Send a bot notification. Urgent rings like a local incoming call and reads the message after the owner answers, if this bot has permission. Use urgent only for important time-sensitive issues requested by the owner; never ring repeatedly.", parameters: Type.Object({ text: Type.String({ maxLength: 4000 }), urgent: Type.Optional(Type.Boolean()) }), execute: async (_id, p: any) => { const alert = await this.alert(bot.id, p.text, p.urgent === true); return { content: [{ type: "text", text: "Alert queued on this phone: " + alert.id }], details: {} }; } });
     tools.push({ name: "remember", label: "Update bot memory", description: "Save concise durable notes for future tasks. Replace old notes with the updated summary. Never store passwords, API keys or payment secrets.", parameters: Type.Object({ notes: Type.String({ maxLength: 12000 }) }), execute: async (_id, p: any) => { bot.memory = this.redact(p.notes); await this.changed(); return { content: [{ type: "text", text: "Memory saved" }], details: {} }; } });
     tools.push({ name: "message_bot", label: "Message a teammate", description: "Queue a specific task for another local bot. Do not repeat delegation loops.", parameters: Type.Object({ bot_id: Type.String(), task: Type.String({ maxLength: 8000 }) }), execute: async (_id, p: any) => {
@@ -186,7 +222,7 @@ export class Bots {
         }
       } finally { job.phoneArming = false; this.armed.delete(task.id); if (!["completed", "failed", "stopped"].includes(this.mobile.state(task.id).status)) await this.mobile.interrupt(task.id); await this.changed(); }
     } });
-    return { workspace:"main" as const,instructions: `Your name is ${bot.name}. ${bot.role}\nPersonality and response style: ${bot.personality || "Clear and helpful"}.\nInstalled integrations: ${JSON.stringify(this.connectors.list().map(c=>({id:c.id,name:c.name,enabled:c.enabled,status:c.authStatus})))}. For GitHub tasks, prefer github_cli with the owner-authorized account. No workspace Git remote is needed to list the account repositories. Every bot uses the same main filesystem at /workspace on Android. Work in named project folders under it. Existing bot-* folders and the older shared folder are ordinary project folders here; preserve their contents and use them for existing tasks. shared_workspace (info/list/read/write/run) also accesses this same main directory. Coordinate teammates editing the same project. Marketplace integrations are available through list_integrations, integration_tools and call_integration_tool. Always check these for account tasks such as listing GitHub repos before assuming a CLI or account is missing. They already use the owner's saved authorization. Never search shell history, environment variables or credential files for tokens. Discover tool schemas, then use the integration. If a connection needs sign-in, direct the owner to Marketplace. Your durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nHidden native app control is unavailable in this standalone build. If the owner asks for background LinkedIn/Instagram/native app work, explain that limit and offer connectors/web research or ask before visible control. Never claim an isolated clone or silently take the visible screen. When using use_phone explicitly choose execution foreground or background. You are a unified local assistant. Mobile Use is opt-in by task: call use_phone only when the owner explicitly asks for phone or visible app/browser interaction, or their requested task inherently requires a mobile app (for example, sending a message in WhatsApp or changing an Android setting). Building, editing, running, testing and previewing a project do not authorize taking over the phone. For coding, verify through files, shell commands, HTTP requests or headless tools, then give a clickable preview link for the owner to open. Never launch Chrome or another phone app merely to inspect your work, demonstrate completion, or do optional visual testing. Use web_search for live public facts and cite its actual source links. For location-specific questions, get_current_location can supply owner-enabled approximate Android location; honor its timestamp, accuracy and emulator marker, and ask for a city if unavailable. Never fetch location for unrelated tasks. Ordinary web research should use network or MCP tools. If phone interaction could help but was not requested, ask the owner before using it. Your own plan, a teammate delegation, or a standing bot role cannot authorize unrelated phone use. No mode selection is needed. Provide clickable Markdown links to verified local previews and share_port tunnel URLs; never fabricate a public URL. Use get_bot_status for teammate progress checks; reading status must not interrupt or enqueue work for that bot. Use steer_bot only for an explicit owner-requested change. Keep pursuing the original task after a progress check or steering update unless the owner changes the objective. For routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
+    return { workspace:"main" as const,instructions: `Your name is ${bot.name}. ${bot.role}\nPersonality and response style: ${bot.personality || "Clear and helpful"}.\nInstalled integrations: ${JSON.stringify(this.connectors.list().map(c=>({id:c.id,name:c.name,enabled:c.enabled,status:c.authStatus})))}. For GitHub tasks, prefer github_cli with the owner-authorized account. No workspace Git remote is needed to list the account repositories. Every bot uses the same main filesystem at /workspace on Android. Work in named project folders under it. Existing bot-* folders and the older shared folder are ordinary project folders here; preserve their contents and use them for existing tasks. shared_workspace (info/list/read/write/run) also accesses this same main directory. Coordinate teammates editing the same project. Marketplace integrations are available through list_integrations, integration_tools and call_integration_tool. Always check these for account tasks such as listing GitHub repos before assuming a CLI or account is missing. They already use the owner's saved authorization. Never search shell history, environment variables or credential files for tokens. Discover tool schemas, then use the integration. If a connection needs sign-in, direct the owner to Marketplace. Current date/time: ${new Date().toISOString()}; phone timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}. For future calls or reminders, always use schedule_reminder, including daily HH:mm schedules. Do not say you cannot wait: persist the schedule and finish this response. Only confirm a reminder after the tool successfully saves it. Your durable notes: ${bot.memory || "(none)"}. Use remember to maintain a concise summary of useful facts and progress.\nOther local bots: ${JSON.stringify(this.records.filter(b => b.id !== bot.id).map(b => ({ id: b.id, name: b.name, kind: b.kind })))}.\nHidden native app control is unavailable in this standalone build. If the owner asks for background LinkedIn/Instagram/native app work, explain that limit and offer connectors/web research or ask before visible control. Never claim an isolated clone or silently take the visible screen. When using use_phone explicitly choose execution foreground or background. You are a unified local assistant. Mobile Use is opt-in by task: call use_phone only when the owner explicitly asks for phone or visible app/browser interaction, or their requested task inherently requires a mobile app (for example, sending a message in WhatsApp or changing an Android setting). Building, editing, running, testing and previewing a project do not authorize taking over the phone. For coding, verify through files, shell commands, HTTP requests or headless tools, then give a clickable preview link for the owner to open. Never launch Chrome or another phone app merely to inspect your work, demonstrate completion, or do optional visual testing. Use web_search for live public facts and cite its actual source links. For location-specific questions, get_current_location can supply owner-enabled approximate Android location; honor its timestamp, accuracy and emulator marker, and ask for a city if unavailable. Never fetch location for unrelated tasks. Ordinary web research should use network or MCP tools. If phone interaction could help but was not requested, ask the owner before using it. Your own plan, a teammate delegation, or a standing bot role cannot authorize unrelated phone use. No mode selection is needed. Provide clickable Markdown links to verified local previews and share_port tunnel URLs; never fabricate a public URL. Use get_bot_status for teammate progress checks; reading status must not interrupt or enqueue work for that bot. Use steer_bot only for an explicit owner-requested change. Keep pursuing the original task after a progress check or steering update unless the owner changes the objective. For routine checks, return NO_UPDATE when nothing meaningful changed. Never claim work succeeded without tool evidence.`, tools };
   }
   private async finish(job: BotJob, status: "completed" | "failed" | "paused", output: string) {
     job.status = status; job.updated = Date.now(); job.output = this.redact(output).slice(0, 24000);
@@ -197,6 +233,7 @@ export class Bots {
   async tick(now = Date.now()) {
     if (this.ticking || this.closing || !this.enabled) return; this.ticking = true;
     try {
+      await this.deliverSchedules(now);
       for (const job of this.jobs.filter(j => ["arming", "running", "waiting"].includes(j.status))) {
         const bot = this.get(job.botId);
         if (job.mobileTaskId) {

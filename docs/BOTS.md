@@ -105,3 +105,9 @@ Bots should work inside named project folders and coordinate overlapping edits.
 The `shared_workspace` compatibility tool now points to this same main directory;
 reads return a revision and writes may include `expectedRevision` to reject
 stale edits. Its shell commands retain the bot's shell approval setting.
+
+## Scheduled calls and reminders
+
+Bots can use `schedule_reminder` to create, list or cancel saved reminders. ?Call me in 10 minutes? saves a one-time call; ?call me daily at 5 PM? saves a daily 17:00 call in the phone timezone. An explicit IANA timezone can override this. Calls use the existing bot avatar and incoming-call screen; `urgent: false` sends a notification instead. The model finishes after saving and does not sleep until the reminder is due.
+
+Schedules and their delivery state persist across runtime restarts. Missed occurrences coalesce into one reminder when the runtime resumes. Daily reminders keep local calendar time across daylight-saving changes, skipping nonexistent times and avoiding duplicate calls on the same local date. Delivery requires the on-device runtime to remain running; Android notification, ringing and full-screen permissions still apply. Pausing an individual bot's task does not cancel its saved reminders. Ask the bot to list or cancel reminders explicitly.
