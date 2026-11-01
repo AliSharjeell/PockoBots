@@ -32,6 +32,7 @@ and relevant conversation, tool output or phone screenshots leave the device.
 | Capability | In your pocket |
 | --- | --- |
 | Build and run software | Edit files, clone repositories, run Git, install dependencies, execute commands and start development servers. |
+| Read the web | Every bot includes [Agent-Reach](docs/AGENT_REACH.md) for public web and platform readers. No separate installation; internet access and upstream service limits apply. |
 | Use your phone | Operate visible Android apps and the browser through the integrated Artemis helper. The bot chooses its tools from the task. |
 | Keep working in the background | Queue tasks, run proactive routines, retain notes and notify you while the app is closed. |
 | Work as a team | Create customized bots with separate chats and workspaces; group chats retain each speaker, and bots can delegate bounded tasks to teammates. |
