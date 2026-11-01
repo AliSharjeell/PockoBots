@@ -201,10 +201,13 @@ public final class HierarchyDumper {
             final CountDownLatch latch,
             final boolean allowRetry) {
         try {
-            service.takeScreenshot(
-                    Display.DEFAULT_DISPLAY,
-                    SCREENSHOT_EXECUTOR,
-                    new AccessibilityService.TakeScreenshotCallback() {
+            AccessibilityWindowInfo selected=null;
+            if(Build.VERSION.SDK_INT>=34)for(AccessibilityWindowInfo window:service.getWindows())if(window.getType()==AccessibilityWindowInfo.TYPE_APPLICATION){if(selected==null)selected=window;if(window.isFocused()||window.isActive()){selected=window;break;}}
+            final boolean windowCapture=Build.VERSION.SDK_INT>=34&&selected!=null;
+            final Rect bounds=new Rect();if(windowCapture)selected.getBoundsInScreen(bounds);
+            final DisplayUtils.DisplayInfo display=DisplayUtils.getDisplayInfo(service);
+            if(!windowCapture)dev.pocket.agent.MobileOverlayService.suspendOverlay(true);
+            AccessibilityService.TakeScreenshotCallback callback=new AccessibilityService.TakeScreenshotCallback() {
                         @Override
                         public void onSuccess(AccessibilityService.ScreenshotResult screenshotResult) {
                             try {
@@ -215,17 +218,19 @@ public final class HierarchyDumper {
                                     Bitmap swBitmap = hwBitmap.copy(Bitmap.Config.ARGB_8888, false);
                                     hwBitmap.recycle();
                                     buffer.close();
-                                    bitmapRef.set(swBitmap);
+                                    if(windowCapture&&swBitmap!=null){Bitmap full=Bitmap.createBitmap(display.width,display.height,Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(full);canvas.drawColor(android.graphics.Color.BLACK);canvas.drawBitmap(swBitmap,null,bounds,null);swBitmap.recycle();swBitmap=full;}bitmapRef.set(swBitmap);
                                 }
                             } catch (Throwable t) {
                                 Log.w(TAG, "Error copying screenshot buffer", t);
                             } finally {
+                                if(!windowCapture)dev.pocket.agent.MobileOverlayService.suspendOverlay(false);
                                 latch.countDown();
                             }
                         }
 
                         @Override
                         public void onFailure(int errorCode) {
+                            if(!windowCapture)dev.pocket.agent.MobileOverlayService.suspendOverlay(false);
                             errorRef.set(errorCode);
                             if (allowRetry && errorCode == ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT) {
                                 Log.i(TAG, "takeScreenshot rate-limited; retrying after " + SCREENSHOT_INTERVAL_RETRY_MS + " ms");
@@ -245,9 +250,11 @@ public final class HierarchyDumper {
                             Log.w(TAG, "takeScreenshot failed, errorCode: " + errorCode);
                             latch.countDown();
                         }
-                    }
-            );
+                    };
+            if(windowCapture)service.takeScreenshotOfWindow(selected.getId(),SCREENSHOT_EXECUTOR,callback);
+            else service.takeScreenshot(Display.DEFAULT_DISPLAY,SCREENSHOT_EXECUTOR,callback);
         } catch (Throwable t) {
+            dev.pocket.agent.MobileOverlayService.suspendOverlay(false);
             Log.w(TAG, "takeScreenshot invocation error", t);
             latch.countDown();
         }
@@ -286,7 +293,7 @@ public final class HierarchyDumper {
         // 3. Wait for the screenshot (one retry after the rate-limit interval fits inside)
         try {
             screenshotLatch.await(2500L, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException ignored) {}
+        } catch (InterruptedException ignored) {} finally {dev.pocket.agent.MobileOverlayService.suspendOverlay(false);}
 
         Bitmap bitmap = bitmapRef.get();
         if (bitmap != null) {
