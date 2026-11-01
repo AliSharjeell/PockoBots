@@ -1,3 +1,4 @@
+import './network.js';
 import {
   createModels,
   createProvider,
@@ -65,8 +66,11 @@ export async function testConnection(settings: Settings) {
     },
     { signal: AbortSignal.timeout(30000), maxTokens: 64 },
   );
-  if (result.stopReason === "error" || result.stopReason === "aborted")
-    throw Error(result.errorMessage || "Connection test failed");
+  if (result.stopReason === "error" || result.stopReason === "aborted"){
+    const message=result.errorMessage||'Connection test failed';
+    if(/connection error|fetch failed|network error|timed? ?out/i.test(message))throw Error('Could not reach '+new URL(settings.baseUrl).host+'. Check the device internet connection and provider Base URL, then retry Test API. The saved key has not been removed.');
+    throw Error(message);
+  }
   return {
     ok: true,
     latencyMs: Date.now() - started,
