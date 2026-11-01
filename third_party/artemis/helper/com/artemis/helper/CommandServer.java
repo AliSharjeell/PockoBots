@@ -284,8 +284,7 @@ public class CommandServer extends Thread {
             } else if (!dev.pocket.agent.MobileAccess.allowed()) {
                 resp = errorJson("Mobile task controller is paused or inactive");
             } else {
-                boolean interacting=path.equals("/action")||path.equals("/rpc");
-            if(interacting)dev.pocket.agent.MobileOverlayService.passThrough(true);
+                dev.pocket.agent.MobileOverlayService.passThrough(true);
                 try { resp = executeCommand(cmd, json); }
                 finally { dev.pocket.agent.MobileOverlayService.passThrough(false); }
             }
