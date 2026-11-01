@@ -66,7 +66,7 @@ public class RuntimeService extends Service {
             List<String> command = new ArrayList<>(Arrays.asList(nativeDir + "/libproot.so", "--kill-on-exit", "-0", "-r", root.getPath(),
                 "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", files + "/projects:/workspace",
                 "-b", files + "/state:/state", "-b", files + "/home:/root", "-b", files + "/tmp:/tmp",
-                "-w", "/opt/pocket-agent", "/usr/bin/env", "-i", "HOME=/root", "USER=root", "LANG=C.UTF-8",
+                "-w", "/opt/pocket-agent", "/usr/bin/env", "-i", "HOME=/root", "USER=root", "LANG=C.UTF-8", "TZ=" + java.util.TimeZone.getDefault().getID(),
                 "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "POCKET_WORKSPACE=/workspace", "POCKET_STATE=/state", "POCKET_PORT=8787",
                 "LD_PRELOAD=/usr/local/lib/libpocket-compat.so", "UV_USE_IO_URING=0",
