@@ -224,6 +224,7 @@ object ModernSheet {
         dialog.window?.apply {
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(this, false)
             decorView.setPadding(0,0,0,0)
+            if(android.os.Build.VERSION.SDK_INT>=30) attributes = attributes.apply { setFitInsetsTypes(0) }
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
             setGravity(Gravity.BOTTOM)
