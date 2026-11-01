@@ -429,7 +429,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             JSONObject message=messages.optJSONObject(i);
             boolean welcome=i==0&&message.optString("role").equals("system")&&message.optString("jobId").isEmpty();
             if(message.optString("role").equals("system")&&!welcome){
-                thread.addView(muted(message.optString("text"),11));
+                bubble(message.optString("text"),false,true,true,message.optLong("time"));
             }else{
                 boolean isUser=message.optString("role").equals("user");
                 boolean isFirst=i==0||!messages.optJSONObject(i-1).optString("role").equals(message.optString("role"));
