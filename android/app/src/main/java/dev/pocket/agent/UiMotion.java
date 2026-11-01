@@ -8,7 +8,7 @@ final class UiMotion {
     /** Both pages remain siblings under the Activity owner, never in ViewOverlay. */
     static void conversation(ViewGroup host,View oldPage,View newPage,android.graphics.Rect origin,boolean closing,String rowTag){
         if(closing)host.addView(newPage,0,new ViewGroup.LayoutParams(-1,-1));else{newPage.setAlpha(0);host.addView(newPage,new ViewGroup.LayoutParams(-1,-1));}
-        View moving=closing?oldPage:newPage;
+        newPage.requestApplyInsets();View moving=closing?oldPage:newPage;
         newPage.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){
             newPage.getViewTreeObserver().removeOnPreDrawListener(this);
             if(!newPage.isAttachedToWindow()||moving.getParent()!=host)return true;
