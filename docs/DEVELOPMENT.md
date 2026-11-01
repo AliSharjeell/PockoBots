@@ -158,13 +158,15 @@ Run the isolated native view lifecycle check on a connected emulator:
 .\android\gradlew.bat -p android :app:assembleDebug :app:assembleDebugAndroidTest -PruntimeAbi=x86_64 -PqaInstall -PuiRegressionOnly
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w -r -e class dev.pocket.agent.UiMotionRegressionTest dev.pocket.agent.qa.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w -r -e class dev.pocket.agent.UiMotionRegressionTest,dev.pocket.agent.ConversationViewportTest dev.pocket.agent.qa.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 This mode uses a separate QA package and excludes the Linux runtime assets. Its
 host never starts the runtime or loads account data. The test skips the owner's
 normal package and exercises seven navigation/theme replacements with real
-Compose glass controls, checking their lifecycle and saved-state owners.
+Compose glass controls, checking their lifecycle and saved-state owners. It also
+checks opening/closing the conversation transform, pinning streamed chat text,
+manual chat history and terminal scrollback through empty/incremental polls.
 `uiRegressionOnly` is rejected unless `qaInstall` is also supplied. Build again
 without either property before installing the normal app.
 
