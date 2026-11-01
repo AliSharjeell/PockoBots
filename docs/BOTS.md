@@ -91,3 +91,18 @@ browsing and custom stdio environment forms are outside this release.
 
 See [OpenBot research](OPENBOT_RESEARCH.md) for the inspected reference and original
 implementation's license boundary.
+
+
+## Shared projects
+
+Every bot can use the same `/workspace/shared` directory on Android. In a bot's
+Files tab, tap **Shared** to browse or edit it; **Bot files** returns to that
+bot's private workspace. Existing projects are not moved.
+
+Bots receive the `shared_workspace` tool for discovering the exact directory,
+listing, reading, writing and running commands there. Reads return a revision;
+writes can include `expectedRevision` to reject stale edits. Tool writes to the
+same file are serialized. Shell commands can also edit these files, so bots
+should coordinate work with their teammates and use Git when collaborating.
+Shared file tools retain traversal/symlink checks and the normal editor size
+limit. Shared shell commands retain the bot's shell approval setting.
