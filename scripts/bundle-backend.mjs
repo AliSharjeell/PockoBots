@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { mkdir, copyFile, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import "./copy-runtime.mjs";
+import {runtimePayloads} from "./copy-runtime.mjs";
 const result = await build({
   entryPoints: ["backend/src/server.ts"],
   outfile: "dist/server.js",
@@ -41,4 +41,7 @@ await mkdir("android/app/src/main/assets/licenses", { recursive: true });
 await writeFile("android/app/src/main/assets/licenses/backend-third-party.txt", notices.join("\n\n----\n\n"));
 await mkdir("android/app/src/main/assets/backend", { recursive: true });
 await copyFile("dist/server.js", "android/app/src/main/assets/backend/server.js");
-await copyFile("backend/runtime/terminal_bridge.py", "android/app/src/main/assets/backend/terminal_bridge.py");
+for (const name of runtimePayloads) await copyFile('backend/runtime/' + name, 'android/app/src/main/assets/backend/' + name);
+// Reader dependencies and their licenses travel together in the verified bundle.
+await copyFile('backend/runtime/agent-reach-lock.json', 'android/app/src/main/assets/licenses/agent-reach-bundle.json');
+await copyFile('backend/runtime/agent-reach-notices.txt', 'android/app/src/main/assets/licenses/agent-reach-third-party.txt');

@@ -5,7 +5,7 @@ tasks.register('bundleBackend', Exec) {
     workingDir repoRoot
     commandLine System.getProperty('os.name').toLowerCase().contains('windows') ? ['cmd', '/c', 'npm.cmd', 'run', 'build:android'] : ['npm', 'run', 'build:android']
     inputs.files(fileTree(new File(repoRoot, 'backend/src')), fileTree(new File(repoRoot, 'backend/runtime')), new File(repoRoot, 'scripts/bundle-backend.mjs'), new File(repoRoot, 'scripts/copy-runtime.mjs'), new File(repoRoot, 'package.json'), new File(repoRoot, 'package-lock.json'))
-    outputs.files(file('src/main/assets/backend/server.js'), file('src/main/assets/backend/terminal_bridge.py'), file('src/main/assets/licenses/backend-third-party.txt'))
+    outputs.files(file('src/main/assets/backend/server.js'), file('src/main/assets/backend/terminal_bridge.py'), file('src/main/assets/backend/agent_reach_launcher.py'), file('src/main/assets/backend/agent-reach-lock.json'), file('src/main/assets/backend/agent-reach-vendor.zip'), file('src/main/assets/licenses/agent-reach-bundle.json'), file('src/main/assets/licenses/agent-reach-third-party.txt'), file('src/main/assets/licenses/backend-third-party.txt'))
     onlyIf { new File(repoRoot, 'node_modules/esbuild').exists() }
 }
 if (runtimeAbi != null && !(runtimeAbi in ['arm64-v8a', 'x86_64'])) {

@@ -20,6 +20,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=backend /build/dist ./dist
 COPY backend/runtime/terminal_bridge.py ./runtime/terminal_bridge.py
+COPY backend/runtime/agent_reach_launcher.py backend/runtime/agent-reach-lock.json backend/runtime/agent-reach-vendor.zip ./runtime/
 COPY web ./web
 COPY runtime/android-compat.c /opt/pocket-agent/runtime/android-compat.c
 RUN gcc -shared -fPIC -O2 /opt/pocket-agent/runtime/android-compat.c -o /usr/local/lib/libpocket-compat.so && \
