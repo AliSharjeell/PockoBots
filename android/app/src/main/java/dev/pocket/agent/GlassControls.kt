@@ -57,6 +57,15 @@ object GlassControls {
     fun bindPopup(view: View, owner: ComponentActivity) {
         view.setViewTreeLifecycleOwner(owner)
         view.setViewTreeSavedStateRegistryOwner(owner)
+        // Compose resolves its window recomposer from PopupDecorView, above the
+        // content view. Bind that root before the Compose children attach.
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {
+                v.rootView.setViewTreeLifecycleOwner(owner)
+                v.rootView.setViewTreeSavedStateRegistryOwner(owner)
+            }
+            override fun onViewDetachedFromWindow(v: View) = Unit
+        })
     }
     @JvmStatic
     fun bindDialog(dialog: Dialog, owner: ComponentActivity) {
