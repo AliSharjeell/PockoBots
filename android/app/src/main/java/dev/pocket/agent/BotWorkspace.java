@@ -79,6 +79,11 @@ final class BotWorkspace {
     private void editFile(String path,String source,boolean fresh){String id=filesProject();ProjectEditor.open(app,id,path,source,fresh,()->{if(screen.equals("Files"))show(body,"Files",project);});}
     private void settings(){
         final int epoch=generation;LinearLayout content=scrolling();JSONObject saved=app.currentState().optJSONObject("settings");if(saved==null)return;content.addView(text("Bring Your Own Key",22));content.addView(app.muted("One model connection for all your bots.",12));
+        if(saved.optBoolean("backupAvailable")){
+            Switch backup=new Switch(app);backup.setText("Use MiniMax backup");backup.setTextColor(AgentStyle.TEXT);backup.setChecked(saved.optBoolean("backupEnabled"));backup.setPadding(dp(4),dp(14),dp(4),dp(14));content.addView(backup);
+            content.addView(app.muted(saved.optString("backupModel")+" · Switch off to return to your saved connection.",12));
+            backup.setOnCheckedChangeListener((view,on)->{backup.setEnabled(false);app.marketplaceRequest("PUT","/settings/backup",app.json("enabled",on),value->{try{app.currentState().put("settings",value);}catch(Exception ignored){}backup.setEnabled(true);},error->{backup.setOnCheckedChangeListener(null);backup.setChecked(!on);backup.setEnabled(true);AgentSheet.message(app,"Couldn't switch model",error);show(body,"BYOK",project);});});
+        }
         final int[] protocol={saved.optString("api").equals("anthropic-messages")?2:saved.optString("api").equals("openai-completions")?1:0};
         LinearLayout protocols=AgentStyle.segment(app);Button openai=button(protocols,"OpenAI Compatible",()->{}),anthropic=button(protocols,"Anthropic Compatible",()->{});
         for(Button choice:new Button[]{openai,anthropic}){choice.setTextSize(11);choice.setLayoutParams(new LinearLayout.LayoutParams(0,dp(42),1));}
