@@ -133,7 +133,7 @@ public class MobileOverlayService extends Service {
             surface.addView(header);header.setOnClickListener(v->toggle());header.setOnTouchListener(this::drag);surface.setOnTouchListener(expanded?null:this::drag);surface.setOnClickListener(v->{if(!expanded)toggle();});
             if(expanded){
                 logScroll=new ScrollView(this);logs=new LinearLayout(this);logs.setOrientation(LinearLayout.VERTICAL);logScroll.addView(logs);surface.addView(logScroll,new LinearLayout.LayoutParams(-1,dp(170)));
-                questionLabel=text("",12);surface.addView(questionLabel);
+                questionLabel=text("",12);questionLabel.setMaxLines(3);questionLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);surface.addView(questionLabel);
                 LinearLayout composer=new LinearLayout(this);composer.setGravity(Gravity.CENTER_VERTICAL);composer.setPadding(0,dp(8),0,0);
                 answer=new EditText(this);AgentStyle.input(answer);answer.setText(draft);answer.setMaxLines(3);answer.setMinLines(1);answer.setTextSize(13);answer.setSingleLine(false);answer.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);answer.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);answer.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(16000)});
                 composer.addView(answer,new LinearLayout.LayoutParams(0,-2,1));
@@ -167,7 +167,7 @@ public class MobileOverlayService extends Service {
     private String panelText(){
         if(mobileLive()||ownerId.isEmpty()){
             String result=task.optString("output");JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0)result+="\n\n"+trace.optJSONObject(trace.length()-1).optString("text");
-            if(result.isEmpty())result=task.optString("prompt");return result+(task.optString("error").isEmpty()?"":"\n\n"+task.optString("error"));
+            if(result.isEmpty())result=task.optString("prompt");JSONObject question=task.optJSONObject("question");if(question!=null)result+="\n\n"+question.optString("text");return result+(task.optString("error").isEmpty()?"":"\n\n"+task.optString("error"));
         }
         JSONObject progress=progress();String result=progress.optString("text");JSONArray tools=progress.optJSONArray("tools");if(busy()&&tools!=null&&tools.length()>0){JSONObject tool=tools.optJSONObject(tools.length()-1);result+="\n\n"+tool.optString("name")+" \u00b7 "+tool.optString("status");}
         if(result.isEmpty()){JSONArray messages=botState.optJSONArray("messages");if(messages!=null)for(int i=messages.length()-1;i>=0;i--){JSONObject message=messages.optJSONObject(i);if(message.optString("role").equals("assistant")){result=message.optString("text");break;}}}
