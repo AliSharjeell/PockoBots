@@ -20,6 +20,7 @@ public class RuntimeService extends Service {
     private PowerManager.WakeLock wakeLock;
     private volatile boolean stopping;
     private AgentApi botApi;private long lastBotPoll;private final Handler main=new Handler(Looper.getMainLooper());
+    private final Set<String> openingPreviews=java.util.concurrent.ConcurrentHashMap.newKeySet();
     @Override public void onCreate() {
         super.onCreate();
         active = this; ready = false; status = "Starting coding environment…";
@@ -136,6 +137,16 @@ public class RuntimeService extends Service {
                     else getSystemService(NotificationManager.class).notify(alert.optString("botId").hashCode(),BotNotifications.message(this,alert.optString("botId"),alert.optString("botName"),alert.optString("text")));
                 }
                 botApi.request("POST","/bots/alerts/"+alertId+"/ack",new JSONObject());prefs.edit().remove(delivered).apply();
+            }
+            JSONObject preview=botApi.get("/previews/pending").optJSONObject("action");
+            if(preview!=null&&!getSystemService(KeyguardManager.class).isDeviceLocked()&&openingPreviews.add(preview.optString("id"))){
+                final JSONObject action=preview;
+                main.post(()->{try{
+                    String url=action.optString("url");if(!BotPreviewActivity.valid(url))throw new IllegalArgumentException("Invalid preview URL");
+                    if(android.provider.Settings.canDrawOverlays(this))startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("botId",action.optString("botId")));
+                    startActivity(new Intent(this,BotPreviewActivity.class).putExtra("url",url).putExtra("refresh",action.optBoolean("refresh")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",true));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-receipt").start();
+                }catch(Exception error){new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",false).put("error",error.getMessage()));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-failure").start();}});
             }
             Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
             if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;
