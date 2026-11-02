@@ -25,7 +25,7 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started local coding agent, interactive shells and development servers" />
         </service>
         <service android:name=".MobileOverlayService" android:exported="false" android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started mobile task controller with floating progress and questions" />
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-pinned floating bot messages, live progress and Mobile Use controls" />
         </service>
         <activity android:name=".BotPreviewActivity" android:exported="false" android:launchMode="singleTask" />
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">

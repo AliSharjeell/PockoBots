@@ -88,7 +88,7 @@ public class MobileOverlayService extends Service {
                 if(task.optString("status").equals("waiting")&&!previous.equals("waiting")){expanded=true;built=false;}
                 feedback="";render();notifications.notify(2,notification(avatarBot.optString("name","Bot")+(busy()?" is working":" is ready")));
             });
-        }catch(Exception error){main.post(()->{if(!closing){feedback="Connection lost. Reconnecting?";render();}});}
+        }catch(Exception error){main.post(()->{if(!closing){feedback="Connection lost. Reconnecting\u2026";render();}});}
     }
     private boolean mobileLive(){return !id.isEmpty()&&(task.optString("status").equals("running")||task.optString("status").equals("waiting"));}
     private JSONObject activeJob(){JSONArray jobs=botState.optJSONArray("jobs");if(jobs!=null)for(int i=0;i<jobs.length();i++){JSONObject job=jobs.optJSONObject(i);if(job!=null&&java.util.Arrays.asList("running","waiting","arming","queued").contains(job.optString("status")))return job;}return null;}
@@ -144,14 +144,14 @@ public class MobileOverlayService extends Service {
         }
         if(botAvatar!=null){if(!builtAvatar.equals(avatarBot.toString())){header.removeView(botAvatar);botAvatar=new WorkingAvatarView(this,avatarBot,16);header.addView(botAvatar,0,new LinearLayout.LayoutParams(dp(34),dp(34)));builtAvatar=avatarBot.toString();}botAvatar.setWorking(live);}
         if(!circle){
-            String name=avatarBot.optString("name","Bot");heading.setText(name+(live?" is working":" ? Ready"));((ShimmerTextView)heading).active(live);
+            String name=avatarBot.optString("name","Bot");heading.setText(name+(live?" is working":" \u00b7 Ready"));((ShimmerTextView)heading).active(live);
             JSONObject progress=progress();JSONArray tools=progress.optJSONArray("tools");int steps=mobileLive()?task.optInt("steps"):tools==null?0:tools.length();detail.setText(steps+" steps");
             JSONObject job=activeJob();long started=mobileLive()?task.optLong("created"):progress.optLong("started",job==null?System.currentTimeMillis():job.optLong("created"));long ended=mobileLive()?task.optLong("updated"):progress.optLong("updated",started);
             if(meta.getChildCount()<2||clockStart!=started||clockLive!=live||!live&&clockEnd!=ended){if(meta.getChildCount()>1)meta.removeViewAt(1);ElapsedTimeView clock=new ElapsedTimeView(this,started,ended,live);clock.setTextSize(10);clock.setIncludeFontPadding(detail.getIncludeFontPadding());meta.addView(clock);clockStart=started;clockEnd=ended;clockLive=live;}
             if(expanded){
                 String body=panelText();if(!bodySignature.equals(body)){boolean follow=logScroll.getChildCount()==0||logs.getHeight()-logScroll.getScrollY()-logScroll.getHeight()<dp(36);int old=logScroll.getScrollY();bodySignature=body;logs.removeAllViews();logs.addView(markdownText(body,12));logScroll.post(()->{if(follow)logScroll.fullScroll(View.FOCUS_DOWN);else logScroll.scrollTo(0,old);});}
                 JSONObject question=task.optJSONObject("question");String notice=!feedback.isEmpty()?feedback:question==null?"":question.optString("text");questionLabel.setText(notice);questionLabel.setVisibility(notice.isEmpty()?View.GONE:View.VISIBLE);
-                answer.setHint(question==null?"Message "+name+"?":"Reply to continue?");send.setEnabled(!sending);send.setAlpha(sending||draft.trim().isEmpty()?.5f:1f);
+                answer.setHint(question==null?"Message "+name+"\u2026":"Reply to continue\u2026");send.setEnabled(!sending);send.setAlpha(sending||draft.trim().isEmpty()?.5f:1f);
                 controls.removeAllViews();String status=task.optString("status");
                 if(!id.isEmpty()&&(status.equals("paused")||status.equals("queued")))icon(controls,"play","Resume Mobile Use",()->{armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);call("resume",new JSONObject(),this::pollSoon);});
                 if(mobileLive())icon(controls,"pause","Pause Mobile Use",()->control("pause"));
@@ -168,7 +168,7 @@ public class MobileOverlayService extends Service {
             String result=task.optString("output");JSONArray trace=task.optJSONArray("trace");if(trace!=null&&trace.length()>0)result+="\n\n"+trace.optJSONObject(trace.length()-1).optString("text");
             if(result.isEmpty())result=task.optString("prompt");return result+(task.optString("error").isEmpty()?"":"\n\n"+task.optString("error"));
         }
-        JSONObject progress=progress();String result=progress.optString("text");JSONArray tools=progress.optJSONArray("tools");if(busy()&&tools!=null&&tools.length()>0){JSONObject tool=tools.optJSONObject(tools.length()-1);result+="\n\n"+tool.optString("name")+" ? "+tool.optString("status");}
+        JSONObject progress=progress();String result=progress.optString("text");JSONArray tools=progress.optJSONArray("tools");if(busy()&&tools!=null&&tools.length()>0){JSONObject tool=tools.optJSONObject(tools.length()-1);result+="\n\n"+tool.optString("name")+" \u00b7 "+tool.optString("status");}
         if(result.isEmpty()){JSONArray messages=botState.optJSONArray("messages");if(messages!=null)for(int i=messages.length()-1;i>=0;i--){JSONObject message=messages.optJSONObject(i);if(message.optString("role").equals("assistant")){result=message.optString("text");break;}}}
         return result.isEmpty()?"Send a message to keep working with your bot.":result.substring(Math.max(0,result.length()-6000));
     }
