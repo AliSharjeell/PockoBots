@@ -24,7 +24,7 @@ public class MobileOverlayService extends Service {
     private boolean expanded,attached,closing,suspended,pinned,sending,built,renderedCircle;private EditText answer;private float startX,startY;private int windowX,windowY;
     private String ownerId="",bodySignature="",feedback="";private JSONObject botState=new JSONObject();
     private LinearLayout header,captions,meta,logs,controls;private TextView heading,detail,questionLabel;private ScrollView logScroll;private AgentIcon send;
-    private int keyboardBottom;private long clockStart,clockEnd;private boolean clockLive;private String builtAvatar="";
+    private int keyboardBottom,beforeKeyboardY=-1;private long clockStart,clockEnd;private boolean clockLive;private String builtAvatar="";
     private long armingUntil;private int passThroughRequests;
     private NotificationManager notifications;private ChatMarkdown markdown;
     private WorkingAvatarView botAvatar;private JSONObject avatarBot=new JSONObject();private String avatarOwner="";private ValueAnimator morph;private boolean renderedExpanded;private int targetHeight,targetWidth;
@@ -38,8 +38,8 @@ public class MobileOverlayService extends Service {
         layout.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;layout.x=0;layout.y=dp(24);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
         AgentStyle.applyTheme(this);surface.setElevation(dp(10));applyGlass();surface.setClipToOutline(true);
-        layout.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN;
-        surface.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){int bottom=insets.getInsets(WindowInsets.Type.ime()).bottom;if(bottom!=keyboardBottom){keyboardBottom=bottom;main.post(this::sizePanel);}}return insets;});
+        layout.softInputMode=(Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING:WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN;
+        surface.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){int bottom=windows.getCurrentWindowMetrics().getWindowInsets().getInsets(WindowInsets.Type.ime()).bottom;if(bottom!=keyboardBottom){if(bottom>0&&keyboardBottom==0)beforeKeyboardY=layout.y;if(bottom==0&&beforeKeyboardY>=0){layout.y=beforeKeyboardY;beforeKeyboardY=-1;}keyboardBottom=bottom;main.post(this::sizePanel);}}return insets;});
         surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());}
         catch(Exception e){MobileAccess.authorize(false);stopSelf();return;}
@@ -47,27 +47,27 @@ public class MobileOverlayService extends Service {
     }
     int dp(int value){return AgentStyle.dp(this,value);}
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        if(intent==null)return START_NOT_STICKY;
+        if(intent==null){String restored=getSharedPreferences("floating-bot",0).getString("botId","");if(restored.isEmpty()){stopSelf();return START_NOT_STICKY;}intent=new Intent(this,MobileOverlayService.class).putExtra("botId",restored);}
         String action=intent.getAction();
         if("pause".equals(action)||"stop".equals(action)){control(action);return START_NOT_STICKY;}
         if("close".equals(action)){dismiss();return START_NOT_STICKY;}
-        String owner=intent.getStringExtra("botId");if(owner!=null&&!owner.isEmpty()){if(!owner.equals(ownerId)){ownerId=owner;id="";activeTask="";task=new JSONObject();botState=new JSONObject();avatarBot=new JSONObject();draft="";built=false;}pinned=true;}
+        String owner=intent.getStringExtra("botId");if(owner!=null&&!owner.isEmpty()){if(!owner.equals(ownerId)){ownerId=owner;id="";activeTask="";task=new JSONObject();botState=new JSONObject();avatarBot=new JSONObject();draft="";built=false;}pinned=true;getSharedPreferences("floating-bot",0).edit().putString("botId",owner).apply();}
         String next=intent.getStringExtra("taskId");
         if(next!=null&&!next.equals(id)){id=next;activeTask=next;ownerId="";botState=new JSONObject();avatarBot=new JSONObject();signature="";task=new JSONObject();built=false;}
         if(intent.getBooleanExtra("expand",false))expanded=true;
         if(!Settings.canDrawOverlays(this)){MobileAccess.authorize(false);stopSelf();return START_NOT_STICKY;}
         MobileAccess.syncToken(this);if(next!=null){armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);}
         if(!attached){windows.addView(surface,layout);attached=true;}
-        render();pollSoon();return START_NOT_STICKY;
+        render();pollSoon();return pinned?START_STICKY:START_NOT_STICKY;
     }
     private Notification notification(String value){
         Intent open=new Intent(this,BotsActivity.class).putExtra("botId",ownerId);
         Notification.Builder builder=new Notification.Builder(this,"mobile-tasks").setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentTitle("PockoBots · Floating bot").setContentText(value).setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this,2,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
-        for(String action:new String[]{"pause","stop"})builder.addAction(new Notification.Action.Builder(null,action.equals("pause")?"Pause":"Stop",
+        if(mobileLive())for(String action:new String[]{"pause","stop"})builder.addAction(new Notification.Action.Builder(null,action.equals("pause")?"Pause":"Stop",
             PendingIntent.getService(this,action.equals("pause")?3:4,new Intent(this,MobileOverlayService.class).setAction(action),PendingIntent.FLAG_IMMUTABLE)).build());
-        return builder.build();
+        builder.addAction(new Notification.Action.Builder(null,"Dismiss",PendingIntent.getService(this,5,new Intent(this,MobileOverlayService.class).setAction("close"),PendingIntent.FLAG_IMMUTABLE)).build());return builder.build();
     }
     public static boolean pinnedFor(String bot){MobileOverlayService service=instance;return service!=null&&service.pinned&&service.ownerId.equals(bot);}
     private void poll(){
@@ -94,12 +94,12 @@ public class MobileOverlayService extends Service {
     private JSONObject activeJob(){JSONArray jobs=botState.optJSONArray("jobs");if(jobs!=null)for(int i=0;i<jobs.length();i++){JSONObject job=jobs.optJSONObject(i);if(job!=null&&java.util.Arrays.asList("running","waiting","arming","queued").contains(job.optString("status")))return job;}return null;}
     private boolean busy(){return mobileLive()||activeJob()!=null;}
     private void applyGlass(){
-        android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,AgentStyle.dark?new int[]{0xed303034,0xe91b1b1f,0xed242428}:new int[]{0xf0eeeef1,0xe1d6d6dc,0xf0f2f2f4});
+        android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,AgentStyle.dark?new int[]{0xd0303034,0xbf1b1b1f,0xd5242428}:new int[]{0xe2eeeef1,0xc9d6d6dc,0xe2f2f2f4});
         glass.setCornerRadius(dp(28));glass.setStroke(dp(1),AgentStyle.dark?0x55ffffff:0x99ffffff);surface.setBackground(glass);
     }
-    private void hideKeyboard(){if(answer!=null){((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(answer.getWindowToken(),0);answer.clearFocus();}keyboardBottom=0;}
+    private void hideKeyboard(){if(answer!=null){((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(answer.getWindowToken(),0);answer.clearFocus();}keyboardBottom=0;if(beforeKeyboardY>=0){layout.y=beforeKeyboardY;beforeKeyboardY=-1;}}
     private void toggle(){hideKeyboard();expanded=!expanded;built=false;render();}
-    private void dismiss(){hideKeyboard();pinned=false;if(mobileLive())control("pause");stopSelf();}
+    private void dismiss(){hideKeyboard();pinned=false;getSharedPreferences("floating-bot",0).edit().remove("botId").apply();if(mobileLive())control("pause");stopSelf();}
     private void call(String endpoint,JSONObject body,Runnable done){
         String selected=id;requests.execute(() -> {try{api.request("POST","/mobile/tasks/"+selected+"/"+endpoint,body);main.post(done);}
             catch(Exception e){main.post(() -> {MobileAccess.authorize(false);try{task.put("error",e.getMessage());}catch(Exception ignored){}expanded=true;render();});}});
@@ -194,7 +194,7 @@ public class MobileOverlayService extends Service {
         if(surface==null||!attached||closing)return;
         layout.flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|(expanded?0:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)|(suspended||passThroughRequests>0?WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE:0);
         int width=renderedCircle?dp(54):Math.min(dp(expanded?344:280),getResources().getDisplayMetrics().widthPixels-dp(24));
-        if(expanded&&logScroll!=null){int available=getResources().getDisplayMetrics().heightPixels-keyboardBottom-dp(230);logScroll.getLayoutParams().height=Math.max(dp(60),Math.min(dp(190),available));logScroll.requestLayout();}
+        if(expanded&&logScroll!=null){int available=getResources().getDisplayMetrics().heightPixels-keyboardBottom-dp(230);logScroll.getLayoutParams().height=Math.max(dp(60),Math.min(dp(190),available));logScroll.requestLayout();if(controls!=null)controls.setVisibility(keyboardBottom>0&&available<dp(100)?View.GONE:View.VISIBLE);}
         surface.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(Math.max(dp(150),getResources().getDisplayMetrics().heightPixels-keyboardBottom-dp(40)),View.MeasureSpec.AT_MOST));
         int height=surface.getMeasuredHeight();layout.width=width;layout.height=height;clampPosition(width,height);windows.updateViewLayout(surface,layout);targetWidth=width;targetHeight=height;
     }
