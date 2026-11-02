@@ -144,15 +144,27 @@ public class RuntimeService extends Service {
                 main.post(()->{try{
                     String url=action.optString("url");if(!BotPreviewActivity.valid(url))throw new IllegalArgumentException("Invalid preview URL");
                     if(android.provider.Settings.canDrawOverlays(this))startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("botId",action.optString("botId")));
-                    startActivity(new Intent(this,BotPreviewActivity.class).putExtra("url",url).putExtra("refresh",action.optBoolean("refresh")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                    new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",true));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-receipt").start();
-                }catch(Exception error){new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",false).put("error",error.getMessage()));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-failure").start();}});
+                    openRequestedPreview(action,0);
+                }catch(Exception error){previewReceipt(action,false,error.getMessage());}});
+
             }
             Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
             if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;
             if(task.equals(MobileOverlayService.activeTask)&&MobileAccess.allowed()){botApi.request("POST","/bots/phone/ready",new JSONObject().put("taskId",task));}
             else main.post(() -> {try{startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",task).putExtra("botName",request.optString("botName")));}catch(RuntimeException e){android.util.Log.w("PocketBots","Open the app to start this phone task",e);}});
         }catch(Exception e){android.util.Log.w("PocketBots","Bot controller poll will retry: "+e.getClass().getSimpleName());}
+    }
+    private void openRequestedPreview(JSONObject action,int attempt){
+        if(stopping){previewReceipt(action,false,"Runtime stopped");return;}
+        if(android.provider.Settings.canDrawOverlays(this)&&!MobileOverlayService.visibleFor(action.optString("botId"))){
+            if(attempt>=12){previewReceipt(action,false,"Open PockoBots and try the preview again");return;}
+            main.postDelayed(()->openRequestedPreview(action,attempt+1),100);return;
+        }
+        try{startActivity(new Intent(this,BotPreviewActivity.class).putExtra("url",action.optString("url")).putExtra("refresh",action.optBoolean("refresh")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));previewReceipt(action,true,null);}
+        catch(Exception error){previewReceipt(action,false,error.getMessage());}
+    }
+    private void previewReceipt(JSONObject action,boolean opened,String error){
+        new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",opened).put("error",error));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-receipt").start();
     }
     private static void stopProcess(java.lang.Process process, int pid) throws InterruptedException, IOException {
         if (!process.isAlive()) return;

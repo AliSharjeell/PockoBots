@@ -70,6 +70,7 @@ public class MobileOverlayService extends Service {
         builder.addAction(new Notification.Action.Builder(null,"Dismiss",PendingIntent.getService(this,5,new Intent(this,MobileOverlayService.class).setAction("close"),PendingIntent.FLAG_IMMUTABLE)).build());return builder.build();
     }
     public static boolean pinnedFor(String bot){MobileOverlayService service=instance;return service!=null&&service.pinned&&service.ownerId.equals(bot);}
+    static boolean visibleFor(String bot){MobileOverlayService service=instance;return service!=null&&service.attached&&service.ownerId.equals(bot)&&service.surface.getAlpha()>0;}
     private void poll(){
         if(closing||api==null||id.isEmpty()&&ownerId.isEmpty())return;
         String selected=id,owner=ownerId;
@@ -98,7 +99,7 @@ public class MobileOverlayService extends Service {
         glass.setCornerRadius(dp(28));glass.setStroke(dp(1),AgentStyle.dark?0x55ffffff:0x99ffffff);surface.setBackground(glass);
     }
     private void hideKeyboard(){if(answer!=null){((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(answer.getWindowToken(),0);answer.clearFocus();}keyboardBottom=0;if(beforeKeyboardY>=0){layout.y=beforeKeyboardY;beforeKeyboardY=-1;}}
-    private void toggle(){hideKeyboard();expanded=!expanded;built=false;render();}
+    private void toggle(){hideKeyboard();expanded=!expanded;built=false;render();if(ValueAnimator.areAnimatorsEnabled()){surface.setAlpha(.85f);surface.setScaleX(.97f);surface.setScaleY(.97f);surface.animate().alpha(1).scaleX(1).scaleY(1).setDuration(180).start();}}
     private void dismiss(){hideKeyboard();pinned=false;getSharedPreferences("floating-bot",0).edit().remove("botId").apply();if(mobileLive())control("pause");stopSelf();}
     private void call(String endpoint,JSONObject body,Runnable done){
         String selected=id;requests.execute(() -> {try{api.request("POST","/mobile/tasks/"+selected+"/"+endpoint,body);main.post(done);}
