@@ -163,6 +163,13 @@ export class MobileTasks {
     return task;
     } finally { this.launching = false; }
   }
+  async steer(id:string,text:string) {
+    const task=this.state(id),agent=this.agents.get(id);
+    if(task.status!=="running"||!agent||this.cliRuns.has(id))return false;
+    if(!text.trim()||text.length>16000)throw Error("Enter an update of at most 16000 characters");
+    agent.steer({role:"user",content:"Owner update to the current task: "+text.trim(),timestamp:Date.now()});
+    task.history.push({role:"user",text:text.trim()});await this.changed(task);return true;
+  }
   async answer(id: string, questionId: string, text: unknown) {
     const task = this.state(id);
     if (!task.question || task.question.id !== questionId || typeof text !== "string" || !text.trim() || text.length > 4000) throw Error("Question expired or reply is invalid");

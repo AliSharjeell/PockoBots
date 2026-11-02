@@ -168,6 +168,8 @@ export class Bots {
   }
   async sendOwnerMessage(id:string,text:unknown){
     const bot=this.get(id);if(typeof text!=="string"||!text.trim()||text.length>16000)throw Error("Enter a message of at most 16000 characters");const active=this.jobs.find(job=>job.botId===id&&["running","waiting"].includes(job.status));
+    const phone=active?.phoneTaskId||active?.mobileTaskId;
+    if(active&&phone&&await this.mobile.steer(phone,text.trim())){this.message(id,"user",text.trim(),active.id);await this.changed();return {...active,delivery:"steered"};}
     if(active&&!active.phoneTaskId&&!active.mobileTaskId&&await this.sessions.steer(bot.sessionId,text.trim())){this.message(id,"user",text.trim(),active.id);await this.changed();return {...active,delivery:"steered"};}
     return {...await this.enqueue(id,text),delivery:"queued"};
   }
