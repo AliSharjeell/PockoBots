@@ -22,6 +22,7 @@ import { registerProviderRoutes } from "./providers.js";
 import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
 import {Previews} from './previews.js';
+import {BackupModel} from './backup-model.js';
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -37,6 +38,7 @@ export async function createApp(options: {
   const store = new Store(options.stateDir);
   await store.init();
   const token = await store.token();
+  const backup=new BackupModel(store);await backup.init();
   let settings = validateSettings(
     await store.read<Settings>("settings", defaults),
     defaults,
@@ -49,9 +51,9 @@ export async function createApp(options: {
   const connectors = new Connectors(store, `http://127.0.0.1:${port}/api/oauth/mcp/callback`); await connectors.init();
   const redact = (value: unknown) => {
     const json = JSON.stringify(value);
-    return connectors.redact(settings.apiKey
+    return backup.redact(connectors.redact(settings.apiKey
       ? json.split(settings.apiKey).join("[redacted]")
-      : json);
+      : json));
   };
   const publish = (e: unknown) => {
     const data = `data: ${redact(e)}\n\n`;
@@ -63,17 +65,17 @@ export async function createApp(options: {
     store,
     workspace,
     processes,
-    () => settings,
+    () => backup.current(settings),
     publish,
     projects,
   );
   await sessions.init();
-  const mobile = new MobileTasks(store, () => settings, token, publish, options.mobileBridgeBase);
+  const mobile = new MobileTasks(store, () => backup.current(settings), token, publish, options.mobileBridgeBase);
   await mobile.init();
   const previews=new Previews(store);await previews.init();
-  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text),previews);
+  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews);
   await bots.init();
-  const groups = new Groups(store,bots,publish,text=>connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)); await groups.init();
+  const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -114,7 +116,7 @@ export async function createApp(options: {
   app.get("/api/state", (_req, res) =>
     res.json({
       workspace: workspace.root,
-      settings: publicSettings(settings),
+      settings: backup.view(settings),
       sessions: sessions.list(),
       jobs: [...processes.jobs.values()],
       projects: projects.list(),
@@ -151,10 +153,12 @@ export async function createApp(options: {
     const next = validateSettings(req.body, settings);
     await store.write("settings", next);
     settings = next;
-    res.json(publicSettings(settings));
+    res.json(backup.view(settings));
   });
   // The owner settings form reads this explicitly; shared state remains redacted.
   app.get("/api/settings/key", (_req,res)=>{res.setHeader("Cache-Control","no-store");res.json({apiKey:settings.apiKey});});
+  app.post('/api/settings/backup',async(req,res)=>{if(sessions.anyBusy()||mobile.anyBusy())throw Error('Wait for the active task before changing models');await backup.configure(req.body);res.json(backup.view(settings));});
+  app.put('/api/settings/backup',async(req,res)=>{if(sessions.anyBusy()||mobile.anyBusy())throw Error('Wait for the active task before changing models');await backup.toggle(req.body.enabled);res.json(backup.view(settings));});
   app.post("/api/settings/test", async (req, res) =>
     res.json(await testConnection(validateSettings(req.body, settings))),
   );
