@@ -21,6 +21,7 @@ import { Groups } from "./groups.js";
 import { registerProviderRoutes } from "./providers.js";
 import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
+import {Previews} from './previews.js';
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -69,7 +70,8 @@ export async function createApp(options: {
   await sessions.init();
   const mobile = new MobileTasks(store, () => settings, token, publish, options.mobileBridgeBase);
   await mobile.init();
-  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text));
+  const previews=new Previews(store);await previews.init();
+  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text),previews);
   await bots.init();
   const groups = new Groups(store,bots,publish,text=>connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)); await groups.init();
   const app = express();
@@ -169,6 +171,8 @@ export async function createApp(options: {
   app.get("/api/bots", (_req, res) => res.type("json").send(redact({ enabled: bots.enabled, bots: bots.list() })));
   app.put("/api/bots/engine", async (req, res) => { await bots.engine(req.body.enabled); res.json({ enabled: bots.enabled }); });
   app.get("/api/bots/phone", (_req, res) => res.json(bots.phoneRequest()));
+  app.get('/api/previews/pending',(_req,res)=>res.json({action:previews.pending()}));
+  app.post('/api/previews/:id/ack',async(req,res)=>res.json(await previews.acknowledge(req.params.id,req.body.opened===true,req.body.error)));
   app.get("/api/bots/:id/schedules", (req,res)=>res.type("json").send(redact(bots.listSchedules(req.params.id))));
   app.post("/api/bots/:id/schedules", async(req,res)=>res.status(201).type("json").send(redact(await bots.schedule(req.params.id,req.body))));
   app.delete("/api/bots/:id/schedules/:schedule", async(req,res)=>res.type("json").send(redact(await bots.cancelSchedule(req.params.id,req.params.schedule))));
@@ -199,6 +203,7 @@ export async function createApp(options: {
   app.post("/api/mobile/tasks/:id/pause", async (req, res) => { await mobile.interrupt(req.params.id); res.json({ ok: true }); });
   app.post("/api/mobile/tasks/:id/stop", async (req, res) => { await mobile.interrupt(req.params.id, true); res.json({ ok: true }); });
   app.post("/api/mobile/tasks/:id/answer", async (req, res) => { await mobile.answer(req.params.id, req.body.questionId, req.body.text); res.json({ ok: true }); });
+  app.post("/api/mobile/tasks/:id/steer", async (req,res)=>{if(typeof req.body.text!=="string"||!await mobile.steer(req.params.id,req.body.text))throw Error("This Mobile Use task cannot accept live updates. Send the update to its bot chat to queue it.");res.json({delivery:"steered"});});
   app.delete("/api/mobile/tasks/:id", async (req, res) => { await mobile.remove(req.params.id); res.json({ ok: true }); });
   app.post("/api/projects", async (req, res) =>
     res.status(201).json(await projects.create(req.body.name)),
