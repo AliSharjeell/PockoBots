@@ -91,6 +91,25 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
     private void refresh(boolean rebuild){if(!visible||api==null)return;if(polling){main.postDelayed(()->refresh(rebuild),100);return;}polling=true;String id=selected;io.execute(()->{try{JSONObject next=api.get("/state"),nextDetail=id.isEmpty()?null:api.get("/bots/"+id);main.post(()->{polling=false;if(!visible||!id.equals(selected))return;state=next;detail=nextDetail;if(!next.optBoolean("botEngineEnabled"))request("PUT","/bots/engine",json("enabled",true),v->{});String changed=(id.isEmpty()?next.optJSONArray("bots"):nextDetail).toString()+next.optJSONArray("groups");if(rebuild||body==null){shell();signature="";}if(!signature.equals(changed)){signature=changed;if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}main.postDelayed(poll,1000);});}catch(Exception e){main.post(()->{polling=false;if(visible){main.postDelayed(poll,2000);if(rebuild)error(e);}});}});}
+    private void toggleFloatingBot(){
+        if(!Settings.canDrawOverlays(this)){Toast.makeText(this,"Allow display over other apps, then choose Floating bot again.",Toast.LENGTH_LONG).show();startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));return;}
+        boolean pinned=MobileOverlayService.pinnedFor(selected);startForegroundService(pinned?new Intent(this,MobileOverlayService.class).setAction("close"):new Intent(this,MobileOverlayService.class).putExtra("botId",selected).putExtra("expand",true));
+        Toast.makeText(this,pinned?"Floating bot dismissed":"Your bot stays available over other apps",Toast.LENGTH_SHORT).show();
+    }
+    private void chatOptions(View anchor){
+        if(detail==null||detail.optJSONObject("bot")==null)return;JSONObject bot=detail.optJSONObject("bot");String botId=selected;
+        LinearLayout menu=column();menu.setPadding(dp(10),dp(10),dp(10),dp(10));
+        View glass=GlassControls.wrap(menu,22f,false);menu.setLayoutParams(new FrameLayout.LayoutParams(-1,-2));GlassControls.bindPopup(glass,this);
+        PopupWindow popup=new PopupWindow(glass,dp(244),-2,true);popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));popup.setOutsideTouchable(true);popup.setElevation(dp(8));
+        TextView floating=text(MobileOverlayService.pinnedFor(selected)?"Dismiss floating bot":"Floating bot",14);floating.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(floating);floating.setOnClickListener(v->{popup.dismiss();toggleFloatingBot();});
+        View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);menu.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+        String current=bot.optString("effort","high");TextView effort=text("Effort: "+current+"  \u2304",14);effort.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(effort);
+        LinearLayout choices=column();choices.setVisibility(View.GONE);menu.addView(choices);String[] levels={"low","medium","high","xhigh","max"},labels={"Low","Medium","High","Extra high","Max"};
+        for(int i=0;i<levels.length;i++){String level=levels[i];TextView item=text(labels[i]+(level.equals(current)?"  \u2713":""),14);item.setPadding(dp(14),dp(10),dp(14),dp(10));item.setTextColor(level.equals(current)?AgentStyle.BLUE:AgentStyle.TEXT);choices.addView(item);item.setOnClickListener(v->{popup.dismiss();request("PUT","/bots/"+botId,json("effort",level),value->{if(selected.equals(botId)){detail.put("bot",value);refresh(false);}Toast.makeText(this,"Effort saved for new tasks",Toast.LENGTH_SHORT).show();});});}
+        TextView hint=muted("New tasks; model/provider support varies.",10);hint.setPadding(dp(10),dp(2),dp(10),dp(8));menu.addView(hint);
+        effort.setOnClickListener(v->{choices.setVisibility(choices.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);popup.update(dp(244),-2);});
+        popup.showAsDropDown(anchor,0,dp(8),Gravity.END);
+    }
     private void open(String id){animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}
     void showSettingsPage(String name){showScreen(name);}
@@ -121,11 +140,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             TextView name=text(bot.optString("name"),17);name.setTextColor(AgentStyle.TEXT);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);header.addView(GlassControls.wrap(identity,24f,false),new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
-            AgentIcon floating=new AgentIcon(this,"floating","Keep this bot in a floating pill",()->{
-                if(!Settings.canDrawOverlays(this)){Toast.makeText(this,"Allow display over other apps, then tap the floating button again.",Toast.LENGTH_LONG).show();startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));return;}
-                boolean pinned=MobileOverlayService.pinnedFor(selected);startForegroundService(pinned?new Intent(this,MobileOverlayService.class).setAction("close"):new Intent(this,MobileOverlayService.class).putExtra("botId",selected).putExtra("expand",true));
-                Toast.makeText(this,pinned?"Floating bot dismissed":"Your bot stays available over other apps",Toast.LENGTH_SHORT).show();
-            });header.addView(GlassControls.wrap(floating,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
+            AgentIcon menu=new AgentIcon(this,"chatmenu","Bot options",()->{});menu.setOnClickListener(this::chatOptions);
+            header.addView(GlassControls.wrap(menu,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
         }else{
             String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen;
             TextView name=text(title,settingsChild()?22:28);
@@ -384,7 +400,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     }
     private void send(){
         String value=composer.getText().toString().trim();if(value.isEmpty())return;
-        if(state.optJSONObject("settings").optString("executionProvider","byok").equals("byok")&&!state.optJSONObject("settings").optBoolean("hasKey")){
+        if(state.optJSONObject("settings").optString("executionProvider","byok").equals("byok")&&!state.optJSONObject("settings").optBoolean("hasActiveKey",state.optJSONObject("settings").optBoolean("hasKey"))){
             new AlertDialog.Builder(this).setTitle("Connect your model").setMessage("Save your BYOK connection before sending tasks. Your draft will be kept.").setPositiveButton("Open settings",(d,n)->showScreen("Settings")).setNegativeButton("Cancel",null).show();
             return;
         }

@@ -54,6 +54,11 @@ internal fun Modifier.pockoGlass(dark: Boolean, corner: Dp, primary: Boolean = f
 
 object GlassControls {
     @JvmStatic
+    fun bindPopup(view: View, owner: ComponentActivity) {
+        view.setViewTreeLifecycleOwner(owner)
+        view.setViewTreeSavedStateRegistryOwner(owner)
+    }
+    @JvmStatic
     fun bindDialog(dialog: Dialog, owner: ComponentActivity) {
         dialog.window?.decorView?.apply {
             setViewTreeLifecycleOwner(owner)
