@@ -31,6 +31,7 @@ final class AgentIcon extends View {
             case "pause":resource=R.drawable.lucide_pause;break;
             case "play":resource=R.drawable.lucide_play;break;
             case "open":resource=R.drawable.lucide_external_link;break;
+            case "floating":resource=R.drawable.floating_bot;break;
             case "up":resource=R.drawable.lucide_chevron_up;break;
             case "down":resource=R.drawable.lucide_chevron_down;break;
             case "stop":resource=R.drawable.lucide_square;break;

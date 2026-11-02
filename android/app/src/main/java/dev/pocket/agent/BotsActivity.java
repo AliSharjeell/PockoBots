@@ -121,7 +121,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             TextView name=text(bot.optString("name"),17);name.setTextColor(AgentStyle.TEXT);name.setTypeface(AgentStyle.font(this),Typeface.BOLD);
             name.setSingleLine(true);name.setMaxWidth(Math.max(dp(60),getResources().getDisplayMetrics().widthPixels-dp(180)));name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);header.addView(GlassControls.wrap(identity,24f,false),new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
-            AgentIcon floating=new AgentIcon(this,"open","Keep this bot in a floating pill",()->{
+            AgentIcon floating=new AgentIcon(this,"floating","Keep this bot in a floating pill",()->{
                 if(!Settings.canDrawOverlays(this)){Toast.makeText(this,"Allow display over other apps, then tap the floating button again.",Toast.LENGTH_LONG).show();startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));return;}
                 boolean pinned=MobileOverlayService.pinnedFor(selected);startForegroundService(pinned?new Intent(this,MobileOverlayService.class).setAction("close"):new Intent(this,MobileOverlayService.class).putExtra("botId",selected).putExtra("expand",true));
                 Toast.makeText(this,pinned?"Floating bot dismissed":"Your bot stays available over other apps",Toast.LENGTH_SHORT).show();
