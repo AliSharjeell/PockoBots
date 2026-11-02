@@ -51,9 +51,9 @@ public class MobileOverlayService extends Service {
         String action=intent.getAction();
         if("pause".equals(action)||"stop".equals(action)){control(action);return START_NOT_STICKY;}
         if("close".equals(action)){dismiss();return START_NOT_STICKY;}
-        String owner=intent.getStringExtra("botId");if(owner!=null&&!owner.isEmpty()){if(!owner.equals(ownerId)){ownerId=owner;id="";activeTask="";task=new JSONObject();botState=new JSONObject();avatarBot=new JSONObject();draft="";built=false;}pinned=true;getSharedPreferences("floating-bot",0).edit().putString("botId",owner).apply();}
+        String owner=intent.getStringExtra("botId");if(owner!=null&&!owner.isEmpty()){if(!owner.equals(ownerId)){hideKeyboard();answer=null;ownerId=owner;id="";activeTask="";task=new JSONObject();botState=new JSONObject();avatarBot=new JSONObject();draft="";built=false;}pinned=true;getSharedPreferences("floating-bot",0).edit().putString("botId",owner).apply();}
         String next=intent.getStringExtra("taskId");
-        if(next!=null&&!next.equals(id)){id=next;activeTask=next;ownerId="";botState=new JSONObject();avatarBot=new JSONObject();signature="";task=new JSONObject();built=false;}
+        if(next!=null&&!next.equals(id)){String hint=intent.getStringExtra("ownerBotId");if(hint==null||!hint.equals(ownerId)){hideKeyboard();answer=null;draft="";ownerId=hint==null?"":hint;botState=new JSONObject();avatarBot=new JSONObject();built=false;}id=next;activeTask=next;signature="";task=new JSONObject();}
         if(intent.getBooleanExtra("expand",false))expanded=true;
         if(!Settings.canDrawOverlays(this)){MobileAccess.authorize(false);stopSelf();return START_NOT_STICKY;}
         MobileAccess.syncToken(this);if(next!=null){armingUntil=System.currentTimeMillis()+5000;MobileAccess.authorize(true);}
@@ -86,7 +86,7 @@ public class MobileOverlayService extends Service {
                 String previous=task.optString("status");
                 if(fetched!=null){task=fetched;id=task.optString("id");activeTask=id;}else if(identity!=null){task=new JSONObject();id="";activeTask="";}
                 if(!mobileLive()&&System.currentTimeMillis()>armingUntil)MobileAccess.authorize(false);
-                if(task.optString("status").equals("waiting")&&!previous.equals("waiting")){expanded=true;built=false;}
+                if(task.optString("status").equals("waiting")&&!previous.equals("waiting")&&!expanded){expanded=true;built=false;}
                 feedback="";render();notifications.notify(2,notification(avatarBot.optString("name","Bot")+(busy()?" is working":" is ready")));
             });
         }catch(Exception error){main.post(()->{if(!closing){feedback="Connection lost. Reconnecting\u2026";render();}});}

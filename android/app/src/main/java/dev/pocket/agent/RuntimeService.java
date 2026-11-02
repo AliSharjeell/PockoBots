@@ -151,7 +151,7 @@ public class RuntimeService extends Service {
             Object pending=botApi.request("GET","/bots/phone",null);if(!(pending instanceof JSONObject))return;JSONObject request=(JSONObject)pending;String task=request.optString("taskId");if(task.isEmpty())return;
             if(getSystemService(KeyguardManager.class).isDeviceLocked()||!android.provider.Settings.canDrawOverlays(this)||com.artemis.helper.ArtemisAccessibilityService.getInstance()==null)return;
             if(task.equals(MobileOverlayService.activeTask)&&MobileAccess.allowed()){botApi.request("POST","/bots/phone/ready",new JSONObject().put("taskId",task));}
-            else main.post(() -> {try{startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",task).putExtra("botName",request.optString("botName")));}catch(RuntimeException e){android.util.Log.w("PocketBots","Open the app to start this phone task",e);}});
+            else main.post(() -> {try{startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",task).putExtra("ownerBotId",request.optString("botId")).putExtra("botName",request.optString("botName")));}catch(RuntimeException e){android.util.Log.w("PocketBots","Open the app to start this phone task",e);}});
         }catch(Exception e){android.util.Log.w("PocketBots","Bot controller poll will retry: "+e.getClass().getSimpleName());}
     }
     private void openRequestedPreview(JSONObject action,int attempt){
