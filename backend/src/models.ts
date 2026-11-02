@@ -11,13 +11,15 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { subscriptions } from "./providers.js";
 import type { Settings } from "./storage.js";
 export function connection(settings: Settings, vision = false) {
+  const minimax=/^MiniMax-M3/i.test(settings.model);
   const model: Model<Api> = {
-    id: settings.model,
+    id: minimax?settings.model.replace(/\[1m\]$/i,''):settings.model,
     name: settings.model,
     api: settings.api,
     provider: settings.provider,
     baseUrl: settings.baseUrl,
-    reasoning: false,
+    reasoning: minimax||/^(gpt-5|o[134](?:-|$)|claude-)/i.test(settings.model),
+    ...(minimax?{thinkingLevelMap:{off:null,low:'low',medium:'medium',high:'high',xhigh:'xhigh',max:'max'},...(settings.api==='anthropic-messages'?{compat:{forceAdaptiveThinking:true}}:{})}:{}),
     input: vision ? ["text", "image"] : ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: settings.contextWindow,
@@ -64,7 +66,7 @@ export async function testConnection(settings: Settings) {
         { role: "user", content: "Reply with OK only.", timestamp: Date.now() },
       ],
     },
-    { signal: AbortSignal.timeout(30000), maxTokens: 64 },
+    { signal: AbortSignal.timeout(30000), maxTokens: 1024, reasoning: model.reasoning?'low':undefined },
   );
   if (result.stopReason === "error" || result.stopReason === "aborted"){
     const message=result.errorMessage||'Connection test failed';

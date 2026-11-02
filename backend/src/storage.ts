@@ -44,6 +44,7 @@ export class Store {
     return token;
   }
 }
+export type Effort='low'|'medium'|'high'|'xhigh'|'max';
 export type Settings = {
   executionProvider?: "byok" | "codex" | "claude" | "opencode" | "gemini";
   providerModel?: string;
