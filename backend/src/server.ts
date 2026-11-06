@@ -22,6 +22,7 @@ import { registerProviderRoutes } from "./providers.js";
 import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
 import {Previews} from './previews.js';
+import {Webhooks} from './webhooks.js';
 import {BackupModel} from './backup-model.js';
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
@@ -75,16 +76,19 @@ export async function createApp(options: {
   const previews=new Previews(store);await previews.init();
   const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews);
   await bots.init();
+  const webhooks = new Webhooks(store, bots); await webhooks.init();
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
+    const isWebhook = req.path === "/api/webhooks/bot" || req.path.startsWith("/api/webhooks/bot/");
     const host = req.headers.host;
-    if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
+    if (!isWebhook && host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
       res.status(403).json({ error: "Invalid host" });
       return;
     }
     if (
+      !isWebhook &&
       req.headers.origin &&
       ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(
         req.headers.origin,
@@ -104,6 +108,9 @@ export async function createApp(options: {
   app.use(express.json({ limit: "2mb" }));
   registerMarketplaceCallback(app,connectors,port);
   app.use("/api", (req, res, next) => {
+    if (req.path === "/webhooks/bot" || req.path.startsWith("/webhooks/bot/")) {
+      return next();
+    }
     const candidate = req.headers.authorization?.replace(/^Bearer /, "") || "";
     const digest = (x: string) => createHash("sha256").update(x).digest();
     if (!timingSafeEqual(digest(candidate), digest(token))) {
@@ -122,6 +129,7 @@ export async function createApp(options: {
       projects: projects.list(),
       mobileTasks: mobile.list(),
       groups: groups.list(), bots: bots.list(), botEngineEnabled: bots.enabled, connectors: connectors.list(),
+      webhooks: webhooks.getConfig(port),
     }),
   );
   app.get("/api/events", (req, res) => {
@@ -183,6 +191,63 @@ export async function createApp(options: {
   app.get("/api/bots/alerts", (_req, res) => res.type("json").send(redact(bots.pendingAlerts())));
   app.post("/api/bots/alerts/:id/ack", async (req, res) => { await bots.acknowledgeAlert(req.params.id); res.json({ ok: true }); });
   app.post("/api/bots/:id/alerts", async (req, res) => res.status(201).type("json").send(redact(await bots.alert(req.params.id, req.body.text, req.body.urgent === true))));
+  app.get("/api/webhooks/config", (_req, res) => res.json(webhooks.getConfig(port)));
+  app.put("/api/webhooks/config", async (req, res) => res.json(await webhooks.updateConfig(req.body)));
+  app.post("/api/webhooks/config/regenerate", async (_req, res) => res.json(await webhooks.regenerateSecret()));
+  const extractWebhookSecret = (req: express.Request) => {
+    const auth = req.headers.authorization?.replace(/^Bearer /, "") || "";
+    const custom = (req.headers["x-webhook-secret"] as string) || "";
+    const query = typeof req.query.secret === "string" ? req.query.secret : "";
+    const bodySecret = typeof req.body?.secret === "string" ? req.body.secret : "";
+    return auth || custom || query || bodySecret || undefined;
+  };
+  const isLoopbackReq = (req: express.Request) => {
+    const ip = req.socket?.remoteAddress || req.ip || "";
+    return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  };
+  app.get("/api/webhooks/bot", (req, res) => {
+    if (!webhooks.isAuthorized(extractWebhookSecret(req), isLoopbackReq(req))) {
+      const cfg = webhooks.getConfig(port);
+      if (!cfg.enabled) return res.status(403).json({ error: "External webhook mode is disabled" });
+      return res.status(401).json({ error: "Invalid webhook secret" });
+    }
+    res.json({
+      ok: true,
+      enabled: webhooks.getConfig(port).enabled,
+      bots: bots.list().map(b => ({ id: b.id, name: b.name, allowUrgent: b.allowUrgent })),
+    });
+  });
+  const handleWebhookRoute = async (req: express.Request, res: express.Response) => {
+    const isLoopback = isLoopbackReq(req);
+    const secret = extractWebhookSecret(req);
+    if (!webhooks.isAuthorized(secret, isLoopback)) {
+      const cfg = webhooks.getConfig(port);
+      if (!cfg.enabled) {
+        return res.status(403).json({ error: "External webhook mode is disabled. Enable it in Settings > Connections > External Webhooks." });
+      }
+      return res.status(401).json({ error: "Unauthorized: Invalid webhook secret. Pass it via X-Webhook-Secret header, Authorization: Bearer, or query ?secret=" });
+    }
+    const targetBot = req.params.bot || req.body?.bot || (typeof req.query.bot === "string" ? req.query.bot : "");
+    if (!targetBot) {
+      return res.status(400).json({ error: "Specify a bot by name or id in URL /api/webhooks/bot/:nameOrId or body field 'bot'" });
+    }
+    const payload = {
+      ...req.body,
+      ...(req.query.call === "true" ? { call: true } : {}),
+      ...(req.query.urgent === "true" ? { urgent: true } : {}),
+      ...(typeof req.query.message === "string" ? { message: req.query.message } : {}),
+      ...(typeof req.query.text === "string" ? { text: req.query.text } : {}),
+      ...(typeof req.query.action === "string" ? { action: req.query.action as any } : {}),
+    };
+    try {
+      const result = await webhooks.handleWebhook(targetBot, payload);
+      res.status(200).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Webhook handling failed" });
+    }
+  };
+  app.post("/api/webhooks/bot", handleWebhookRoute);
+  app.post("/api/webhooks/bot/:bot", handleWebhookRoute);
   app.post("/api/bots/phone/ready", (req, res) => { bots.armPhone(req.body.taskId); res.json({ ok: true }); });
   app.post("/api/bots", async (req, res) => res.status(201).json(await bots.create(req.body)));
   app.get("/api/bots/:id", (req, res) => res.type("json").send(redact(bots.state(req.params.id))));
@@ -359,7 +424,7 @@ export async function createApp(options: {
     sessions,
     processes,
     mobile,
-    bots, groups, connectors,
+    bots, groups, connectors, webhooks,
     close: async () => {
       await groups.close(); await bots.close(); await connectors.close();
       sessions.stopAll();
