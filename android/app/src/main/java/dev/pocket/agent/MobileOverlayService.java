@@ -37,9 +37,9 @@ public class MobileOverlayService extends Service {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,PixelFormat.TRANSLUCENT);
         layout.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;layout.x=0;layout.y=dp(24);
         surface=new LinearLayout(this);surface.setOrientation(LinearLayout.VERTICAL);surface.setPadding(dp(12),dp(10),dp(12),dp(10));
-        AgentStyle.applyTheme(this);surface.setElevation(dp(10));applyGlass();surface.setClipToOutline(true);
+        AgentStyle.applyTheme(this);surface.setElevation(dp(16));applyGlass();surface.setClipToOutline(true);
         layout.softInputMode=(Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING:WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN;
-        surface.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){int bottom=windows.getCurrentWindowMetrics().getWindowInsets().getInsets(WindowInsets.Type.ime()).bottom;if(bottom!=keyboardBottom){if(bottom>0&&keyboardBottom==0)beforeKeyboardY=layout.y;if(bottom==0&&beforeKeyboardY>=0){layout.y=beforeKeyboardY;beforeKeyboardY=-1;}keyboardBottom=bottom;main.post(this::sizePanel);}}return insets;});
+        surface.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){int bottom=windows.getCurrentWindowMetrics().getWindowInsets().getInsets(WindowInsets.Type.ime()).bottom;if(bottom!=keyboardBottom){if(bottom>0&&keyboardBottom==0)beforeKeyboardY=layout.y;if(bottom==0&&keyboardBottom>0){resetToBottomMiddle();}keyboardBottom=bottom;main.post(this::sizePanel);}}return insets;});
         surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());}
         catch(Exception e){MobileAccess.authorize(false);stopSelf();return;}
@@ -95,10 +95,14 @@ public class MobileOverlayService extends Service {
     private JSONObject activeJob(){JSONArray jobs=botState.optJSONArray("jobs");if(jobs!=null)for(int i=0;i<jobs.length();i++){JSONObject job=jobs.optJSONObject(i);if(job!=null&&java.util.Arrays.asList("running","waiting","arming","queued").contains(job.optString("status")))return job;}return null;}
     private boolean busy(){return mobileLive()||activeJob()!=null;}
     private void applyGlass(){
-        android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,AgentStyle.dark?new int[]{0xd0303034,0xbf1b1b1f,0xd5242428}:new int[]{0xe2eeeef1,0xc9d6d6dc,0xe2f2f2f4});
-        glass.setCornerRadius(dp(28));glass.setStroke(dp(1),AgentStyle.dark?0x55ffffff:0x99ffffff);surface.setBackground(glass);
+        android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,AgentStyle.dark?new int[]{0xf5141417,0xf00b0b0d,0xf518181c}:new int[]{0xf21c1c20,0xeb151518,0xf2202025});
+        glass.setCornerRadius(dp(28));glass.setStroke(dp(1),0x33ffffff);surface.setBackground(glass);
     }
-    private void hideKeyboard(){if(answer!=null){((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(answer.getWindowToken(),0);answer.clearFocus();}keyboardBottom=0;if(beforeKeyboardY>=0){layout.y=beforeKeyboardY;beforeKeyboardY=-1;}}
+    private void resetToBottomMiddle(){
+        layout.x=0;layout.y=dp(24);beforeKeyboardY=-1;
+        if(surface!=null&&attached){clampPosition(surface.getWidth(),surface.getHeight());windows.updateViewLayout(surface,layout);}
+    }
+    private void hideKeyboard(){if(answer!=null){((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(answer.getWindowToken(),0);answer.clearFocus();}keyboardBottom=0;resetToBottomMiddle();}
     private void toggle(){hideKeyboard();expanded=!expanded;built=false;render();if(ValueAnimator.areAnimatorsEnabled()){surface.setAlpha(.85f);surface.setScaleX(.97f);surface.setScaleY(.97f);surface.animate().alpha(1).scaleX(1).scaleY(1).setDuration(180).start();}}
     private void dismiss(){hideKeyboard();pinned=false;getSharedPreferences("floating-bot",0).edit().remove("botId").apply();if(mobileLive())control("pause");stopSelf();}
     private void call(String endpoint,JSONObject body,Runnable done){
@@ -138,7 +142,8 @@ public class MobileOverlayService extends Service {
                 answer=new EditText(this);AgentStyle.input(answer);answer.setText(draft);answer.setMaxLines(3);answer.setMinLines(1);answer.setTextSize(13);answer.setSingleLine(false);answer.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);answer.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);answer.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(16000)});
                 composer.addView(answer,new LinearLayout.LayoutParams(0,-2,1));
                 send=new AgentIcon(this,"send","Send message to bot",this::sendMessage);send.setIconTint(0xffffffff);send.setBackground(AgentStyle.surface(this,AgentStyle.BLUE,24,false));LinearLayout.LayoutParams sendParams=new LinearLayout.LayoutParams(dp(42),dp(42));sendParams.leftMargin=dp(6);composer.addView(send,sendParams);surface.addView(composer);
-                answer.setOnEditorActionListener((view,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEND){sendMessage();return true;}return false;});
+                answer.setOnEditorActionListener((view,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEND||action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||(event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN)){sendMessage();hideKeyboard();resetToBottomMiddle();return true;}return false;});
+                answer.setOnKeyListener((view,keyCode,event)->{if(keyCode==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN&&!event.isShiftPressed()){sendMessage();hideKeyboard();resetToBottomMiddle();return true;}return false;});
                 answer.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence value,int start,int count,int after){}public void onTextChanged(CharSequence value,int start,int before,int count){draft=value.toString();if(send!=null)send.setAlpha(draft.trim().isEmpty()?.5f:1f);}public void afterTextChanged(android.text.Editable value){main.post(MobileOverlayService.this::sizePanel);}});
                 controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER_VERTICAL);controls.setPadding(0,dp(8),0,0);surface.addView(controls);
             }
@@ -175,6 +180,7 @@ public class MobileOverlayService extends Service {
     }
     private void sendMessage(){
         if(answer==null||sending)return;String value=answer.getText().toString().trim();if(value.isEmpty())return;
+        hideKeyboard();resetToBottomMiddle();
         JSONObject question=task.optJSONObject("question");String target=ownerId,taskId=id;JSONObject body=new JSONObject();String endpoint;
         try{
             body.put("text",value);
