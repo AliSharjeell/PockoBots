@@ -14,6 +14,10 @@ An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
 </div>
 
+<p align="center">
+  <img src="docs/images/landing-hero.png" width="800" alt="PockoBots Hero Overview" />
+</p>
+
 Give a bot a name, tell it what to do, and get on with your day. It can build an
 app, run a project, browse the web, operate Android apps, check for updates and
 message you when it needs you—all from the same conversation.
@@ -35,12 +39,6 @@ PockoBots live demo: autonomous AI bots running on an Android phone, executing t
 
 <p align="center">
   <img src="docs/images/demo.gif" width="720" alt="PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows" />
-</p>
-
-### PockoBots Overview
-
-<p align="center">
-  <img src="docs/images/landing-hero.png" width="800" alt="PockoBots Overview" />
 </p>
 
 ### Features & Capabilities
@@ -92,6 +90,12 @@ Hidden native-app control is experimental. A YouTube secondary-display experimen
 passed on the Pixel emulator with an ADB/scrcpy companion, while Settings remained
 on the main screen. The standalone app still uses the visible screen; no isolated
 LinkedIn or Instagram account is claimed. See the [measured display results](docs/BACKGROUND_DISPLAYS.md).
+
+### Connected to your everyday tools and services
+
+<p align="center">
+  <img src="docs/images/landing-connections.png" width="800" alt="Already part of your life. Now part of your team. Integration Garden" />
+</p>
 
 ## Get started
 
@@ -156,6 +160,10 @@ and the relevant Android permissions; priority alerts can appear while locked
 when Android permits them.
 
 ## How it compares
+
+<p align="center">
+  <img src="docs/images/landing-freedom.png" width="800" alt="Your phone is already a computer. Let's put it to work. Comparison Showcase" />
+</p>
 
 PockoBots is for people who want to own the execution environment and choose
 the model behind their personal bots. It is an independent project, not an
