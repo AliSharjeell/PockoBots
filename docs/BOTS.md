@@ -111,3 +111,44 @@ stale edits. Its shell commands retain the bot's shell approval setting.
 Bots can use `schedule_reminder` to create, list or cancel saved reminders. ?Call me in 10 minutes? saves a one-time call; ?call me daily at 5 PM? saves a daily 17:00 call in the phone timezone. An explicit IANA timezone can override this. Calls use the existing bot avatar and incoming-call screen; `urgent: false` sends a notification instead. The model finishes after saving and does not sleep until the reminder is due.
 
 Schedules and their delivery state persist across runtime restarts. Missed occurrences coalesce into one reminder when the runtime resumes. Daily reminders keep local calendar time across daylight-saving changes, skipping nonexistent times and avoiding duplicate calls on the same local date. Delivery requires the on-device runtime to remain running; Android notification, ringing and full-screen permissions still apply. Pausing an individual bot's task does not cancel its saved reminders. Ask the bot to list or cancel reminders explicitly.
+
+## External Webhooks mode
+
+Other applications or background servers running on the phone (such as computer vision Python scripts, OpenCV detection models, or local automation daemons) can send webhooks to trigger any bot by name or ID.
+
+### Webhook configuration
+Open **Settings > Connections & sharing > External webhooks** to review or change:
+- **Webhook URL:** `http://127.0.0.1:18878/api/webhooks/bot` (or `.../api/webhooks/bot/:nameOrId`)
+- **Webhook secret:** Optional or required token, passable in header `X-Webhook-Secret`, `Authorization: Bearer <token>`, or query `?secret=<token>`
+- **Allow phone apps without secret:** When enabled, scripts running on `127.0.0.1` do not need the secret token.
+
+### Triggering a bot call from an external app
+For example, a computer vision fire detector script can trigger an immediate ringing bot call:
+
+```bash
+curl -X POST http://127.0.0.1:18878/api/webhooks/bot \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bot": "Fire Guard",
+    "message": "Fire detected in camera feed!",
+    "call": true
+  }'
+```
+
+Or using Python from an external app on the phone:
+```python
+import requests
+
+requests.post("http://127.0.0.1:18878/api/webhooks/bot", json={
+    "bot": "any bot name",
+    "message": "Fire detected!",
+    "call": True
+})
+```
+
+Supported JSON fields:
+- `bot`: Any bot name (case-insensitive) or bot ID.
+- `message` (or `text` / `prompt`): The event description or prompt.
+- `call` or `urgent` (boolean) or `action: "call"`: Immediately rings the phone's full-screen bot call/alert screen and posts the message to the bot's conversation.
+- `action: "notify"`: Triggers a high-priority Android notification and posts the message.
+- `action: "message"` (default): Delivers the message directly to the bot chat to start processing.

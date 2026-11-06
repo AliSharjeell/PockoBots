@@ -33,8 +33,11 @@ a receipt confirms the URL handoff, not successful visual rendering. A locked
 device defers opening, and queued requests expire after two minutes. The Android
 runtime must be running to receive requests.
 
-The pill uses a translucent glass finish with highlights and rounded edges.
-This is a native overlay treatment, not a promise of cross-app lens refraction
-on every Android version. No accessibility permission is granted by merely
+The pill uses a dark obsidian surface with high-contrast outlines and drop shadows
+to cleanly separate from whatever website or app is visible in the background.
+When typing in the floating pill, pressing Enter or tapping Send sends the message,
+dismisses the soft keyboard, and returns the pill to its resting bottom-center position.
+Intentionally closing the keyboard with the back gesture or hide button similarly
+restores the pill to the bottom center. No accessibility permission is granted by merely
 pinning a bot or opening a preview. Visible Mobile Use retains its existing
 task authorization and accessibility requirements.
