@@ -10,10 +10,7 @@ An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
 **Free app · No platform subscription · Bring your own model · Local execution**
 
-[![Website](https://img.shields.io/badge/Website-pockobots.com-1675e6?style=for-the-badge&logo=googlechrome&logoColor=white)](https://pockobots.com)
-[![GitHub Release](https://img.shields.io/github/v/release/AliSharjeell/PockoBots?label=v0.1%20Beta&style=for-the-badge&color=238636)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)
-
-[🌐 Website](https://pockobots.com) · [📱 Download v0.1 APK](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source)
+[Website](https://pockobots.com) · [Download v0.1 APK](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
 
 </div>
 
@@ -259,3 +256,11 @@ packages, native libraries and JavaScript/Markdown dependencies. See
 [runtime notices](runtime/NOTICE.md), [Artemis provenance](third_party/artemis/UPSTREAM.md)
 and bundled license notices. OpenBot informed the product research; its source
 was not copied into this MIT project.
+
+## Author & Contact
+
+Created by Ali Sharjeel. For inquiries, bug reports, and feedback:
+- **Email:** [alisharjeelofficial@gmail.com](mailto:alisharjeelofficial@gmail.com)
+- **Website:** [https://pockobots.com](https://pockobots.com)
+- **GitHub:** [@AliSharjeell](https://github.com/AliSharjeell)
+
