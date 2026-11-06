@@ -10,7 +10,7 @@ An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
 **Free app · No platform subscription · Bring your own model · Local execution**
 
-[Website](https://pockobots.com) · [Download v0.1 APK](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
+[Website](https://pockobots.com) · [Download v0.1 APK (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
 
 </div>
 
@@ -107,10 +107,23 @@ LinkedIn or Instagram account is claimed. See the [measured display results](doc
   <img src="docs/images/landing-install.png" width="800" alt="PockoBots v0.1 Beta Installation Guide" />
 </p>
 
+### Choose your edition
+
+Two builds are available under **[GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)**:
+
+| Edition | File | Best for | Google Play Protect |
+| --- | --- | --- | --- |
+| **PockoBots (Standard)** *(Recommended)* | `pockobots-v0.1-debug.apk` | Most users. Full local coding agent, interactive Node.js/Python/Git runtime, floating pill overlay, Chrome previews, background services, ringing alerts, and webhooks. | **Installs seamlessly.** Zero sensitive permission triggers or fraud blocks. |
+| **PockoBots Mobile Use** | `pockobots-mobileuse-v0.1-debug.apk` | Power users. Everything in Standard + the on-device Artemis accessibility service for automated on-screen third-party app interaction. | May trigger Play Protect's sensitive permission warning because it declares `BIND_ACCESSIBILITY_SERVICE`. |
+
+> [!TIP]
+> **Installing the Mobile Use Edition:**
+> Google Play Protect's Enhanced Fraud Protection automatically blocks browser sideloads declaring accessibility services. If your phone shows *"Blocked to protect your device"*, simply open **Google Play Store > tap your profile icon > Play Protect > tap Settings ⚙️ > toggle off "Scan apps with Play Protect"** temporarily to install, or install via your phone's built-in **Files** app using *"More details → Install anyway"*.
+
 ### How to install on your phone
 
 1. **Download the APK:**
-   Download the latest **[PockoBots v0.1 Beta APK](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)** (`pockobots-v0.1-debug.apk`) directly to your phone from the [GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) page.
+   Download either **[PockoBots (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)** or the **[Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)** directly to your Android device.
 2. **Allow installation from your browser or file manager:**
    Tap the downloaded `.apk` file. If Android displays a security prompt saying your phone isn't allowed to install unknown apps from this source, tap **Settings** and enable **Allow from this source**, then tap **Install**.
 3. **First launch & runtime unpack:**
@@ -120,7 +133,7 @@ LinkedIn or Instagram account is claimed. See the [measured display results](doc
    - **Notifications:** Receive bot updates and completion alerts.
    - **Display over other apps:** Allows the floating bot pill overlay to float above Chrome and other apps.
    - **Priority ringing alerts:** Allows emergency calls and urgent reminders to ring the phone.
-   - **Accessibility service (Artemis):** Opt-in permission needed only if you want bots to interact with visible Android apps or the browser.
+   - **Accessibility service (Artemis):** *(Mobile Use Edition only)* Opt-in permission needed only if you want bots to interact with visible Android apps or the browser.
 5. **Connect your model (BYOK):**
    Open **Settings > Bring your own key**. Select an OpenAI-compatible or Anthropic-compatible provider, enter your model name, base URL, and API key, and tap Save.
 6. **Create a bot and start working:**
