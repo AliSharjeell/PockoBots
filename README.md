@@ -5,9 +5,7 @@
 # PockoBots
 
 ### Personal AI bots that live and work on your Android phone.
-
-An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
-
+An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.<br>
 **Free app · No platform subscription · Bring your own model · Local execution**
 
 [Website](https://pockobots.com) · [Download v0.1 APK (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
