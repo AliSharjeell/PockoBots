@@ -59,11 +59,10 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         center.setGravity(Gravity.CENTER);
         center.setPadding(dp(32),dp(32),dp(32),dp(32));
         
-        BloubView logo=new BloubView(this);
-        logo.setShapeId("squircle");
-        logo.setColorHex("#007AFF");
-        logo.setExpressionId("heureux");
-        center.addView(logo,new LinearLayout.LayoutParams(dp(84),dp(84)));
+        ImageView logo=new ImageView(this);
+        logo.setImageResource(R.drawable.app_logo);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        center.addView(logo,new LinearLayout.LayoutParams(dp(96),dp(96)));
         
         TextView title=new TextView(this);
         title.setText("PockoBots");
