@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/images/logo.png" width="128" height="128" alt="PockoBots Logo" style="border-radius: 28px;" />
+
 # PockoBots
 
 ### Personal AI bots that live and work on your Android phone.
@@ -96,17 +98,15 @@ subscription, but inference, internet access and external services can cost mone
   <img src="docs/images/demo.gif" width="720" alt="PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows" />
 </p>
 
-Actual Android emulator captures using local test fixtures:
+<p align="center">
+  <img src="docs/images/landing-hero.png" width="800" alt="PockoBots Overview" />
+</p>
 
-<table>
-<tr>
-<td align="center"><img src="docs/images/v0.6-conversation.png" width="260" alt="Bot chat with rendered Markdown, a table and a clickable preview link"><br>One conversation</td>
-<td align="center"><img src="docs/images/v0.6-home.png" width="260" alt="Bot inbox with custom avatars and a glass navigation dock"><br>Your local bots</td>
-<td align="center"><img src="docs/images/v0.5-browser.png" width="260" alt="Bot using the real Android browser with its floating progress island"><br>Real phone control</td>
-</tr>
-</table>
+### Features & Capabilities
 
-[More screenshots: sidebar, terminals, settings and setup](docs/UI.md).
+<p align="center">
+  <img src="docs/images/landing-features.png" width="800" alt="PockoBots Features Showcase" />
+</p>
 
 ## Try a task
 
