@@ -117,26 +117,30 @@ Repeated app/page reopening pauses instead of looping indefinitely.
 
 ## Get started
 
-1. **Install a current standalone APK.** Use `arm64-v8a` for most Android phones
-   or `x86_64` for a matching emulator. Android 8+ is required; phone screenshots
-   require Android 11+. Existing APKs may still display the name **Pocket Agent**.
-2. **Let the included environment unpack.** Allow several minutes and roughly
-   1–2 GB of free storage for tools and projects. Runtime setup uses the files
-   packaged in the APK.
-3. **Follow Setup & permissions.** Enable notifications, phone Accessibility,
-   the floating island and full-screen alerts as needed. Install offline Android
-   voice data if you want answered alerts read aloud. Android requires you to
-   grant its permissions yourself.
-4. **Connect your model.** Open Settings, choose an OpenAI-compatible or
-   Anthropic-compatible protocol, then save your base URL, model and API key.
-   Phone/browser tasks need a model that can handle the supplied screen input.
-5. **Create a bot and send a task.** Use its Terminal and Files tabs, or open
-   Main terminal from the sidebar to manage shared CLIs and repositories.
+> [!WARNING]
+> **This is v0.1 beta — it may have issues.**
+> PockoBots runs complex local agent runtimes, package managers, and background services directly on your Android device. Android battery management, vendor-specific background killers, and device sleep may cause unexpected interruptions. Please report any issues or edge cases on GitHub!
 
-Current builds can be obtained from successful [GitHub Actions runs](https://github.com/AliSharjeell/PockoBots/actions/workflows/build.yml)
-or built from source below. Artifacts expire and may require GitHub sign-in.
-**The historical v0.1.0 release is a legacy Termux preview, not the current
-standalone bot app.**
+### How to install on your phone
+
+1. **Download the APK:**
+   Download the latest **[PockoBots v0.1 Beta APK](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1)** (`pockobots-v0.1-debug.apk`) directly to your phone from the [GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.1) page.
+2. **Allow installation from your browser or file manager:**
+   Tap the downloaded `.apk` file. If Android displays a security prompt saying your phone isn't allowed to install unknown apps from this source, tap **Settings** and enable **Allow from this source**, then tap **Install**.
+3. **First launch & runtime unpack:**
+   Open PockoBots. On first launch, the app automatically unpacks the packaged Node.js, Python, Git, and task environment to private app storage. Ensure you have approximately 1–2 GB of free device storage and allow 1–2 minutes for the initial unpack to complete.
+4. **Follow Setup & permissions:**
+   From the initial setup screen, enable the permissions you plan to use:
+   - **Notifications:** Receive bot updates and completion alerts.
+   - **Display over other apps:** Allows the floating bot pill overlay to float above Chrome and other apps.
+   - **Priority ringing alerts:** Allows emergency calls and urgent reminders to ring the phone.
+   - **Accessibility service (Artemis):** Opt-in permission needed only if you want bots to interact with visible Android apps or the browser.
+5. **Connect your model (BYOK):**
+   Open **Settings > Bring your own key**. Select an OpenAI-compatible or Anthropic-compatible provider, enter your model name, base URL, and API key, and tap Save.
+6. **Create a bot and start working:**
+   Give your bot a name and instructions. Every bot can code, run servers, open previews in Chrome, schedule calls, and listen for external webhooks.
+
+Existing builds and historical artifacts can also be inspected under [GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases).
 
 Shell commands without per-command prompts and ringing access are enabled by
 default. Per-bot preferences let you change these settings. Provider keys live
