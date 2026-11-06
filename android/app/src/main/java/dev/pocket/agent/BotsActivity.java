@@ -123,7 +123,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
     void showAdvancedConnections(){connections();}
-    private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers").contains(screen);}
+    private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers","Webhooks").contains(screen);}
     private void toggleAppearance(){saveDraft();getSharedPreferences("appearance",0).edit().putString("theme",AgentStyle.dark?"light":"dark").apply();AgentStyle.applyTheme(this);setTheme(AgentStyle.dark?R.style.AppTheme:R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);pendingMotion=0;animatePage=true;shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
 
     private void showScreen(String next){pendingMotion=0;animatePage=!(next.equals("Chat")&&selected.isEmpty());if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
@@ -151,7 +151,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             AgentIcon menu=new AgentIcon(this,"chatmenu","Bot options",()->{});menu.setOnClickListener(this::chatOptions);
             header.addView(GlassControls.wrap(menu,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
         }else{
-            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen;
+            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen.equals("Webhooks")?"External webhooks":screen;
             TextView name=text(title,settingsChild()?22:28);
             name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),800,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);
