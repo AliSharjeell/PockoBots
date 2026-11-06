@@ -42,7 +42,15 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private void requestQuiet(String method,String path,JSONObject data,Result done,Runnable failed,boolean showError){if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){android.util.Log.e("POCKET_AGENT","done callback error",e);error(e);}});}catch(Exception e){android.util.Log.e("POCKET_AGENT","request error: "+method+" "+path,e);main.post(()->{if(!isDestroyed()){failed.run();if(showError)error(e);}});}});}
     void terminalInput(String id,JSONObject data){AgentApi connection=api;if(connection==null)return;inputs.execute(()->{try{connection.request("POST","/terminals/"+id+"/input",data);}catch(Exception e){android.util.Log.w("POCKET_AGENT","Terminal input unavailable; keeping the active shell view");}});}
     void error(Exception e){AgentSheet.message(this,"PockoBots",e.getMessage());}
-    void openUrl(String url){try{Uri parsed=Uri.parse(url);if(!Arrays.asList("http","https").contains(parsed.getScheme()))throw new IllegalArgumentException("Use an HTTP or HTTPS link");startActivity(new Intent(Intent.ACTION_VIEW,parsed));}catch(Exception e){error(e);}}
+    void openUrl(String url){try{Uri parsed=Uri.parse(url);if(!Arrays.asList("http","https").contains(parsed.getScheme()))throw new IllegalArgumentException("Use an HTTP or HTTPS link");
+        Intent chromeIntent=new Intent(Intent.ACTION_VIEW,parsed);
+        chromeIntent.setPackage("com.android.chrome");
+        try{
+            startActivity(chromeIntent);
+        }catch(android.content.ActivityNotFoundException notChrome){
+            startActivity(new Intent(Intent.ACTION_VIEW,parsed));
+        }
+    }catch(Exception e){error(e);}}
     private void showLoadingScreen(String subtitle){
         FrameLayout loading=new FrameLayout(this);
         loading.setBackgroundColor(AgentStyle.BACK);

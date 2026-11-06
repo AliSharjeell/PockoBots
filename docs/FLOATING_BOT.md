@@ -21,8 +21,8 @@ Pinned mode is restored if Android restarts its service; force-stop and Android
 battery restrictions can still stop an app's foreground services.
 
 For “build my app and take me there,” bots can start and verify the server,
-then use `open_preview`. Android opens the URL directly in a dedicated webapp
-preview without a screen-control model navigating Chrome. The floating bot
+then use `open_preview`. Android opens the URL directly in Chrome without
+a screen-control model navigating Chrome or opening in an in-app viewer. The floating bot
 stays available for follow-up changes. Dev-server hot reload updates the page;
 `open_preview` with `refresh: true` reloads the existing preview if needed.
 Regular preview links in chat continue to open normally.

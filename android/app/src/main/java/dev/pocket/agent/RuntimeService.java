@@ -2,6 +2,7 @@ package dev.pocket.agent;
 
 import android.app.*;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.*;
 import java.io.*;
 import java.util.*;
@@ -160,8 +161,20 @@ public class RuntimeService extends Service {
             if(attempt>=12){previewReceipt(action,false,"Open PockoBots and try the preview again");return;}
             main.postDelayed(()->openRequestedPreview(action,attempt+1),100);return;
         }
-        try{startActivity(new Intent(this,BotPreviewActivity.class).putExtra("url",action.optString("url")).putExtra("refresh",action.optBoolean("refresh")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));previewReceipt(action,true,null);}
-        catch(Exception error){previewReceipt(action,false,error.getMessage());}
+        try{
+            String url=action.optString("url");
+            Intent chromeIntent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
+            chromeIntent.setPackage("com.android.chrome");
+            chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try{
+                startActivity(chromeIntent);
+            }catch(android.content.ActivityNotFoundException notChrome){
+                Intent browserIntent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(browserIntent);
+            }
+            previewReceipt(action,true,null);
+        }catch(Exception error){previewReceipt(action,false,error.getMessage());}
     }
     private void previewReceipt(JSONObject action,boolean opened,String error){
         new Thread(()->{try{botApi.request("POST","/previews/"+action.optString("id")+"/ack",new JSONObject().put("opened",opened).put("error",error));}catch(Exception ignored){}finally{openingPreviews.remove(action.optString("id"));}},"preview-receipt").start();

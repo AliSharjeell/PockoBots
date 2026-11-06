@@ -404,7 +404,15 @@ public class MainActivity extends Activity {
         if(type.equals("connected")&&tab.equals("Chat"))refreshChat();
     }
     private void scheduleChat(){if(!chatScheduled){chatScheduled=true;handler.postDelayed(chatUpdate,100);}}
-    private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){error(e);}}
+    private void openUrl(String url){try{
+        Intent chromeIntent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
+        chromeIntent.setPackage("com.android.chrome");
+        try{
+            startActivity(chromeIntent);
+        }catch(android.content.ActivityNotFoundException notChrome){
+            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));
+        }
+    }catch(Exception e){error(e);}}
     private void back(){if(drawer!=null){closeDrawer();return;}if(mode.equals("Mobile Use")){if(!tab.equals("Tasks"))show("Tasks");else finish();}else if(!tab.equals("Projects"))show("Projects");else finish();}
     @Override public void onBackPressed(){back();}
 }
