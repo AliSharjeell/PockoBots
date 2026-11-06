@@ -92,6 +92,10 @@ subscription, but inference, internet access and external services can cost mone
 
 ## See it in action
 
+<p align="center">
+  <img src="docs/images/demo.gif" width="720" alt="PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows" />
+</p>
+
 Actual Android emulator captures using local test fixtures:
 
 <table>
