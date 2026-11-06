@@ -10,7 +10,7 @@ An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.
 
 **Free app · No platform subscription · Bring your own model · Local execution**
 
-[Get started](#get-started) · [See the app](#see-it-in-action) · [How it compares](#how-it-compares) · [Build it](#build-from-source)
+[See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source)
 
 </div>
 
@@ -25,9 +25,40 @@ or rented cloud execution machine is required.
 
 **PockoBots is free, open-source software. Model usage is separate:** bring your
 own API key or sign into a supported vendor CLI and pay your chosen provider,
-if applicable. The current app does
-not bundle an offline language model. With a cloud provider, model requests
-and relevant conversation, tool output or phone screenshots leave the device.
+if applicable. The current app does not bundle an offline language model. With a
+cloud provider, model requests and relevant conversation, tool output or phone
+screenshots leave the device.
+
+## See it in action
+
+PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows.
+
+<p align="center">
+  <img src="docs/images/demo.gif" width="720" alt="PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows" />
+</p>
+
+### PockoBots Overview
+
+<p align="center">
+  <img src="docs/images/landing-hero.png" width="800" alt="PockoBots Overview" />
+</p>
+
+### Features & Capabilities
+
+<p align="center">
+  <img src="docs/images/landing-features.png" width="800" alt="PockoBots Features Showcase" />
+</p>
+
+## Try a task
+
+- "Build me a to-do app in HTML, CSS and JavaScript. Run it and give me a preview link."
+- "Clone this repository, investigate the failing tests, and show me the fix."
+- "Open the phone browser, research these options, and summarize what you find."
+- "Check this project every morning and notify me when something needs attention."
+
+Bots report tool results, ask for missing information and keep their work in
+separate project directories. Phone actions share one device and take turns.
+Repeated app/page reopening pauses instead of looping indefinitely.
 
 ## What your bots can do
 
@@ -62,68 +93,15 @@ passed on the Pixel emulator with an ADB/scrcpy companion, while Settings remain
 on the main screen. The standalone app still uses the visible screen; no isolated
 LinkedIn or Instagram account is claimed. See the [measured display results](docs/BACKGROUND_DISPLAYS.md).
 
-## Built around the phone you already carry
-
-Your phone is already with you throughout the day. PockoBots uses that hardware
-for persistent personal agents, with background services, durable queues,
-proactive checks and notifications. You do not need to keep a laptop open or
-provision a remote machine for task execution.
-
-Background operation is on by default. Android can still stop work after
-force-stop, shutdown, battery restrictions or low memory, so **uninterrupted
-24/7 operation is not guaranteed**. Phone UI actions require an unlocked screen
-and the relevant Android permissions; priority alerts can appear while locked
-when Android permits them.
-
-## How it compares
-
-PockoBots is for people who want to own the execution environment and choose
-the model behind their personal bots. It is an independent project, not an
-affiliated client or a promise of identical features.
-
-| Product | Price / access snapshot | What you are choosing |
-| --- | --- | --- |
-| **PockoBots** | **$0 platform subscription.** BYOK model charges are separate. | Open-source Android app; files, shell tools and app actions execute on your own phone. No PockoBots account or country rollout gate. Your provider and connected services have their own availability rules. |
-| **Grok Bot** | Premium is listed at **$30/month**; other eligible plans may include access. | Grok Bot's computer, scheduled routines and included bot usage. [Official product and pricing](https://x.ai/bot). |
-| **Dots** | Individual access includes eligible Pro tiers, starting at **$100/month**. | ChatGPT's personal agent, subject to plan eligibility and rollout. [Official access guide](https://learn.chatgpt.com/docs/dots) · [Official Pro pricing](https://learn.chatgpt.com/docs/pricing). |
-| **Muse** | Free for many uses, with optional paid plans; regional rollout. | Meta's personal agent and cloud VM. Availability has expanded beyond North America, including [Japan](https://about.fb.com/ja/news/2026/10/muse-personal-ai-agent-launches-in-japan/) and [Singapore](https://about.fb.com/news/2026/10/muse-is-now-available-in-singapore-the-worlds-first-personal-ai-agent-built-for-everyone/). |
-
-Comparison checked **October 28, 2026**. Listed dollar prices are USD; vendor
-plans, included usage and availability can change. PockoBots has no software
-subscription, but inference, internet access and external services can cost money.
-
-## See it in action
-
-<p align="center">
-  <img src="docs/images/demo.gif" width="720" alt="PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows" />
-</p>
-
-<p align="center">
-  <img src="docs/images/landing-hero.png" width="800" alt="PockoBots Overview" />
-</p>
-
-### Features & Capabilities
-
-<p align="center">
-  <img src="docs/images/landing-features.png" width="800" alt="PockoBots Features Showcase" />
-</p>
-
-## Try a task
-
-- "Build me a to-do app in HTML, CSS and JavaScript. Run it and give me a preview link."
-- "Clone this repository, investigate the failing tests, and show me the fix."
-- "Open the phone browser, research these options, and summarize what you find."
-- "Check this project every morning and notify me when something needs attention."
-
-Bots report tool results, ask for missing information and keep their work in
-separate project directories. Phone actions share one device and take turns.
-Repeated app/page reopening pauses instead of looping indefinitely.
-
 ## Get started
 
 > [!WARNING]
 > **This is v0.1 beta — it may have issues.**
 > PockoBots runs complex local agent runtimes, package managers, and background services directly on your Android device. Android battery management, vendor-specific background killers, and device sleep may cause unexpected interruptions. Please report any issues or edge cases on GitHub!
+
+<p align="center">
+  <img src="docs/images/landing-install.png" width="800" alt="PockoBots v0.1 Beta Installation Guide" />
+</p>
 
 ### How to install on your phone
 
@@ -159,6 +137,40 @@ or phone server from another device, open **Servers & sharing**, sign in to
 Microsoft Dev Tunnels and share the server's port. Use the actual public URL
 shown in the logs. Public sharing needs internet access and the tunnel provider's
 account; the agent control port cannot be shared through this API.
+
+## Built around the phone you already carry
+
+Your phone is already with you throughout the day. PockoBots uses that hardware
+for persistent personal agents, with background services, durable queues,
+proactive checks and notifications. You do not need to keep a laptop open or
+provision a remote machine for task execution.
+
+<p align="center">
+  <img src="docs/images/landing-how.png" width="800" alt="How PockoBots Works" />
+</p>
+
+Background operation is on by default. Android can still stop work after
+force-stop, shutdown, battery restrictions or low memory, so **uninterrupted
+24/7 operation is not guaranteed**. Phone UI actions require an unlocked screen
+and the relevant Android permissions; priority alerts can appear while locked
+when Android permits them.
+
+## How it compares
+
+PockoBots is for people who want to own the execution environment and choose
+the model behind their personal bots. It is an independent project, not an
+affiliated client or a promise of identical features.
+
+| Product | Price / access snapshot | What you are choosing |
+| --- | --- | --- |
+| **PockoBots** | **$0 platform subscription.** BYOK model charges are separate. | Open-source Android app; files, shell tools and app actions execute on your own phone. No PockoBots account or country rollout gate. Your provider and connected services have their own availability rules. |
+| **Grok Bot** | Premium is listed at **$30/month**; other eligible plans may include access. | Grok Bot's computer, scheduled routines and included bot usage. [Official product and pricing](https://x.ai/bot). |
+| **Dots** | Individual access includes eligible Pro tiers, starting at **$100/month**. | ChatGPT's personal agent, subject to plan eligibility and rollout. [Official access guide](https://learn.chatgpt.com/docs/dots) · [Official Pro pricing](https://learn.chatgpt.com/docs/pricing). |
+| **Muse** | Free for many uses, with optional paid plans; regional rollout. | Meta's personal agent and cloud VM. Availability has expanded beyond North America, including [Japan](https://about.fb.com/ja/news/2026/10/muse-personal-ai-agent-launches-in-japan/) and [Singapore](https://about.fb.com/news/2026/10/muse-is-now-available-in-singapore-the-worlds-first-personal-ai-agent-built-for-everyone/). |
+
+Comparison checked **October 28, 2026**. Listed dollar prices are USD; vendor
+plans, included usage and availability can change. PockoBots has no software
+subscription, but inference, internet access and external services can cost money.
 
 ## What is local?
 
