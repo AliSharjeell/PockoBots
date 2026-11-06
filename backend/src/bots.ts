@@ -142,11 +142,16 @@ export class Bots {
     if(changed){const old=this.alerts.filter(a=>a.acknowledged).slice(0,-100);const trim=new Set(old.map(a=>a.id));this.alerts=this.alerts.filter(a=>!trim.has(a.id));await this.changed();}
   }
   pendingAlerts() { return this.alerts.filter(a => !a.acknowledged); }
+  find(target: string) {
+    if (!target || typeof target !== "string") return null;
+    const trimmed = target.trim().toLowerCase();
+    return this.records.find(b => b.id.toLowerCase() === trimmed || b.name.toLowerCase() === trimmed) || null;
+  }
   async acknowledgeAlert(id: string) { const alert = this.alerts.find(a => a.id === id); if (!alert) throw Error("Alert not found"); alert.acknowledged = true; await this.changed(); }
-  async alert(id: string, text: unknown, urgent: boolean) {
+  async alert(id: string, text: unknown, urgent: boolean, allowRepeat = false) {
     const bot = this.get(id); if (typeof text !== "string" || !text.trim() || text.length > 4000) throw Error("Alert text must be 1–4000 characters");
-    if (urgent && !bot.allowUrgent) throw Error("Ringing alerts are disabled for this bot. Use a normal notification instead.");
-    if (urgent && this.alerts.some(a => a.botId === id && a.urgent && Date.now() - a.created < 600000)) throw Error("This bot already rang within the last ten minutes");
+    if (urgent && !bot.allowUrgent && !allowRepeat) throw Error("Ringing alerts are disabled for this bot. Use a normal notification instead.");
+    if (urgent && !allowRepeat && this.alerts.some(a => a.botId === id && a.urgent && Date.now() - a.created < 600000)) throw Error("This bot already rang within the last ten minutes");
     if (this.pendingAlerts().filter(a => a.botId === id).length >= 10) throw Error("This bot has too many unread alerts");
     const alert: BotAlert = { id: randomUUID(), botId: id, botName: bot.name,botAvatar:bot.avatar,botAccent:bot.accent, text: this.redact(text.trim()), urgent, created: Date.now(), acknowledged: false };
     this.alerts.push(alert); const finished = this.alerts.filter(a => a.acknowledged); const trim = new Set(finished.slice(0, Math.max(0, finished.length - 100)).map(a => a.id)); this.alerts = this.alerts.filter(a => !trim.has(a.id));
