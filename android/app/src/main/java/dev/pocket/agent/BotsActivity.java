@@ -116,7 +116,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         LinearLayout providerChoices=column();providerChoices.setVisibility(View.GONE);
         LinearLayout providerRow=row();providerRow.setPadding(dp(10),dp(12),dp(10),dp(12));
         TextView providerLabel=text("Provider:",14);providerLabel.setPadding(0,0,dp(8),0);providerRow.addView(providerLabel);
-        ImageView providerMark=new ImageView(this);providerMark.setColorFilter(AgentStyle.MUTED);providerMark.setVisibility(currentProvider.equals("byok")?View.GONE:View.VISIBLE);providerRow.addView(providerMark,new LinearLayout.LayoutParams(dp(19),dp(19)));
+        ImageView providerMark=new ImageView(this);providerMark.setColorFilter(AgentStyle.MUTED);providerMark.setImageResource(MarketplaceIcons.provider(currentProvider));providerRow.addView(providerMark,new LinearLayout.LayoutParams(dp(19),dp(19)));
         TextView providerName=text(currentProvider.equals("byok")?"your own key":currentProvider+"  \u2304",14);providerName.setPadding(dp(6),0,dp(0),0);providerRow.addView(providerName,new LinearLayout.LayoutParams(0,-2,1));
         menu.addView(providerRow);menu.addView(providerChoices);
         LinearLayout modelChoices=column();modelChoices.setVisibility(View.GONE);
@@ -135,6 +135,12 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         popup.showAsDropDown(anchor,0,dp(8),Gravity.END);
         marketplaceRequest("GET","/providers",null,value->{
             if(!(value instanceof JSONArray))return;JSONArray providers=(JSONArray)value;providerChoices.removeAllViews();
+            // Your own key is a provider too: the one connection you made yourself.
+            boolean byokActive=currentProvider.equals("byok");
+            LinearLayout byokRow=row();byokRow.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView byokMark=new ImageView(this);byokMark.setImageResource(MarketplaceIcons.provider("byok"));byokMark.setColorFilter(byokActive?AgentStyle.BLUE:AgentStyle.MUTED);byokRow.addView(byokMark,new LinearLayout.LayoutParams(dp(20),dp(20)));
+            TextView byokLabel=text("Your own key"+(byokActive?"  ✓":""),14);byokLabel.setPadding(dp(10),0,dp(0),0);byokLabel.setTextColor(byokActive?AgentStyle.BLUE:AgentStyle.TEXT);byokRow.addView(byokLabel,new LinearLayout.LayoutParams(0,-2,1));
+            LinearLayout.LayoutParams byokParams=new LinearLayout.LayoutParams(-1,-2);byokParams.setMargins(dp(4),dp(2),0,dp(2));providerChoices.addView(byokRow,byokParams);
+            byokRow.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider","byok"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Your own key is now the model",Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
             for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider),installed=entry.optBoolean("installed");
                 LinearLayout row=row();row.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView mark=new ImageView(this);mark.setImageResource(MarketplaceIcons.provider(id));mark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(mark,new LinearLayout.LayoutParams(dp(20),dp(20)));
                 TextView label=text(entry.optString("name")+(installed?"":"  \u00b7 not installed")+(active?"  \u2713":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:installed?AgentStyle.TEXT:AgentStyle.MUTED);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
@@ -293,13 +299,13 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.requestLayout();});androidx.core.view.ViewCompat.requestApplyInsets(viewport);
     }
     private void dock(){
-        int tab=screen.equals("Browser")&&selected.isEmpty()?1:screen.equals("Marketplace")?2:screen.equals("Terminal")&&selected.isEmpty()?3:(screen.equals("Settings")||settingsChild())?4:0;
+        int tab=screen.equals("Marketplace")?1:screen.equals("Browser")&&selected.isEmpty()?2:screen.equals("Terminal")&&selected.isEmpty()?3:(screen.equals("Settings")||settingsChild())?4:0;
         dockOverlay=new FrameLayout(this);View fade=new View(this);fade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{AgentStyle.BACK&0x00ffffff,(AgentStyle.BACK&0x00ffffff)|0x33000000,(AgentStyle.BACK&0x00ffffff)|0x66000000}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
         dockOverlay.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{
             if(index==0)open("");
-            if(index==1){saveDraft();composer=null;selected="";detail=null;showScreen("Browser");}
-            if(index==2)showScreen("Marketplace");
+            if(index==1)showScreen("Marketplace");
+            if(index==2){saveDraft();composer=null;selected="";detail=null;showScreen("Browser");}
             if(index==3){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
             if(index==4)showScreen("Settings");
         }),new FrameLayout.LayoutParams(-1,dp(78),Gravity.BOTTOM));

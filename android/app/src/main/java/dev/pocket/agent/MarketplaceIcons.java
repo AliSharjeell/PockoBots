@@ -40,6 +40,7 @@ final class MarketplaceIcons {
     /** The mark of a subscription provider, for the rows that pick one. */
     static int provider(String id) {
         switch(id) {
+            case "byok": return R.drawable.lucide_key_round;
             case "codex": return R.drawable.brand_codex;
             case "claude": return R.drawable.brand_claude;
             case "gemini": return R.drawable.brand_gemini;
