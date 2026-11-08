@@ -30,8 +30,22 @@ export const FALLBACK_MODELS: Record<string, ProviderModel[]> = {
     { id: "claude-fable-5-1", name: "Claude Fable 5.1", description: "A long-form model for writing." },
   ],
   opencode: [
-    { id: "opencode/big-pickle", name: "Big Pickle", description: "A free model that needs no credit." },
-    { id: "opencode/space-bunny-free", name: "Space Bunny", description: "A free model that needs no credit." },
+    { id: "opencode/big-pickle", name: "Big Pickle", description: "Free OpenCode model." },
+    { id: "opencode/flint-40b-free", name: "Flint 40B Free", description: "Free OpenCode model." },
+    { id: "opencode/glm-5.3-flash-free", name: "GLM-5.3-Flash Free", description: "Free OpenCode model." },
+    { id: "opencode/deepseek-v4.1-flash-free", name: "DeepSeek V4.1 Flash Free", description: "Free OpenCode model." },
+    { id: "opencode/nemotron-3.5-lightning-free", name: "Nemotron 3.5 Lightning Free", description: "Free OpenCode model." },
+    { id: "opencode/nemotron-3.5-super-vl-free", name: "Nemotron 3.5 Super VL Free", description: "Free OpenCode model." },
+    { id: "opencode/mimo-v2.6-flash-free", name: "MiMo-V2.6-Flash Free", description: "Free OpenCode model." },
+    { id: "opencode/inkling-2-small-free", name: "Inkling 2 Small Free", description: "Free OpenCode model." },
+    { id: "opencode/beam-free", name: "Beam Free", description: "Free OpenCode model." },
+    { id: "opencode/crouton-alpha-free", name: "Crouton Alpha Free", description: "Free OpenCode model." },
+    { id: "opencode/frantic-ferret-free", name: "Frantic Ferret Free", description: "Free OpenCode model." },
+    { id: "opencode/ling-3.0-flash-fin-free", name: "Ling 3.0 Flash Fin Free", description: "Free OpenCode model." },
+    { id: "opencode/longcat-2.5-preview-free", name: "LongCat 2.5 Preview Free", description: "Free OpenCode model." },
+    { id: "opencode/muse-spark-1.3-contributor-free", name: "Muse Spark 1.3 Free", description: "Free OpenCode model." },
+    { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", description: "Free OpenCode model." },
+    { id: "opencode/space-bunny-free", name: "Space Bunny Free", description: "Free OpenCode model." },
   ],
   gemini: [
     { id: "gemini-3-pro", name: "Gemini 3 Pro", description: "The strongest Gemini model." },
@@ -198,10 +212,12 @@ function modelsFromAcpSession(session: any): ProviderModel[] {
 function modelsFromCodexList(result: any): ProviderModel[] {
   const data = result?.data;
   if (!Array.isArray(data)) return [];
+  const seen = new Set<string>();
   const models: ProviderModel[] = [];
   for (const entry of data) {
     const id = String(entry?.model ?? "").trim();
-    if (!id) continue;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
     models.push({
       id,
       name: String(entry?.displayName ?? id).trim() || id,

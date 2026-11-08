@@ -18,10 +18,15 @@ export const providerCatalog = [
  { id:"gemini", name:"Gemini CLI", command:"gemini", install:"npm install -g @google/gemini-cli", login:"gemini", docs:"https://geminicli.com/docs/get-started/authentication/", supported:true },
  { id:"grok", name:"Grok CLI", command:"grok", install:"mkdir -p \"$HOME/.local/bin\" && ARCH=$(uname -m) && case \"$ARCH\" in aarch64|arm64) A=aarch64 ;; *) A=x86_64 ;; esac && curl -fsSL \"https://x.ai/cli/grok-1.0.22-linux-$A\" -o \"$HOME/.local/bin/grok\" && chmod +x \"$HOME/.local/bin/grok\"", login:"grok --no-auto-update login", docs:"https://x.ai/cli", supported:true },
  { id:"cursor", name:"Cursor CLI", command:"cursor-agent", install:"mkdir -p \"$HOME/.local/bin\" && curl -fsSL https://cursor.com/install -fsS | bash", login:"cursor-agent login", docs:"https://cursor.com/docs/cli/overview", supported:true },
- { id:"antigravity", name:"Antigravity", command:"", install:"", login:"", docs:"https://antigravity.google/", supported:false, reason:"Antigravity desktop is not an Android/Linux subscription CLI adapter. Gemini CLI is a separate supported integration; its account eligibility is decided by Google." },
- { id:"freebuff", name:"Freebuff", command:"", install:"", login:"", docs:"https://github.com/CodebuffAI/freebuff", supported:false, reason:"The official freebuff CLI can be installed manually with npm install -g freebuff in Main terminal. Its headless PockoBots phone-tool adapter has not been verified, so it cannot yet power bot chats." },
- { id:"commandcode", name:"CommandCode", command:"", install:"", login:"", docs:"https://commandcode.ai/docs/headless", supported:false, reason:"The official command-code CLI supports cmd login and headless execution. Install manually with npm install -g command-code in Main terminal. A run-scoped PockoBots MCP adapter has not been verified, so it cannot yet power bot chats." },
 ] as const;
+
+/**
+ * Providers that run without an account.
+ *
+ * OpenCode serves free models to anyone, so signing in is a choice there and not a step. Every
+ * other provider hands out nothing until the owner has signed in with the vendor.
+ */
+export const FREE_TIER_PROVIDERS = new Set<string>(["opencode"]);
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
 export function provider(id: string) {const p=providerCatalog.find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
 
@@ -63,7 +68,7 @@ export class SubscriptionProviders {
    void this.refreshCatalog(p.id);
   }
   const catalog=this.catalog(p.id);
-  return {...p,installed,authenticated,version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+  return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
  }));}
  async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");const callId=randomUUID();run.onActivity?.({type:"tool_execution_start",toolCallId:callId,toolName:tool.name,args:input.arguments||{}});try{const result=await tool.execute(callId,input.arguments||{},run.signal);run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result,isError:!!(result as any).isError});return result;}catch(error){run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result:"Tool failed",isError:true});throw error;}}
  async run(id:string,options:{effort?:Effort;cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}){

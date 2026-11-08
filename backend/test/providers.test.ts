@@ -11,8 +11,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Type } from "typebox";
-import { SubscriptionProviders, executeProvider, installCommand, providerCatalog, providerText, registerProviderRoutes } from "../src/providers.js";
+import { FREE_TIER_PROVIDERS, SubscriptionProviders, executeProvider, installCommand, providerCatalog, providerText, registerProviderRoutes } from "../src/providers.js";
 import { Store, defaults, validateSettings } from "../src/storage.js";
+import { FALLBACK_MODELS } from "../src/provider-models.js";
 
 test("subscription provider uses a real process and MCP bridge without importing credentials",async()=>{
  const root=await mkdtemp(join(tmpdir(),"pocko-provider-test-"));const runtime=new SubscriptionProviders(()=>({command:process.execPath,args:[fileURLToPath(new URL('./fixtures/provider-cli.mjs',import.meta.url))]}));
@@ -28,7 +29,7 @@ test("subscription process cancellation stops the child and reports cancellation
 });
 
 test("provider settings keep BYOK and distinguish unsupported subscriptions",()=>{
- assert.equal(validateSettings({},defaults).executionProvider,'byok');const selected=validateSettings({executionProvider:'codex',providerModel:'default'},defaults);assert.equal(selected.executionProvider,'codex');assert.equal(selected.apiKey,'');assert.throws(()=>validateSettings({executionProvider:'made-up'},defaults),/Invalid execution/);assert.equal(providerCatalog.find(p=>p.id==='freebuff')?.supported,false);
+ assert.equal(validateSettings({},defaults).executionProvider,'byok');const selected=validateSettings({executionProvider:'codex',providerModel:'default'},defaults);assert.equal(selected.executionProvider,'codex');assert.equal(selected.apiKey,'');assert.throws(()=>validateSettings({executionProvider:'made-up'},defaults),/Invalid execution/);assert.equal(providerCatalog.find(p=>p.id==='freebuff'),undefined);assert.equal(providerCatalog.find(p=>p.id==='antigravity'),undefined);assert.equal(providerCatalog.find(p=>p.id==='commandcode'),undefined);
 });
 
 
@@ -117,4 +118,12 @@ test("an Agent Client Protocol agent's session update is read as what it said",(
 test("a CLI that answers in plain text still answers",async()=>{
  const script='console.log("Cursor answered in plain text");';
  assert.equal(await executeProvider(process.execPath,['-e',script],{cwd:tmpdir(),env:process.env,signal:new AbortController().signal}),"Cursor answered in plain text");
+});
+
+
+test("OpenCode runs its free models without an account",()=>{
+ assert.equal(FREE_TIER_PROVIDERS.has("opencode"),true);
+ for(const id of ["codex","claude","gemini","grok","cursor"])assert.equal(FREE_TIER_PROVIDERS.has(id),false,id+" needs an account");
+ assert.ok(FALLBACK_MODELS.opencode.length>8);
+ assert.ok(FALLBACK_MODELS.opencode.every(m=>m.id.startsWith("opencode/")));
 });
