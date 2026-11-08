@@ -323,6 +323,7 @@ fun ModernSubscriptionsContent(
     providers: List<SubscriptionProviderData>,
     selectedId: String,
     selectedModel: String,
+    activeProvider: String,
     query: String,
     loading: Boolean,
     error: String,
@@ -497,6 +498,15 @@ fun ModernSubscriptionsContent(
                     )
                 }
 
+                if (activeProvider == "byok") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Your own key is the model every bot runs on",
+                        color = PockoColors.EmeraldReady,
+                        fontSize = 12.sp
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
                 val usable = selected.installed && (selected.authenticated || !selected.signInRequired)
                 Button(
@@ -601,6 +611,7 @@ object ModernSubscriptions {
                 val providers = controller.providers.value
                 val selectedId = controller.selectedId.value
                 val selectedModel = controller.selectedModel.value
+                val activeProvider = controller.activeProvider.value
                 val query = controller.query.value
                 val loading = controller.loading.value
                 val error = controller.error.value
@@ -608,6 +619,7 @@ object ModernSubscriptions {
                     providers = providers,
                     selectedId = selectedId,
                     selectedModel = selectedModel,
+                    activeProvider = activeProvider,
                     query = query,
                     loading = loading,
                     error = error,
@@ -637,6 +649,9 @@ class SubscriptionsController(
     val query = mutableStateOf("")
     val loading = mutableStateOf(true)
     val error = mutableStateOf("")
+    /** The provider every bot runs on, and the model it runs on. */
+    val activeProvider = mutableStateOf("")
+    val activeModel = mutableStateOf("")
 
     private var epoch = 0
 
@@ -651,19 +666,22 @@ class SubscriptionsController(
             providers.value = (0 until list.length()).mapNotNull { index ->
                 (list.optJSONObject(index) ?: return@mapNotNull null).let(::parseProvider)
             }
+            val settings = app.currentState().optJSONObject("settings")
+            activeProvider.value = settings?.optString("executionProvider", "byok") ?: "byok"
+            activeModel.value = settings?.optString("providerModel", "") ?: ""
             if (selectedId.value.isEmpty()) {
                 // The provider already in use is the one to open on.
-                val current = app.currentState().optJSONObject("settings")?.optString("executionProvider", "byok") ?: "byok"
-                selectedId.value = providers.value.firstOrNull { it.id == current }?.id
+                selectedId.value = providers.value.firstOrNull { it.id == activeProvider.value }?.id
                     ?: providers.value.firstOrNull { it.supported }?.id
                     ?: providers.value.firstOrNull()?.id
                     ?: ""
             }
-            // The model in use stays chosen unless this provider does not offer it.
+            // A model is ticked only when it is the model in use, or one the owner has just ticked.
             val models = providers.value.firstOrNull { it.id == selectedId.value }?.models.orEmpty()
-            val saved = app.currentState().optJSONObject("settings")?.optString("providerModel", "") ?: ""
-            val chosen = selectedModel.value.ifEmpty { saved }
-            selectedModel.value = if (models.any { it.id == chosen }) chosen else models.firstOrNull()?.id ?: ""
+            val chosen = selectedModel.value.ifEmpty {
+                if (activeProvider.value == selectedId.value) activeModel.value else ""
+            }
+            selectedModel.value = if (models.any { it.id == chosen }) chosen else ""
         }, { message ->
             if (current != epoch) return@marketplaceRequest
             loading.value = false
@@ -691,7 +709,9 @@ class SubscriptionsController(
                 if (provider.id != id) provider
                 else provider.copy(models = parsed, modelSource = (value as? JSONObject)?.optString("source") ?: "fallback")
             }
-            selectedModel.value = parsed.firstOrNull { it.id == selectedModel.value }?.id ?: parsed.firstOrNull()?.id ?: ""
+            // A model is ticked only when it is the model in use, or one the owner has just ticked.
+            val chosen = selectedModel.value.ifEmpty { if (activeProvider.value == id) activeModel.value else "" }
+            selectedModel.value = parsed.firstOrNull { it.id == chosen }?.id ?: ""
         }, { })
     }
 
@@ -820,6 +840,7 @@ private fun PreviewSubscriptionsDark() {
                 )
             ),
             selectedId = "claude",
+            activeProvider = "claude",
             selectedModel = "claude-opus-5-5",
             query = "",
             loading = false,
