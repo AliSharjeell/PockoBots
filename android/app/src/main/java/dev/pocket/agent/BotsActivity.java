@@ -29,6 +29,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private boolean oauthReturn(Intent intent){Uri data=intent.getData();return data!=null&&"pockobots".equals(data.getScheme())&&"oauth".equals(data.getHost())&&"/complete".equals(data.getPath());}
 
     int dp(int n){return AgentStyle.dp(this,n);}
+    String getSelectedBotId(){return selected;}
     JSONObject json(Object...pairs){JSONObject value=new JSONObject();try{for(int i=0;i<pairs.length;i+=2)value.put((String)pairs[i],pairs[i+1]);}catch(Exception e){throw new IllegalArgumentException(e);}return value;}
     JSONObject currentState(){return state;}
     Handler mainHandler(){return main;}
@@ -126,9 +127,9 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         // The provider list and its models come from the same request, so one round trip fills both.
         marketplaceRequest("GET","/providers",null,value->{
             if(!(value instanceof JSONArray))return;JSONArray providers=(JSONArray)value;providerChoices.removeAllViews();modelChoices.removeAllViews();String providerLabel=currentProvider,modelLabel=currentModel;
-            for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider);
+            for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider),installed=entry.optBoolean("installed");
                 LinearLayout row=row();ImageView mark=new ImageView(this);mark.setImageResource(MarketplaceIcons.provider(id));mark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(mark,new LinearLayout.LayoutParams(dp(22),dp(22)));
-                TextView label=text(entry.optString("name")+(active?"  \u2713":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:AgentStyle.TEXT);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+                TextView label=text(entry.optString("name")+(installed?"":"  \u00b7 not installed")+(active?"  \u2713":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:installed?AgentStyle.TEXT:AgentStyle.MUTED);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
                 providerChoices.addView(row);row.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider",id,"providerModel","default"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Provider set to "+entry.optString("name"),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
                 if(active){providerLabel=entry.optString("name");JSONArray models=entry.optJSONArray("models");if(models!=null)for(int j=0;j<models.length();j++){JSONObject model=models.optJSONObject(j);String modelId=model.optString("id");boolean modelActive=modelId.equals(currentModel);if(modelActive)modelLabel=model.optString("name",modelId);
                     TextView modelItem=text(model.optString("name",modelId)+(modelActive?"  \u2713":""),14);modelItem.setPadding(dp(14),dp(10),dp(14),dp(10));modelItem.setTextColor(modelActive?AgentStyle.BLUE:AgentStyle.TEXT);modelChoices.addView(modelItem);modelItem.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("providerModel",modelId),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Model set to "+model.optString("name",modelId),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the model",Toast.LENGTH_SHORT).show());});}}}
@@ -143,14 +144,14 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers","Webhooks").contains(screen);}
     private void toggleAppearance(){saveDraft();getSharedPreferences("appearance",0).edit().putString("theme",AgentStyle.dark?"light":"dark").apply();AgentStyle.applyTheme(this);setTheme(AgentStyle.dark?R.style.AppTheme:R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);pendingMotion=0;animatePage=true;shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
 
-    private void showScreen(String next){pendingMotion=0;animatePage=!(next.equals("Chat")&&selected.isEmpty());if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
+    void showScreen(String next){pendingMotion=0;animatePage=!(next.equals("Chat")&&selected.isEmpty());if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
     private void shell(){
         navigationEpoch++;if(animatePage){UiMotion.change(findViewById(android.R.id.content),pendingMotion);animatePage=false;}
         workspace.stop();messageRows.clear();jumpToLatest=null;dockOverlay=null;headerAvatar=null;composerAction=null;chatBusy=false;currentJob=null;page=column();page.setBackgroundColor(AgentStyle.BACK);page.setPadding(dp(12),dp(8),dp(12),0);
         page.setOnApplyWindowInsetsListener((v,insets)->{int navigation=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom();int bottom=selected.isEmpty()?Math.max(0,insets.getSystemWindowInsetBottom()-navigation):dp(8)+insets.getSystemWindowInsetBottom();v.setPadding(dp(12)+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),dp(12)+insets.getSystemWindowInsetRight(),bottom);positionDock(navigation);return insets.consumeSystemWindowInsets();});
         
         FrameLayout header=new FrameLayout(this);
-        boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
+        boolean botHeader=!selected.isEmpty()&&Arrays.asList("Chat","Browser","Terminal","Files").contains(screen)&&detail!=null&&detail.optJSONObject("bot")!=null;
         if(!selected.isEmpty()||settingsChild()){
             AgentIcon back=new AgentIcon(this,"back",settingsChild()?"Back to Settings":"Back to messages",()->{if(settingsChild())showScreen("Settings");else open("");});
             header.addView(GlassControls.wrap(back,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.START|Gravity.CENTER_VERTICAL));
@@ -182,12 +183,14 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
 
         View workspaceTabs=null;
-        if(!selected.isEmpty()&&Arrays.asList("Chat","Terminal","Files").contains(screen)){
-            String[] tabs={"Chat","Terminal","Files"};
+        if(!selected.isEmpty()&&Arrays.asList("Chat","Browser","Terminal","Files").contains(screen)){
+            String[] tabs={"Chat","Browser","Terminal","Files"};
             workspaceTabs=GlassDock.createWorkspace(this,AgentStyle.dark,Arrays.asList(tabs).indexOf(screen),index->showScreen(tabs[index]));page.addView(workspaceTabs,new LinearLayout.LayoutParams(-1,dp(60)));
         }
 
-        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);root.addView(page);setContentView(root);
+        body=column();page.addView(body,new LinearLayout.LayoutParams(-1,0,1));composer=null;thread=null;root=new FrameLayout(this);
+        FrameLayout hiddenStage=new FrameLayout(this);hiddenStage.setAlpha(0.01f);root.addView(hiddenStage,0,new FrameLayout.LayoutParams(1080,1920));BotBrowserManager.get().setHiddenStage(hiddenStage);
+        root.addView(page);setContentView(root);
         if(!screen.equals("Chat")){if(screen.equals("Marketplace"))marketplace();else workspace.show(body,screen,"");if(selected.isEmpty())dock();return;}
         if(selected.isEmpty()){inbox();dock();return;}
         
@@ -512,6 +515,33 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 startForegroundService(new Intent(this,MobileOverlayService.class).putExtra("taskId",phone.optString("id")).putExtra("expand",true));
                 main.postDelayed(()->request("POST","/mobile/tasks/"+phone.optString("id")+"/answer",json("questionId",question.optString("id"),"text",answer),v->refresh(false)),400);
             },true);
+        }
+        BotBrowserInstance botBrowser = BotBrowserManager.get().get(selected);
+        if(botBrowser!=null){
+            if(botBrowser.isWaitingForHuman()){
+                LinearLayout handoff=column();
+                handoff.setPadding(dp(14),dp(12),dp(14),dp(12));
+                handoff.setBackground(AgentStyle.surface(this,0x28FF9500,16,true));
+                LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,-2);hlp.setMargins(0,dp(6),0,dp(6));
+                handoff.setLayoutParams(hlp);
+                TextView title=text("⚠️ Bot needs your help in Browser",13);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);handoff.addView(title);
+                TextView reason=muted(botBrowser.getHumanRequestReason(),12);reason.setPadding(dp(8),0,dp(8),dp(6));handoff.addView(reason);
+                Button takeControl=button(handoff,"Open Browser & Take Control",()->showScreen("Browser"),true);
+                takeControl.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF9500));
+                thread.addView(handoff);
+            } else if(!botBrowser.getCurrentUrl().equals("about:blank")){
+                LinearLayout liveChip=row();
+                liveChip.setPadding(dp(12),dp(6),dp(12),dp(6));
+                liveChip.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));
+                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));
+                liveChip.setLayoutParams(clp);
+                TextView liveText=text("🌐 Browser: "+botBrowser.getCurrentTitle(),12);
+                liveText.setMaxWidth(dp(200));liveText.setSingleLine(true);liveText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                liveChip.addView(liveText);
+                Button viewBtn=button(liveChip,"View live",()->showScreen("Browser"),false);
+                viewBtn.setTextSize(11);
+                thread.addView(liveChip);
+            }
         }
         JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false,needsPhoneAccess=false;currentJob=null;
         if(jobs!=null)for(int i=0;i<jobs.length();i++){

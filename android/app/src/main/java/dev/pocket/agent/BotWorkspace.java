@@ -23,7 +23,14 @@ final class BotWorkspace {
     private TextView text(String s,int n){return app.text(s,n);}
     private Button button(LinearLayout p,String s,Runnable click){return app.button(p,s,click,false);}
     private LinearLayout scrolling(){ScrollView scroll=new ScrollView(app);scroll.setClipToPadding(false);if(scope().equals("root"))scroll.setPadding(0,0,0,dp(96));LinearLayout content=column();content.setPadding(dp(4),dp(12),dp(4),dp(16));scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return content;}
-    void show(LinearLayout parent,String tab,String id){stop();body=parent;body.removeAllViews();if(!project.equals(id)){directory=".";}project=id;screen=tab;if(tab.equals("Terminal"))terminal();else if(tab.equals("Files"))files();else if(tab.equals("Settings"))settingsHome();else if(tab.equals("BYOK"))settings();else if(tab.equals("Subscriptions"))subscriptions();else if(tab.equals("Connections"))connectionsPage();else if(tab.equals("Permissions"))app.permissionSettings(scrolling());else if(tab.equals("Servers"))servers();else if(tab.equals("Webhooks"))webhooksPage();}
+    void show(LinearLayout parent,String tab,String id){stop();body=parent;body.removeAllViews();if(!project.equals(id)){directory=".";}project=id;screen=tab;if(tab.equals("Browser"))browser();else if(tab.equals("Terminal"))terminal();else if(tab.equals("Files"))files();else if(tab.equals("Settings"))settingsHome();else if(tab.equals("BYOK"))settings();else if(tab.equals("Subscriptions"))subscriptions();else if(tab.equals("Connections"))connectionsPage();else if(tab.equals("Permissions"))app.permissionSettings(scrolling());else if(tab.equals("Servers"))servers();else if(tab.equals("Webhooks"))webhooksPage();}
+    private void browser(){
+        body.removeAllViews();
+        String botId = project.isEmpty() ? app.getSelectedBotId() : project;
+        BotBrowserView browserView = new BotBrowserView(app, botId);
+        browserView.setOnHandbackCallback(() -> app.showScreen("Chat"));
+        body.addView(browserView, new LinearLayout.LayoutParams(-1, -1));
+    }
     private String scope(){return app.terminalScope();}
     private void glassButton(LinearLayout parent,String label,Runnable action,boolean primary){
         Button key=app.button(parent,label,action,primary);key.setTextColor(primary?0xffffffff:AgentStyle.TEXT);parent.removeView(key);parent.addView(GlassControls.wrap(key,22f,primary));
