@@ -232,12 +232,19 @@ public class BotBrowserServer extends Thread {
                     return;
                 }
                 boolean waitForLoad = body.optBoolean("waitForLoad", true);
+                long before = browser.navigationCount();
                 browser.navigate(url);
 
                 if (waitForLoad) {
-                    // Wait up to 5 seconds for page load to start or settle
+                    // Wait for the load to begin before waiting for it to end. A WebView that has not
+                    // been asked for anything reports neither loading nor progress, so a wait on those
+                    // alone called the page settled before it had started, and the bot saw a blank page.
+                    long started = System.currentTimeMillis() + 8000;
+                    while (System.currentTimeMillis() < started && browser.navigationCount() == before) {
+                        Thread.sleep(50);
+                    }
                     int checks = 0;
-                    while (checks < 25) {
+                    while (checks < 50) {
                         Thread.sleep(200);
                         checks++;
                         if (!browser.isLoading() && browser.getLoadProgress() >= 90) break;

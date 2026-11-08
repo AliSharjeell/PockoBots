@@ -48,9 +48,10 @@ public class BotBrowserInstance {
 
     private volatile String currentUrl = DEFAULT_HOME_URL;
     private volatile String currentTitle = "Google";
-    private volatile int loadProgress = 100;
+    private volatile int loadProgress = 0;
     private volatile boolean isLoading = false;
     private volatile String lastError = "";
+    private final java.util.concurrent.atomic.AtomicLong navigationCount = new java.util.concurrent.atomic.AtomicLong(0);
 
     // Human intervention state
     private volatile boolean waitingForHuman = false;
@@ -234,8 +235,17 @@ public class BotBrowserInstance {
 
     public void navigate(String url) {
         final String target = resolveInputUrl(url);
-        mainHandler.post(() -> webView.loadUrl(target));
+        mainHandler.post(() -> { navigationCount.incrementAndGet(); webView.loadUrl(target); });
     }
+
+    /**
+     * How many pages this browser has been asked for.
+     *
+     * A caller that waits for a load to finish has to know the load began. A WebView that has not
+     * been asked for anything reports neither loading nor progress, so a wait on those alone calls
+     * the page settled before it has started.
+     */
+    public long navigationCount() { return navigationCount.get(); }
 
     public void goBack() {
         mainHandler.post(() -> {

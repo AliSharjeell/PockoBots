@@ -533,31 +533,17 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             },true);
         }
         BotBrowserInstance botBrowser = BotBrowserManager.get().get(selected);
-        if(botBrowser!=null){
-            if(botBrowser.isWaitingForHuman()){
-                LinearLayout handoff=column();
-                handoff.setPadding(dp(14),dp(12),dp(14),dp(12));
-                handoff.setBackground(AgentStyle.surface(this,0x28FF9500,16,true));
-                LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,-2);hlp.setMargins(0,dp(6),0,dp(6));
-                handoff.setLayoutParams(hlp);
-                TextView title=text("⚠️ Bot needs your help in Browser",13);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);handoff.addView(title);
-                TextView reason=muted(botBrowser.getHumanRequestReason(),12);reason.setPadding(dp(8),0,dp(8),dp(6));handoff.addView(reason);
-                Button takeControl=button(handoff,"Open Browser & Take Control",()->showScreen("Browser"),true);
-                takeControl.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF9500));
-                thread.addView(handoff);
-            } else if(!botBrowser.getCurrentUrl().equals("about:blank")){
-                LinearLayout liveChip=row();
-                liveChip.setPadding(dp(12),dp(6),dp(12),dp(6));
-                liveChip.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));
-                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));clp.gravity=Gravity.CENTER_HORIZONTAL;
-                liveChip.setLayoutParams(clp);
-                TextView liveText=text("🌐 Browser: "+botBrowser.getCurrentTitle(),12);
-                liveText.setMaxWidth(dp(200));liveText.setSingleLine(true);liveText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                liveChip.addView(liveText);
-                Button viewBtn=button(liveChip,"View live",()->showScreen("Browser"),false);
-                viewBtn.setTextSize(11);
-                thread.addView(liveChip);
-            }
+        if(botBrowser!=null&&botBrowser.isWaitingForHuman()){
+            LinearLayout handoff=column();
+            handoff.setPadding(dp(14),dp(12),dp(14),dp(12));
+            handoff.setBackground(AgentStyle.surface(this,0x28FF9500,16,true));
+            LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,-2);hlp.setMargins(0,dp(6),0,dp(6));
+            handoff.setLayoutParams(hlp);
+            TextView title=text("⚠️ Bot needs your help in Browser",13);title.setTypeface(AgentStyle.font(this),Typeface.BOLD);handoff.addView(title);
+            TextView reason=muted(botBrowser.getHumanRequestReason(),12);reason.setPadding(dp(8),0,dp(8),dp(6));handoff.addView(reason);
+            Button takeControl=button(handoff,"Open Browser & Take Control",()->showScreen("Browser"),true);
+            takeControl.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF9500));
+            thread.addView(handoff);
         }
         JSONArray jobs=detail.optJSONArray("jobs");boolean busy=false,paused=false,needsPhoneAccess=false;currentJob=null;
         if(jobs!=null)for(int i=0;i<jobs.length();i++){
@@ -567,6 +553,20 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             needsPhoneAccess|=job.optBoolean("phoneArming");
         }
         chatBusy=busy;updateComposerAction();if(headerAvatar!=null)headerAvatar.setWorking(busy);
+        // The card says which page the bot is on, so it only belongs there while the bot is working.
+        if(botBrowser!=null&&busy&&!botBrowser.getCurrentUrl().equals("about:blank")){
+            LinearLayout liveChip=row();
+            liveChip.setPadding(dp(12),dp(6),dp(12),dp(6));
+            liveChip.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));
+            LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));clp.gravity=Gravity.CENTER_HORIZONTAL;
+            liveChip.setLayoutParams(clp);
+            TextView liveText=text("🌐 Browser: "+botBrowser.getCurrentTitle(),12);
+            liveText.setMaxWidth(dp(200));liveText.setSingleLine(true);liveText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            liveChip.addView(liveText);
+            Button viewBtn=button(liveChip,"View live",()->showScreen("Browser"),false);
+            viewBtn.setTextSize(11);
+            thread.addView(liveChip);
+        }
         if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
             LinearLayout thinking=row();thinking.setClipChildren(false);thinking.setClipToPadding(false);WorkingAvatarView avatar=new WorkingAvatarView(this,bot,13);avatar.setWorking(true);
