@@ -41,6 +41,8 @@ public class RuntimeService extends Service {
         startForeground(1, notification);
         wakeLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "PocketAgent:runtime");
         wakeLock.acquire();
+        BotBrowserManager.get().init(this);
+        BotBrowserServer.startServer(this);
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent!=null&&intent.hasExtra("botsEnabled"))getSharedPreferences("bot-runtime",MODE_PRIVATE).edit().putBoolean("enabled",intent.getBooleanExtra("botsEnabled",false)).apply();
@@ -203,6 +205,7 @@ public class RuntimeService extends Service {
             }, "pocket-stop").start();
         }
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        BotBrowserServer.stopServer();
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
