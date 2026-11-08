@@ -549,7 +549,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
                 LinearLayout liveChip=row();
                 liveChip.setPadding(dp(12),dp(6),dp(12),dp(6));
                 liveChip.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));
-                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));
+                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));clp.gravity=Gravity.CENTER_HORIZONTAL;
                 liveChip.setLayoutParams(clp);
                 TextView liveText=text("🌐 Browser: "+botBrowser.getCurrentTitle(),12);
                 liveText.setMaxWidth(dp(200));liveText.setSingleLine(true);liveText.setEllipsize(android.text.TextUtils.TruncateAt.END);

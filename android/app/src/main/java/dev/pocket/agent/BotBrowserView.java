@@ -49,7 +49,9 @@ public class BotBrowserView extends LinearLayout {
         this.context = context;
         this.botId = (botId == null || botId.isEmpty()) ? "global" : botId;
         setOrientation(VERTICAL);
-        setBackgroundColor(AgentStyle.BACK);
+        // The browser is a card on the page, not a slab that runs to the edges of the screen.
+        setBackground(AgentStyle.surface(context, AgentStyle.BACK, 22, true));
+        setClipToOutline(true);
 
         initViews();
         attachBrowser();
