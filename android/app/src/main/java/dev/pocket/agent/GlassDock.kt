@@ -1,4 +1,4 @@
-﻿package dev.pocket.agent
+package dev.pocket.agent
 
 import android.content.Context
 import android.view.View
@@ -53,6 +53,7 @@ val DockTabs = listOf(
 
 val WorkspaceTabs = listOf(
     DockTabItem("Chat", R.drawable.phosphor_chat_circle_regular, R.drawable.phosphor_chat_circle_fill),
+    DockTabItem("Browser", R.drawable.phosphor_globe_regular, R.drawable.phosphor_globe_fill),
     DockTabItem("Terminal", R.drawable.phosphor_terminal_window_regular, R.drawable.phosphor_terminal_window_fill),
     DockTabItem("Files", R.drawable.phosphor_folder_open_regular, R.drawable.phosphor_folder_open_fill)
 )
@@ -73,7 +74,7 @@ fun GlassDockBar(
     ) {
         Row(
             modifier = Modifier
-                .widthIn(max = if (compact) 216.dp else 300.dp)
+                .widthIn(max = if (compact) 280.dp else 300.dp)
                 .fillMaxWidth()
                 .shadow(
                     elevation = if (!dark) 0.dp else if (compact) 6.dp else 16.dp,
