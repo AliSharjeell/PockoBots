@@ -18,7 +18,9 @@ export function browserTools(botId: string, bridge: BrowserBridge): AgentTool<an
         url: Type.String({ maxLength: 8000, description: "The full URL to navigate to (http:// or https://)" }),
       }),
       execute: async (_id, p: any, signal) => {
-        const url = new URL(p.url.startsWith("http") ? p.url : `https://${p.url}`);
+        const raw = String(p.url || "").trim();
+        const target = raw.includes("://") ? raw : `https://${raw}`;
+        const url = new URL(target);
         if (!["http:", "https:"].includes(url.protocol)) {
           throw Error("Use an HTTP/HTTPS URL");
         }
