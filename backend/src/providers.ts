@@ -9,18 +9,24 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Processes } from "./processes.js";
 import type { Terminals } from "./terminals.js";
 import { Value } from "typebox/value";
+import { catalogFor, discoverModels, type ModelCatalog } from "./provider-models.js";
 
 export const providerCatalog = [
  { id:"codex", name:"Codex / ChatGPT", command:"codex", install:"npm install -g @openai/codex", login:"codex login --device-auth", docs:"https://developers.openai.com/codex/cli", supported:true },
  { id:"claude", name:"Claude Code", command:"claude", install:"npm install -g @anthropic-ai/claude-code", login:"claude auth login", docs:"https://code.claude.com/docs/en/authentication", supported:true },
  { id:"opencode", name:"OpenCode", command:"opencode", install:"npm install -g opencode-ai", login:"opencode auth login", docs:"https://opencode.ai/docs/cli/", supported:true },
  { id:"gemini", name:"Gemini CLI", command:"gemini", install:"npm install -g @google/gemini-cli", login:"gemini", docs:"https://geminicli.com/docs/get-started/authentication/", supported:true },
+ { id:"grok", name:"Grok CLI", command:"grok", install:"mkdir -p \"$HOME/.local/bin\" && ARCH=$(uname -m) && case \"$ARCH\" in aarch64|arm64) A=aarch64 ;; *) A=x86_64 ;; esac && curl -fsSL \"https://x.ai/cli/grok-1.0.22-linux-$A\" -o \"$HOME/.local/bin/grok\" && chmod +x \"$HOME/.local/bin/grok\"", login:"grok --no-auto-update login", docs:"https://x.ai/cli", supported:true },
+ { id:"cursor", name:"Cursor CLI", command:"cursor-agent", install:"mkdir -p \"$HOME/.local/bin\" && curl -fsSL https://cursor.com/install -fsS | bash", login:"cursor-agent login", docs:"https://cursor.com/docs/cli/overview", supported:true },
  { id:"antigravity", name:"Antigravity", command:"", install:"", login:"", docs:"https://antigravity.google/", supported:false, reason:"Antigravity desktop is not an Android/Linux subscription CLI adapter. Gemini CLI is a separate supported integration; its account eligibility is decided by Google." },
  { id:"freebuff", name:"Freebuff", command:"", install:"", login:"", docs:"https://github.com/CodebuffAI/freebuff", supported:false, reason:"The official freebuff CLI can be installed manually with npm install -g freebuff in Main terminal. Its headless PockoBots phone-tool adapter has not been verified, so it cannot yet power bot chats." },
  { id:"commandcode", name:"CommandCode", command:"", install:"", login:"", docs:"https://commandcode.ai/docs/headless", supported:false, reason:"The official command-code CLI supports cmd login and headless execution. Install manually with npm install -g command-code in Main terminal. A run-scoped PockoBots MCP adapter has not been verified, so it cannot yet power bot chats." },
 ] as const;
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
 export function provider(id: string) {const p=providerCatalog.find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
+
+/** npm takes flags that quieten its output. A vendor's own installer does not. */
+export function installCommand(p:{install:string}) {return p.install.startsWith("npm install")?p.install+" --no-fund --no-audit --loglevel=http":p.install;}
 
 async function probe(command:string,args:string[],timeout=15000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
 
@@ -29,9 +35,36 @@ export class SubscriptionProviders {
  constructor(private launcher:(command:string)=>{command:string;args:string[]} = command=>({command,args:[]})) {}
  private base="http://127.0.0.1:8787";
  private apiToken="";
+ private root="";
  private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal;onActivity?:(event:any)=>void}>();
- configure(base:string,token:string){this.base=base;this.apiToken=token;}
- async status(){return Promise.all(providerCatalog.map(async p=>{if(!p.supported)return {...p,installed:false,authenticated:false};const version=await probe(p.command,["--version"]);let authenticated:boolean|null=null;if(version.code===0&&(p.id==="codex"||p.id==="claude")){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}else if(version.code===0){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}return {...p,installed:version.code===0,authenticated,version:version.code===0?version.text.trim().slice(0,100):"",note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};}));}
+ private catalogs=new Map<string,{catalog:ModelCatalog;at:number}>();
+ private refreshing=new Map<string,Promise<void>>();
+ configure(base:string,token:string,root?:string){this.base=base;this.apiToken=token;if(root)this.root=root;}
+ /** The model list to show for a provider: the CLI's own list once it has answered, else the shipped one. */
+ private catalog(id:string){const cached=this.catalogs.get(id);return cached?cached.catalog:catalogFor(id,null);}
+ /** Asks a provider's CLI which models it can run, and keeps the answer for a few minutes. */
+ private refreshCatalog(id:string,force=false):Promise<void>{
+  const running=this.refreshing.get(id);if(running)return running;
+  const cached=this.catalogs.get(id);if(!force&&cached&&Date.now()-cached.at<300000)return Promise.resolve();
+  const p=provider(id);if(!p.supported)return Promise.resolve();
+  const work=(async()=>{try{const discovered=await discoverModels(id,{command:p.command,cwd:this.root||process.cwd(),env:process.env});this.catalogs.set(id,{catalog:catalogFor(id,discovered),at:Date.now()});}catch{}finally{this.refreshing.delete(id);}})();
+  this.refreshing.set(id,work);return work;
+ }
+ /** The models a provider can run. A caller that wants fresh ones asks the CLI again. */
+ async models(id:string,refresh=false){if(refresh)await this.refreshCatalog(id,true);else void this.refreshCatalog(id);return this.catalog(id);}
+ async status(){return Promise.all(providerCatalog.map(async p=>{
+  if(!p.supported)return {...p,installed:false,authenticated:false};
+  const version=await probe(p.command,["--version"]),installed=version.code===0;
+  let authenticated:boolean|null=null;
+  if(installed){
+   if(p.id==="codex"||p.id==="claude"){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}
+   else if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
+   else{const auth=await probe(p.command,["login","status"]);authenticated=auth.code===0?true:null;}
+   void this.refreshCatalog(p.id);
+  }
+  const catalog=this.catalog(p.id);
+  return {...p,installed,authenticated,version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+ }));}
  async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");const callId=randomUUID();run.onActivity?.({type:"tool_execution_start",toolCallId:callId,toolName:tool.name,args:input.arguments||{}});try{const result=await tool.execute(callId,input.arguments||{},run.signal);run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result,isError:!!(result as any).isError});return result;}catch(error){run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result:"Tool failed",isError:true});throw error;}}
  async run(id:string,options:{effort?:Effort;cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}){
   const p=provider(id);if(!p.supported)throw Error(p.reason);if(options.signal.aborted)throw Error("Cancelled");
@@ -46,6 +79,8 @@ export class SubscriptionProviders {
    if(id==="claude")args=["-p",...(options.effort?["--effort",options.effort==="xhigh"?"high":options.effort]:[]),"--output-format","stream-json","--verbose","--allowedTools","Bash,Read,Edit,Write,Glob,Grep,mcp__pockobots__*","--mcp-config",configPath,...(model?["--model",model]:[])];
    if(id==="opencode"){env.OPENCODE_CONFIG_CONTENT=JSON.stringify({permission:"allow",mcp:{pockobots:{type:"local",command:[process.execPath,helper],environment,enabled:true,timeout:600000}}});args=["run","--format","json",...(model?["--model",model]:[]),"--",options.prompt];}
    if(id==="gemini"){const config=join(directory,"gemini.json");await writeFile(config,JSON.stringify({mcpServers:{pockobots:{...mcp,timeout:600000,trust:true}}}),{mode:0o600});env.GEMINI_CLI_SYSTEM_SETTINGS_PATH=config;args=["--prompt",options.prompt,"--output-format","stream-json","--approval-mode","yolo",...(model?["--model",model]:[])];}
+   if(id==="grok")args=["--no-auto-update","agent","--single",options.prompt,"--output-format","streaming-json","--always-approve",...(model?["--model",model]:[])];
+   if(id==="cursor")args=["-p",options.prompt,"--output-format","text","--force",...(model?["--model",model]:[])];
    const launcher=this.launcher(p.command); return await executeProvider(launcher.command,[...launcher.args,...args],{cwd:options.cwd,env,prompt:["codex","claude"].includes(id)?options.prompt:undefined,signal:options.signal,onText:options.onText,onActivity:options.onActivity});
   }finally{this.runs.delete(runId);await rm(directory,{recursive:true,force:true});}
  }
@@ -58,10 +93,15 @@ export function providerText(event:any):string|undefined {
  if(event.type==="text"&&typeof event.part?.text==="string")return event.part.text;
  if(event.type==="message"&&event.role==="assistant"&&typeof event.content==="string")return event.content;
  if(event.type==="assistant"&&Array.isArray(event.message?.content))return event.message.content.filter((p:any)=>p.type==="text").map((p:any)=>p.text).join("\n");
+ // An Agent Client Protocol agent, such as the Grok CLI, reports what it said as a session update.
+ if(event.sessionUpdate==="agent_message_chunk"&&typeof event.content?.text==="string")return event.content.text;
  return undefined;
 }
 /** Accept only structured vendor activity, not arbitrary stderr or an invented thought stream. */
 export function providerActivity(event:any):any[]{
+ if(event.sessionUpdate==="agent_thought_chunk"&&typeof event.content?.text==="string")return [{type:"thinking",id:event.toolCallId||"",text:event.content.text}];
+ if(event.sessionUpdate==="tool_call")return [{type:"tool_execution_start",toolCallId:event.toolCallId,toolName:event.title||"tool",args:event.rawInput||{},result:"",isError:false}];
+ if(event.sessionUpdate==="tool_call_update"&&(event.status==="completed"||event.status==="failed"))return [{type:"tool_execution_end",toolCallId:event.toolCallId,toolName:event.title||"tool",result:event.content||"",isError:event.status==="failed"}];
  const item=event.item;
  if(item&&["item.started","item.updated","item.completed"].includes(event.type)){
   if(item.type==="reasoning"&&typeof item.text==="string")return [{type:"thinking",id:item.id,text:item.text}];
@@ -72,13 +112,14 @@ export function providerActivity(event:any):any[]{
  return [];
 }
 export function executeProvider(command:string,args:string[],options:{cwd:string;env:NodeJS.ProcessEnv;prompt?:string;signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}):Promise<string>{
- return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:options.cwd,env:options.env,detached:process.platform!=="win32",stdio:["pipe","pipe","pipe"]});let pending="",answer="",providerFailed=false,settled=false,stopped=false;let force:ReturnType<typeof setTimeout>|undefined;
+ return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:options.cwd,env:options.env,detached:process.platform!=="win32",stdio:["pipe","pipe","pipe"]});let pending="",raw="",answer="",providerFailed=false,settled=false,stopped=false;let force:ReturnType<typeof setTimeout>|undefined;
  const kill=()=>{stopped=true;try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGTERM");else child.kill();}catch{}if(!force){force=setTimeout(()=>{try{if(child.pid&&process.platform!=="win32")process.kill(-child.pid,"SIGKILL");else child.kill("SIGKILL");}catch{}},2000);force.unref();}};
  const abort=()=>kill();const timer=setTimeout(kill,3600000);timer.unref();options.signal.addEventListener("abort",abort,{once:true});
  const accept=(line:string)=>{try{const event=JSON.parse(line);for(const activity of providerActivity(event))options.onActivity?.(activity);if(event.type==="turn.failed"||event.type==="result"&&(event.is_error===true||event.status==="error"))providerFailed=true;const text=providerText(event);if(text){answer=(event.type==="message"&&event.delta===true?answer+text:text).slice(-30000);options.onText?.(answer);}}catch{}};
- child.stdout.on("data",b=>{pending+=b.toString();if(pending.length>2000000){pending="";kill();return;}let newline;while((newline=pending.indexOf("\n"))>=0){accept(pending.slice(0,newline));pending=pending.slice(newline+1);}});
+ child.stdout.on("data",b=>{const chunk=b.toString();raw=(raw+chunk).slice(-30000);pending+=chunk;if(pending.length>2000000){pending="";kill();return;}let newline;while((newline=pending.indexOf("\n"))>=0){accept(pending.slice(0,newline));pending=pending.slice(newline+1);}});
  child.stderr.on("data",()=>{});
- const finish=(failure?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(force&&!stopped)clearTimeout(force);options.signal.removeEventListener("abort",abort);if(failure)reject(failure);else if(!answer||providerFailed)reject(Error("Provider ended without a successful text result. Check its account and project activity."));else resolve(answer);};
+ const finish=(failure?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(force&&!stopped)clearTimeout(force);options.signal.removeEventListener("abort",abort);if(failure)reject(failure);else if(!answer&&!providerFailed){// A CLI that answers in plain text still answered.
+  const plain=raw.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g,"").trim();if(plain&&!plain.startsWith("{")&&!plain.startsWith("["))answer=plain;}if(!answer||providerFailed)reject(Error("Provider ended without a successful text result. Check its account and project activity."));else resolve(answer);};
  child.once("error",()=>finish(Error("Provider executable is unavailable. Install it in Main terminal and sign in first.")));
  child.once("close",code=>{if(pending)accept(pending);if(options.signal.aborted)return finish(Error("Provider task cancelled"));if(stopped)return finish(Error("Provider task exceeded its time or output limit"));if(code!==0)return finish(Error("Provider CLI stopped ("+code+"). Open its login in Settings and check its account or platform compatibility."));finish();});
  child.stdin.on("error",()=>{});child.stdin.end(options.prompt||"");if(options.signal.aborted)abort();
@@ -87,10 +128,11 @@ export function executeProvider(command:string,args:string[],options:{cwd:string
 export const subscriptions=new SubscriptionProviders();
 /** Register after the app's existing bearer authentication middleware. */
 export function registerProviderRoutes(app:Express,options:{port:number;root:string;processes:Processes;terminals:Terminals;token:string}){
- subscriptions.configure("http://127.0.0.1:"+options.port,options.token);
+ subscriptions.configure("http://127.0.0.1:"+options.port,options.token,options.root);
  const installations=new Map<string,string>();
  app.get("/api/providers",async(_req,res)=>res.json((await subscriptions.status()).map(p=>({...p,installation:options.processes.jobs.get(installations.get(p.id)||"")||null}))));
- app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(p.install+" --no-fund --no-audit --loglevel=http",options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
+ app.get("/api/providers/:id/models",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.models(p.id,true));});
+ app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(installCommand(p),options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
  app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}res.json(job);});
  app.post("/api/providers/:id/login",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const terminal=options.terminals.start(options.root);options.terminals.input(terminal.id,p.login+"\n");res.status(201).json({...terminal,provider:p.id,instruction:"Complete the vendor's login in this terminal. Credentials stay in the vendor CLI's phone-owned account directory."});});
  app.post("/api/provider-tools/:run/:operation",async(req,res)=>res.json(await subscriptions.bridge(req.params.run,String(req.headers["x-provider-bridge-token"]||""),req.params.operation,req.body)));

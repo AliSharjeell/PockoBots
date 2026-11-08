@@ -46,7 +46,7 @@ export class Store {
 }
 export type Effort='low'|'medium'|'high'|'xhigh'|'max';
 export type Settings = {
-  executionProvider?: "byok" | "codex" | "claude" | "opencode" | "gemini";
+  executionProvider?: "byok" | "codex" | "claude" | "opencode" | "gemini" | "grok" | "cursor";
   providerModel?: string;
   provider: "openai" | "anthropic";
   api: "openai-completions" | "openai-responses" | "anthropic-messages";
@@ -77,7 +77,7 @@ export function validateSettings(input: any, previous: Settings): Settings {
         : input.apiKey,
   };
   s.executionProvider ??= "byok"; s.providerModel ??= "default";
-  if (!["byok","codex","claude","opencode","gemini"].includes(s.executionProvider) || typeof s.providerModel !== "string" || s.providerModel.length > 200) throw Error("Invalid execution provider or provider model");
+  if (!["byok","codex","claude","opencode","gemini","grok","cursor"].includes(s.executionProvider) || typeof s.providerModel !== "string" || s.providerModel.length > 200) throw Error("Invalid execution provider or provider model");
   if (input.clearKey === true) s.apiKey = "";
   if (
     !["openai", "anthropic"].includes(s.provider) ||

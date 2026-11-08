@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Type } from "typebox";
-import { SubscriptionProviders, executeProvider, providerCatalog, providerText, registerProviderRoutes } from "../src/providers.js";
+import { SubscriptionProviders, executeProvider, installCommand, providerCatalog, providerText, registerProviderRoutes } from "../src/providers.js";
 import { Store, defaults, validateSettings } from "../src/storage.js";
 
 test("subscription provider uses a real process and MCP bridge without importing credentials",async()=>{
@@ -73,4 +73,48 @@ test("CLI installation deduplicates running installs and scopes progress to its 
   const failure=await (await fetch(base+"/api/providers/codex/install/"+first.id)).json() as any;assert.equal(failure.exitCode,1);assert.match(failure.output,/network unavailable/);
   await fetch(base+"/api/providers/codex/install",{method:"POST"});assert.equal(starts,2);
  }finally{await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+
+test("the catalog carries the vendor CLIs that can be installed and signed in",()=>{
+ for(const id of ["codex","claude","opencode","gemini","grok","cursor"]){const entry=providerCatalog.find(p=>p.id===id);assert.ok(entry,id+" is missing");assert.equal(entry.supported,true);}
+ assert.equal(providerCatalog.find(p=>p.id==="grok")?.command,"grok");
+ assert.equal(providerCatalog.find(p=>p.id==="cursor")?.command,"cursor-agent");
+ assert.equal(validateSettings({executionProvider:"grok"},defaults).executionProvider,"grok");
+ assert.equal(validateSettings({executionProvider:"cursor"},defaults).executionProvider,"cursor");
+});
+
+test("npm flags are only given to npm",()=>{
+ assert.match(installCommand({install:"npm install -g @openai/codex"}),/--no-fund --no-audit/);
+ const cursor=providerCatalog.find(p=>p.id==="cursor")!;
+ assert.doesNotMatch(installCommand(cursor),/--no-fund/);
+ assert.match(installCommand(cursor),/cursor\.com\/install/);
+});
+
+test("the providers route carries a model list for every provider",async()=>{
+ const jobs=new Map<string,any>();
+ const processes={jobs,start:()=>({id:"job",status:"running",exitCode:null,output:""})} as unknown as Processes;
+ const app=express();app.use(express.json());registerProviderRoutes(app,{port:8787,root:tmpdir(),processes,terminals:{} as any,token:"test"});
+ const server=app.listen(0,"127.0.0.1");await new Promise<void>(r=>server.on("listening",r));
+ const base="http://127.0.0.1:"+(server.address() as any).port;
+ try{
+  const providers=await (await fetch(base+"/api/providers")).json() as any[];
+  const codex=providers.find(p=>p.id==="codex");
+  assert.ok(Array.isArray(codex.models)&&codex.models.length>0);
+  assert.equal(codex.modelSource,"fallback");
+  const models=await (await fetch(base+"/api/providers/claude/models")).json() as any;
+  assert.ok(Array.isArray(models.models)&&models.models.length>0);
+  assert.ok(models.models.some((m:any)=>m.name.includes("Claude")));
+ }finally{await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+
+test("an Agent Client Protocol agent's session update is read as what it said",()=>{
+ assert.equal(providerText({sessionUpdate:"agent_message_chunk",content:{type:"text",text:"Grok answered"}}),"Grok answered");
+ assert.equal(providerText({sessionUpdate:"agent_thought_chunk",content:{type:"text",text:"thinking"}}),undefined);
+});
+
+test("a CLI that answers in plain text still answers",async()=>{
+ const script='console.log("Cursor answered in plain text");';
+ assert.equal(await executeProvider(process.execPath,['-e',script],{cwd:tmpdir(),env:process.env,signal:new AbortController().signal}),"Cursor answered in plain text");
 });
