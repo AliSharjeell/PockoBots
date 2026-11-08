@@ -13,7 +13,7 @@ export function browserTools(botId: string, bridge: BrowserBridge): AgentTool<an
       name: "browser_navigate",
       label: "Navigate browser",
       description:
-        "Open an HTTP or HTTPS webpage in this bot's isolated in-app browser. Sessions, cookies, and logins are preserved across visits. Always observe the page after navigation.",
+        "Open an HTTP or HTTPS webpage in this bot's isolated in-app browser. Sessions, cookies, and logins are preserved across visits. Always observe the page after navigation. This is the default way to do anything on a website; do not take over the owner's phone to browse.",
       parameters: Type.Object({
         url: Type.String({ maxLength: 8000, description: "The full URL to navigate to (http:// or https://)" }),
       }),
