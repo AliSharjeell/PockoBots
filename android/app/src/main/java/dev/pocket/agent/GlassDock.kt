@@ -46,6 +46,7 @@ data class DockTabItem(
 
 val DockTabs = listOf(
     DockTabItem("Home", R.drawable.phosphor_house_regular, R.drawable.phosphor_house_fill),
+    DockTabItem("Browser", R.drawable.phosphor_globe_regular, R.drawable.phosphor_globe_fill),
     DockTabItem("Marketplace", R.drawable.phosphor_storefront_regular, R.drawable.phosphor_storefront_fill),
     DockTabItem("Terminal", R.drawable.phosphor_terminal_window_regular, R.drawable.phosphor_terminal_window_fill),
     DockTabItem("Settings", R.drawable.phosphor_gear_six_regular, R.drawable.phosphor_gear_six_fill)

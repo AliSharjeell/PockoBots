@@ -27,6 +27,7 @@ final class BotWorkspace {
     private void browser(){
         body.removeAllViews();
         String botId = project.isEmpty() ? app.getSelectedBotId() : project;
+        if(botId == null || botId.isEmpty()) botId = "global";
         BotBrowserView browserView = new BotBrowserView(app, botId);
         browserView.setOnHandbackCallback(() -> app.showScreen("Chat"));
         body.addView(browserView, new LinearLayout.LayoutParams(-1, -1));

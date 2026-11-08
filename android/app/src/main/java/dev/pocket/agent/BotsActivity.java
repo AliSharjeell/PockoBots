@@ -278,14 +278,15 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(follow&&b-t!=ob-ot)scroll.requestLayout();});androidx.core.view.ViewCompat.requestApplyInsets(viewport);
     }
     private void dock(){
-        int tab=screen.equals("Marketplace")?1:screen.equals("Terminal")&&selected.isEmpty()?2:(screen.equals("Settings")||settingsChild())?3:0;
+        int tab=screen.equals("Browser")&&selected.isEmpty()?1:screen.equals("Marketplace")?2:screen.equals("Terminal")&&selected.isEmpty()?3:(screen.equals("Settings")||settingsChild())?4:0;
         dockOverlay=new FrameLayout(this);View fade=new View(this);fade.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{AgentStyle.BACK&0x00ffffff,(AgentStyle.BACK&0x00ffffff)|0x33000000,(AgentStyle.BACK&0x00ffffff)|0x66000000}));dockOverlay.addView(fade,new FrameLayout.LayoutParams(-1,-1));
         dockOverlay.addView(GlassDock.create(this,AgentStyle.dark,tab,index->{
             if(index==0)open("");
-            if(index==1)showScreen("Marketplace");
-            if(index==2){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
-            if(index==3)showScreen("Settings");
+            if(index==1){saveDraft();composer=null;selected="";detail=null;showScreen("Browser");}
+            if(index==2)showScreen("Marketplace");
+            if(index==3){saveDraft();composer=null;selected="";detail=null;showScreen("Terminal");}
+            if(index==4)showScreen("Settings");
         }),new FrameLayout.LayoutParams(-1,dp(78),Gravity.BOTTOM));
         FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(-1,dp(112),Gravity.BOTTOM);root.addView(dockOverlay,position);WindowInsets insets=root.getRootWindowInsets();if(insets!=null)positionDock(Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getStableInsetBottom());
     }
