@@ -14,7 +14,8 @@ final class AgentStyle {
     // Deep obsidian dark tokens and clean minimal porcelain light tokens
     static int BACK=Color.rgb(9,9,11), PANEL=Color.rgb(24,24,27), BORDER=Color.rgb(39,39,42),
         TEXT=Color.rgb(248,250,252), MUTED=Color.rgb(161,161,170), WHITE=Color.rgb(255,255,255),
-        BLUE=Color.rgb(0,122,255), ACCENT=Color.rgb(6,182,212);
+        BLUE=Color.rgb(0,122,255), ACCENT=Color.rgb(6,182,212),
+        GREEN=Color.rgb(16,185,129), RED=Color.rgb(244,63,94);
     static boolean dark=true;
 
     static void applyTheme(Context context){
