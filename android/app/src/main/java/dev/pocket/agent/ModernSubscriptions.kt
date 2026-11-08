@@ -370,7 +370,7 @@ fun ModernSubscriptionsContent(
                         ProviderMark(provider, 26, dark)
                         Spacer(modifier = Modifier.height(7.dp))
                         Text(
-                            text = provider.name.substringBefore(" /").substringBefore(" CLI"),
+                            text = provider.name,
                             color = if (active) selectedInk(dark) else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B),
                             fontSize = 11.sp,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
@@ -802,7 +802,7 @@ private fun PreviewSubscriptionsDark() {
         ModernSubscriptionsContent(
             providers = listOf(
                 SubscriptionProviderData(
-                    id = "claude", name = "Claude Code", supported = true, reason = "", installed = true, authenticated = true,
+                    id = "claude", name = "Claude", supported = true, reason = "", installed = true, authenticated = true,
                     version = "2.1.319", docs = "https://code.claude.com", modelSource = "cli",
                     models = listOf(
                         SubscriptionModelData("claude-opus-5-5", "Claude Opus 5.5", "The strongest model for hard problems."),

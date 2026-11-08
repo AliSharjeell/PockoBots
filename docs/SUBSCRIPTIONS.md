@@ -8,12 +8,12 @@ is retained when switching providers; existing bot chats and files are retained.
 
 | Provider | Phone-side executable | Login | Headless execution |
 | --- | --- | --- | --- |
-| Codex / ChatGPT | codex | codex login --device-auth | codex exec with JSON events |
-| Claude Code | claude | claude auth login | claude -p with stream-json |
+| ChatGPT (Codex) | codex | codex login --device-auth | codex exec with JSON events |
+| Claude (Claude Code) | claude | claude auth login | claude -p with stream-json |
 | OpenCode | opencode | opencode auth login | opencode run --format json |
-| Gemini CLI | gemini | Start gemini, then choose Sign in with Google | gemini --prompt with stream-json and cached credentials |
-| Grok CLI | grok | grok --no-auto-update login | grok agent --single with streaming-json |
-| Cursor CLI | cursor-agent | cursor-agent login | cursor-agent -p with text output |
+| Gemini (Gemini CLI) | gemini | Start gemini, then choose Sign in with Google | gemini --prompt with stream-json and cached credentials |
+| Grok (Grok CLI) | grok | grok --no-auto-update login | grok agent --single with streaming-json |
+| Cursor (Cursor CLI) | cursor-agent | cursor-agent login | cursor-agent -p with text output |
 
 Install downloads the vendor's CLI into the packaged Linux environment. Sign in
 opens a real PTY and runs the vendor's own login. Complete the browser/code steps

@@ -12,12 +12,12 @@ import { Value } from "typebox/value";
 import { catalogFor, discoverModels, type ModelCatalog } from "./provider-models.js";
 
 export const providerCatalog = [
- { id:"codex", name:"Codex / ChatGPT", command:"codex", install:"npm install -g @openai/codex", login:"codex login --device-auth", docs:"https://developers.openai.com/codex/cli", supported:true },
- { id:"claude", name:"Claude Code", command:"claude", install:"npm install -g @anthropic-ai/claude-code", login:"claude auth login", docs:"https://code.claude.com/docs/en/authentication", supported:true },
+ { id:"codex", name:"ChatGPT", command:"codex", install:"npm install -g @openai/codex", login:"codex login --device-auth", docs:"https://developers.openai.com/codex/cli", supported:true },
+ { id:"claude", name:"Claude", command:"claude", install:"npm install -g @anthropic-ai/claude-code", login:"claude auth login", docs:"https://code.claude.com/docs/en/authentication", supported:true },
  { id:"opencode", name:"OpenCode", command:"opencode", install:"npm install -g opencode-ai", login:"opencode auth login", docs:"https://opencode.ai/docs/cli/", supported:true },
- { id:"gemini", name:"Gemini CLI", command:"gemini", install:"npm install -g @google/gemini-cli", login:"gemini", docs:"https://geminicli.com/docs/get-started/authentication/", supported:true },
- { id:"grok", name:"Grok CLI", command:"grok", install:"mkdir -p \"$HOME/.local/bin\" && ARCH=$(uname -m) && case \"$ARCH\" in aarch64|arm64) A=aarch64 ;; *) A=x86_64 ;; esac && curl -fsSL \"https://x.ai/cli/grok-1.0.22-linux-$A\" -o \"$HOME/.local/bin/grok\" && chmod +x \"$HOME/.local/bin/grok\"", login:"grok --no-auto-update login", docs:"https://x.ai/cli", supported:true },
- { id:"cursor", name:"Cursor CLI", command:"cursor-agent", install:"mkdir -p \"$HOME/.local/bin\" && curl -fsSL https://cursor.com/install -fsS | bash", login:"cursor-agent login", docs:"https://cursor.com/docs/cli/overview", supported:true },
+ { id:"gemini", name:"Gemini", command:"gemini", install:"npm install -g @google/gemini-cli", login:"gemini", docs:"https://geminicli.com/docs/get-started/authentication/", supported:true },
+ { id:"grok", name:"Grok", command:"grok", install:"mkdir -p \"$HOME/.local/bin\" && ARCH=$(uname -m) && case \"$ARCH\" in aarch64|arm64) A=aarch64 ;; *) A=x86_64 ;; esac && curl -fsSL \"https://x.ai/cli/grok-1.0.22-linux-$A\" -o \"$HOME/.local/bin/grok\" && chmod +x \"$HOME/.local/bin/grok\"", login:"grok --no-auto-update login", docs:"https://x.ai/cli", supported:true },
+ { id:"cursor", name:"Cursor", command:"cursor-agent", install:"mkdir -p \"$HOME/.local/bin\" && curl -fsSL https://cursor.com/install -fsS | bash", login:"cursor-agent login", docs:"https://cursor.com/docs/cli/overview", supported:true },
 ] as const;
 
 /**
