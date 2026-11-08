@@ -168,7 +168,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
             AgentIcon menu=new AgentIcon(this,"chatmenu","Bot options",()->{});menu.setOnClickListener(this::chatOptions);
             header.addView(GlassControls.wrap(menu,28f,false),new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.END|Gravity.CENTER_VERTICAL));
         }else{
-            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Connections")?"Connections & sharing":screen.equals("Webhooks")?"External webhooks":screen;
+            String title=screen.equals("Chat")?"PockoBots":screen.equals("Setup")?"Settings":screen.equals("Servers")?"Servers & sharing":screen.equals("Terminal")?"Terminal":screen.equals("Permissions")?"Permissions & background":screen.equals("BYOK")?"Bring your own key":screen.equals("Subscriptions")?"Bring your own subscription":screen.equals("Connections")?"Connections & sharing":screen.equals("Webhooks")?"External webhooks":screen;
             TextView name=text(title,settingsChild()?22:28);
             name.setTypeface(Build.VERSION.SDK_INT>=28?Typeface.create(AgentStyle.font(this),800,false):Typeface.create(AgentStyle.font(this),Typeface.BOLD));
             FrameLayout.LayoutParams titlePosition=new FrameLayout.LayoutParams(-2,-2,Gravity.START|Gravity.CENTER_VERTICAL);

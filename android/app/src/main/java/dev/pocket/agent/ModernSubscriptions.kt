@@ -2,6 +2,12 @@ package dev.pocket.agent
 
 import android.content.Context
 import android.view.View
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -26,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
@@ -52,6 +58,7 @@ data class SubscriptionProviderData(
     val reason: String,
     val installed: Boolean,
     val authenticated: Boolean,
+    val signInRequired: Boolean = true,
     val version: String,
     val docs: String,
     val models: List<SubscriptionModelData>,
@@ -62,24 +69,102 @@ data class SubscriptionProviderData(
 )
 
 /** A provider's mark and the colour it is painted in. */
-data class ProviderBrand(val icon: Int, val mark: Color, val tile: Color)
+data class ProviderBrand(val icon: Int, val mark: Color)
 
 /**
  * The colour of a provider's mark.
  *
- * A provider that has a colour of its own is painted in it; every other mark is painted in the
- * primary text colour, so no mark ever borrows another provider's hue.
+ * A provider that has a colour of its own is painted in it. The rest are painted in white, or in
+ * the dark zinc of the light theme, so a mark reads the same way in both themes.
  */
 fun providerBrand(id: String, dark: Boolean): ProviderBrand {
-    val primary = if (dark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    val ink = if (dark) Color(0xFFFFFFFF) else Color(0xFF18181B)
     return when (id) {
-        "codex" -> ProviderBrand(R.drawable.brand_codex, Color(0xFF10A37F), Color(0xFF10A37F).copy(alpha = 0.16f))
-        "claude" -> ProviderBrand(R.drawable.brand_claude, Color(0xFFD97757), Color(0xFFD97757).copy(alpha = 0.16f))
-        "gemini" -> ProviderBrand(R.drawable.brand_gemini, Color(0xFF8E75B2), Color(0xFF8E75B2).copy(alpha = 0.16f))
-        "grok" -> ProviderBrand(R.drawable.brand_grok, primary, primary.copy(alpha = 0.10f))
-        "opencode" -> ProviderBrand(R.drawable.brand_opencode, primary, primary.copy(alpha = 0.10f))
-        "cursor" -> ProviderBrand(R.drawable.brand_cursor, primary, primary.copy(alpha = 0.10f))
-        else -> ProviderBrand(R.drawable.phosphor_terminal_window_regular, primary, primary.copy(alpha = 0.10f))
+        "codex" -> ProviderBrand(R.drawable.brand_codex, Color(0xFF10A37F))
+        "claude" -> ProviderBrand(R.drawable.brand_claude, Color(0xFFD97757))
+        "gemini" -> ProviderBrand(R.drawable.brand_gemini, Color(0xFF8E75B2))
+        "grok" -> ProviderBrand(R.drawable.brand_grok, ink)
+        "opencode" -> ProviderBrand(R.drawable.brand_opencode, ink)
+        "cursor" -> ProviderBrand(R.drawable.brand_cursor, ink)
+        else -> ProviderBrand(R.drawable.phosphor_terminal_window_regular, ink)
+    }
+}
+
+/** A model that costs nothing to run is marked as such. */
+private fun isFree(model: SubscriptionModelData): Boolean =
+    model.name.contains("free", ignoreCase = true) || model.id.contains("free", ignoreCase = true)
+
+/** A placeholder block that shines while the real content is on its way. */
+@Composable
+private fun ShimmerBlock(dark: Boolean, shape: RoundedCornerShape, modifier: Modifier = Modifier) {
+    val shift = rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Restart),
+        label = "shift"
+    )
+    val base = if (dark) Color(0xFF1D2233) else Color(0xFFE2E8F0)
+    val shine = if (dark) Color(0xFF2A2F42) else Color(0xFFF1F5F9)
+    val start = shift.value * 420f - 210f
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(base, shine, base),
+                    start = Offset(start, 0f),
+                    end = Offset(start + 210f, 0f)
+                )
+            )
+    )
+}
+
+/** The shape of the subscriptions screen, shown while its providers are on their way. */
+@Composable
+private fun SubscriptionsSkeleton(dark: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            repeat(5) {
+                ShimmerBlock(dark, RoundedCornerShape(10.dp), Modifier.size(26.dp))
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (dark) Color(0xFF131520) else Color(0xFFFFFFFF))
+                .padding(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShimmerBlock(dark, RoundedCornerShape(8.dp), Modifier.size(28.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    ShimmerBlock(dark, RoundedCornerShape(6.dp), Modifier.width(120.dp).height(15.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ShimmerBlock(dark, RoundedCornerShape(6.dp), Modifier.width(86.dp).height(11.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            ShimmerBlock(dark, RoundedCornerShape(14.dp), Modifier.fillMaxWidth().height(42.dp))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (dark) Color(0xFF131520) else Color(0xFFFFFFFF))
+                .padding(14.dp)
+        ) {
+            repeat(4) { index ->
+                Row(
+                    modifier = Modifier.padding(vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ShimmerBlock(dark, CircleShape, Modifier.size(21.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    ShimmerBlock(dark, RoundedCornerShape(6.dp), Modifier.width((150 - index * 14).dp).height(14.dp))
+                }
+            }
+        }
     }
 }
 
@@ -89,6 +174,7 @@ private fun statusLine(provider: SubscriptionProviderData): String = when {
     provider.installing -> "Installing on this phone"
     !provider.installed -> "Not installed on this phone"
     provider.authenticated -> if (provider.version.isEmpty()) "Signed in" else "Signed in · ${provider.version}"
+    !provider.signInRequired -> if (provider.version.isEmpty()) "Installed · free models" else "Installed ${provider.version} · free models"
     else -> "Installed · sign-in needed"
 }
 
@@ -96,32 +182,20 @@ private fun statusColor(provider: SubscriptionProviderData, dark: Boolean): Colo
     !provider.supported -> if (dark) Color(0xFF71717A) else Color(0xFF94A3B8)
     provider.installing -> PockoColors.AmberWorking
     provider.installed && provider.authenticated -> PockoColors.EmeraldReady
+    provider.installed && !provider.signInRequired -> PockoColors.EmeraldReady
     provider.installed -> PockoColors.AmberWorking
     else -> if (dark) Color(0xFF71717A) else Color(0xFF94A3B8)
 }
 
 @Composable
-private fun ProviderMark(provider: SubscriptionProviderData, size: Int, dark: Boolean, selected: Boolean = false) {
+private fun ProviderMark(provider: SubscriptionProviderData, size: Int, dark: Boolean) {
     val brand = providerBrand(provider.id, dark)
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .clip(RoundedCornerShape((size / 3).dp))
-            .background(if (selected) brand.mark.copy(alpha = 0.22f) else brand.tile)
-            .border(
-                width = 1.dp,
-                color = if (selected) brand.mark.copy(alpha = 0.55f) else brand.mark.copy(alpha = 0.22f),
-                shape = RoundedCornerShape((size / 3).dp)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            painter = painterResource(brand.icon),
-            contentDescription = provider.name,
-            tint = brand.mark,
-            modifier = Modifier.size((size * 0.55f).dp)
-        )
-    }
+    Icon(
+        painter = painterResource(brand.icon),
+        contentDescription = provider.name,
+        tint = brand.mark,
+        modifier = Modifier.size(size.dp)
+    )
 }
 
 @Composable
@@ -136,13 +210,6 @@ private fun SearchField(value: String, placeholder: String, dark: Boolean, onCha
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Icon(
-            imageVector = Icons.Rounded.Search,
-            contentDescription = null,
-            tint = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
             if (value.isEmpty()) {
                 Text(
@@ -208,14 +275,33 @@ private fun ModelRow(
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = model.name,
-                color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
-                fontSize = 15.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = model.name,
+                    color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
+                    fontSize = 15.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isFree(model)) {
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (dark) Color(0xFF27272A) else Color(0xFFE2E8F0))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Free",
+                            color = if (dark) Color(0xFFA1A1AA) else Color(0xFF64748B),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
             if (model.description.isNotEmpty()) {
                 Text(
                     text = model.description,
@@ -262,76 +348,7 @@ fun ModernSubscriptionsContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                if (dark) Color(0xFF141724) else Color(0xFFEFF6FF),
-                                if (dark) Color(0xFF1B2338) else Color(0xFFF1F5F9)
-                            )
-                        )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.horizontalGradient(
-                            listOf(
-                                PockoColors.AccentCyan.copy(alpha = 0.4f),
-                                PockoColors.PrimaryBlue.copy(alpha = 0.25f),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(16.dp)
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Brush.linearGradient(listOf(PockoColors.PrimaryBlue, PockoColors.AccentCyan))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Subscription models",
-                                color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Run bots on a vendor CLI you already pay for",
-                                color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "${providers.size} PROVIDERS",
-                        color = PockoColors.AccentCyan,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.06).em
-                    )
-                }
-            }
-        }
-
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(providers, key = { it.id }) { provider ->
                     val active = provider.id == selectedId
                     Column(
@@ -339,11 +356,6 @@ fun ModernSubscriptionsContent(
                             .width(78.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (active) Color(0xFF1D2233) else Color.Transparent)
-                            .border(
-                                width = 1.dp,
-                                color = if (active) PockoColors.PrimaryBlue.copy(alpha = 0.5f) else Color.Transparent,
-                                shape = RoundedCornerShape(16.dp)
-                            )
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -352,7 +364,7 @@ fun ModernSubscriptionsContent(
                             .padding(vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ProviderMark(provider, 40, dark, active)
+                        ProviderMark(provider, 26, dark)
                         Spacer(modifier = Modifier.height(7.dp))
                         Text(
                             text = provider.name.substringBefore(" /").substringBefore(" CLI"),
@@ -368,20 +380,7 @@ fun ModernSubscriptionsContent(
         }
 
         if (loading) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Loading providers…",
-                        color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
-                        fontSize = 14.sp
-                    )
-                }
-            }
+            item { SubscriptionsSkeleton(dark) }
             return@LazyColumn
         }
 
@@ -429,7 +428,7 @@ fun ModernSubscriptionsContent(
                     .padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ProviderMark(selected, 46, dark)
+                    ProviderMark(selected, 28, dark)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -496,19 +495,19 @@ fun ModernSubscriptionsContent(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                val current = selected.installed && selected.authenticated
+                val usable = selected.installed && (selected.authenticated || !selected.signInRequired)
                 Button(
                     onClick = {
                         when {
                             selected.installing -> Unit
                             !selected.installed -> onInstall(selected.id)
-                            !selected.authenticated -> onSignIn(selected.id)
+                            !selected.authenticated && selected.signInRequired -> onSignIn(selected.id)
                             else -> onUse(selected.id, selectedModel)
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (current) PockoColors.PrimaryBlue.copy(alpha = 0.18f) else PockoColors.PrimaryBlue
+                        containerColor = if (usable) PockoColors.PrimaryBlue.copy(alpha = 0.18f) else PockoColors.PrimaryBlue
                     ),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                     modifier = Modifier.height(42.dp),
@@ -518,12 +517,28 @@ fun ModernSubscriptionsContent(
                         text = when {
                             selected.installing -> "Installing…"
                             !selected.installed -> "Install CLI"
-                            !selected.authenticated -> "Sign in"
+                            !selected.authenticated && selected.signInRequired -> "Sign in"
                             else -> "Use this subscription"
                         },
-                        color = if (current) PockoColors.PrimaryBlue else Color.White,
+                        color = if (usable) PockoColors.PrimaryBlue else Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+                if (selected.installed && !selected.authenticated && !selected.signInRequired) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Sign in to add the models your plan includes",
+                        color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { onSignIn(selected.id) }
+                            )
+                            .padding(vertical = 6.dp, horizontal = 4.dp)
                     )
                 }
             }
@@ -634,7 +649,9 @@ class SubscriptionsController(
                 (list.optJSONObject(index) ?: return@mapNotNull null).let(::parseProvider)
             }
             if (selectedId.value.isEmpty()) {
-                selectedId.value = providers.value.firstOrNull { it.id == "claude" }?.id
+                // The provider already in use is the one to open on.
+                val current = app.currentState().optJSONObject("settings")?.optString("executionProvider", "byok") ?: "byok"
+                selectedId.value = providers.value.firstOrNull { it.id == current }?.id
                     ?: providers.value.firstOrNull { it.supported }?.id
                     ?: providers.value.firstOrNull()?.id
                     ?: ""
@@ -755,6 +772,7 @@ class SubscriptionsController(
             reason = json.optString("reason"),
             installed = json.optBoolean("installed"),
             authenticated = json.optBoolean("authenticated"),
+            signInRequired = json.optBoolean("signInRequired", true),
             version = json.optString("version"),
             docs = json.optString("docs"),
             models = (0 until (models?.length() ?: 0)).mapNotNull { index ->
@@ -776,12 +794,23 @@ private fun PreviewSubscriptionsDark() {
     PockoTheme(darkTheme = true) {
         ModernSubscriptionsContent(
             providers = listOf(
-                SubscriptionProviderData("claude", "Claude Code", true, "", true, true, "2.1.319", "https://code.claude.com", listOf(
-                    SubscriptionModelData("claude-opus-5-5", "Claude Opus 5.5", "The strongest model for hard problems."),
-                    SubscriptionModelData("claude-sonnet-5-5", "Claude Sonnet 5.5", "A balanced model for most work."),
-                    SubscriptionModelData("claude-haiku-5-5", "Claude Haiku 5.5", "The fastest model for quick edits.")
-                ), "cli"),
-                SubscriptionProviderData("codex", "Codex / ChatGPT", true, "", false, false, "", "https://developers.openai.com", emptyList(), "fallback")
+                SubscriptionProviderData(
+                    id = "claude", name = "Claude Code", supported = true, reason = "", installed = true, authenticated = true,
+                    version = "2.1.319", docs = "https://code.claude.com", modelSource = "cli",
+                    models = listOf(
+                        SubscriptionModelData("claude-opus-5-5", "Claude Opus 5.5", "The strongest model for hard problems."),
+                        SubscriptionModelData("claude-sonnet-5-5", "Claude Sonnet 5.5", "A balanced model for most work."),
+                        SubscriptionModelData("claude-haiku-5-5", "Claude Haiku 5.5", "The fastest model for quick edits.")
+                    )
+                ),
+                SubscriptionProviderData(
+                    id = "opencode", name = "OpenCode", supported = true, reason = "", installed = true, authenticated = false,
+                    signInRequired = false, version = "1.19.5", docs = "https://opencode.ai/docs/cli/", modelSource = "fallback",
+                    models = listOf(
+                        SubscriptionModelData("opencode/big-pickle", "Big Pickle", "Free OpenCode model."),
+                        SubscriptionModelData("opencode/glm-5.3-flash-free", "GLM-5.3-Flash Free", "Free OpenCode model.")
+                    )
+                )
             ),
             selectedId = "claude",
             selectedModel = "claude-opus-5-5",
