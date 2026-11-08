@@ -37,4 +37,16 @@ final class MarketplaceIcons {
             default: return R.drawable.phosphor_storefront_regular;
         }
     }
+    /** The mark of a subscription provider, for the rows that pick one. */
+    static int provider(String id) {
+        switch(id) {
+            case "codex": return R.drawable.brand_codex;
+            case "claude": return R.drawable.brand_claude;
+            case "gemini": return R.drawable.brand_gemini;
+            case "grok": return R.drawable.brand_grok;
+            case "opencode": return R.drawable.brand_opencode;
+            case "cursor": return R.drawable.brand_cursor;
+            default: return R.drawable.phosphor_terminal_window_regular;
+        }
+    }
 }
