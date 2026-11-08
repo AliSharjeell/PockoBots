@@ -80,7 +80,7 @@ data class ProviderBrand(val icon: Int, val mark: Color)
 fun providerBrand(id: String, dark: Boolean): ProviderBrand {
     val ink = if (dark) Color(0xFFFFFFFF) else Color(0xFF18181B)
     return when (id) {
-        "codex" -> ProviderBrand(R.drawable.brand_codex, Color(0xFF10A37F))
+        "codex" -> ProviderBrand(R.drawable.brand_codex, ink)
         "claude" -> ProviderBrand(R.drawable.brand_claude, Color(0xFFD97757))
         "gemini" -> ProviderBrand(R.drawable.brand_gemini, Color(0xFF8E75B2))
         "grok" -> ProviderBrand(R.drawable.brand_grok, ink)
@@ -89,6 +89,9 @@ fun providerBrand(id: String, dark: Boolean): ProviderBrand {
         else -> ProviderBrand(R.drawable.phosphor_terminal_window_regular, ink)
     }
 }
+
+/** The colour of the text that is chosen. */
+private fun selectedInk(dark: Boolean): Color = if (dark) Color(0xFFFFFFFF) else Color(0xFF18181B)
 
 /** A model that costs nothing to run is marked as such. */
 private fun isFree(model: SubscriptionModelData): Boolean =
@@ -278,7 +281,7 @@ private fun ModelRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = model.name,
-                    color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
+                    color = if (selected) selectedInk(dark) else if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
                     fontSize = 15.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
@@ -368,7 +371,7 @@ fun ModernSubscriptionsContent(
                         Spacer(modifier = Modifier.height(7.dp))
                         Text(
                             text = provider.name.substringBefore(" /").substringBefore(" CLI"),
-                            color = if (active) PockoColors.PrimaryBlue else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                            color = if (active) selectedInk(dark) else if (dark) Color(0xFF94A3B8) else Color(0xFF64748B),
                             fontSize = 11.sp,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1,
