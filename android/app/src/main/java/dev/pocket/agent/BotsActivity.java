@@ -113,8 +113,17 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         TextView floating=text(MobileOverlayService.pinnedFor(selected)?"Dismiss floating bot":"Floating bot",14);floating.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(floating);floating.setOnClickListener(v->{popup.dismiss();toggleFloatingBot();});
         View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);menu.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
         JSONObject settings=state.optJSONObject("settings");String currentProvider=settings==null?"byok":settings.optString("executionProvider","byok"),currentModel=settings==null?"default":settings.optString("providerModel","default");
-        LinearLayout providerChoices=column();providerChoices.setVisibility(View.GONE);TextView providerRow=text("Provider: "+currentProvider+"  \u2304",14);providerRow.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(providerRow);menu.addView(providerChoices);
-        LinearLayout modelChoices=column();modelChoices.setVisibility(View.GONE);TextView modelRow=text("Model: "+currentModel+"  \u2304",14);modelRow.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(modelRow);menu.addView(modelChoices);
+        LinearLayout providerChoices=column();providerChoices.setVisibility(View.GONE);
+        LinearLayout providerRow=row();providerRow.setPadding(dp(10),dp(12),dp(10),dp(12));
+        TextView providerLabel=text("Provider:",14);providerLabel.setPadding(0,0,dp(8),0);providerRow.addView(providerLabel);
+        ImageView providerMark=new ImageView(this);providerMark.setColorFilter(AgentStyle.MUTED);providerMark.setVisibility(currentProvider.equals("byok")?View.GONE:View.VISIBLE);providerRow.addView(providerMark,new LinearLayout.LayoutParams(dp(19),dp(19)));
+        TextView providerName=text(currentProvider.equals("byok")?"your own key":currentProvider+"  \u2304",14);providerName.setPadding(dp(6),0,dp(0),0);providerRow.addView(providerName,new LinearLayout.LayoutParams(0,-2,1));
+        menu.addView(providerRow);menu.addView(providerChoices);
+        LinearLayout modelChoices=column();modelChoices.setVisibility(View.GONE);
+        LinearLayout modelRow=row();modelRow.setPadding(dp(10),dp(12),dp(10),dp(12));
+        TextView modelLabel=text("Model:",14);modelLabel.setPadding(0,0,dp(8),0);modelRow.addView(modelLabel);
+        TextView modelName=text(currentModel+"  \u2304",14);modelName.setPadding(dp(6),0,dp(0),0);modelRow.addView(modelName,new LinearLayout.LayoutParams(0,-2,1));
+        menu.addView(modelRow);menu.addView(modelChoices);
         View divider2=new View(this);divider2.setBackgroundColor(AgentStyle.BORDER);menu.addView(divider2,new LinearLayout.LayoutParams(-1,dp(1)));
         String current=bot.optString("effort","high");TextView effort=text("Effort: "+current+"  \u2304",14);effort.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(effort);
         LinearLayout choices=column();choices.setVisibility(View.GONE);menu.addView(choices);String[] levels={"low","medium","high","xhigh","max"},labels={"Low","Medium","High","Extra high","Max"};
@@ -124,16 +133,22 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         providerRow.setOnClickListener(v->{providerChoices.setVisibility(providerChoices.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);modelChoices.setVisibility(View.GONE);popup.update(dp(280),-2);});
         modelRow.setOnClickListener(v->{modelChoices.setVisibility(modelChoices.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);providerChoices.setVisibility(View.GONE);popup.update(dp(280),-2);});
         popup.showAsDropDown(anchor,0,dp(8),Gravity.END);
-        // The provider list and its models come from the same request, so one round trip fills both.
         marketplaceRequest("GET","/providers",null,value->{
-            if(!(value instanceof JSONArray))return;JSONArray providers=(JSONArray)value;providerChoices.removeAllViews();modelChoices.removeAllViews();String providerLabel=currentProvider,modelLabel=currentModel;
+            if(!(value instanceof JSONArray))return;JSONArray providers=(JSONArray)value;providerChoices.removeAllViews();
             for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider),installed=entry.optBoolean("installed");
-                LinearLayout row=row();ImageView mark=new ImageView(this);mark.setImageResource(MarketplaceIcons.provider(id));mark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(mark,new LinearLayout.LayoutParams(dp(22),dp(22)));
+                LinearLayout row=row();row.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView mark=new ImageView(this);mark.setImageResource(MarketplaceIcons.provider(id));mark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(mark,new LinearLayout.LayoutParams(dp(20),dp(20)));
                 TextView label=text(entry.optString("name")+(installed?"":"  \u00b7 not installed")+(active?"  \u2713":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:installed?AgentStyle.TEXT:AgentStyle.MUTED);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
-                providerChoices.addView(row);row.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider",id,"providerModel","default"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Provider set to "+entry.optString("name"),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
-                if(active){providerLabel=entry.optString("name");JSONArray models=entry.optJSONArray("models");if(models!=null)for(int j=0;j<models.length();j++){JSONObject model=models.optJSONObject(j);String modelId=model.optString("id");boolean modelActive=modelId.equals(currentModel);if(modelActive)modelLabel=model.optString("name",modelId);
-                    TextView modelItem=text(model.optString("name",modelId)+(modelActive?"  \u2713":""),14);modelItem.setPadding(dp(14),dp(10),dp(14),dp(10));modelItem.setTextColor(modelActive?AgentStyle.BLUE:AgentStyle.TEXT);modelChoices.addView(modelItem);modelItem.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("providerModel",modelId),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Model set to "+model.optString("name",modelId),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the model",Toast.LENGTH_SHORT).show());});}}}
-            providerRow.setText("Provider: "+providerLabel+"  \u2304");modelRow.setText("Model: "+modelLabel+"  \u2304");popup.update(dp(280),-2);
+                LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);rowParams.setMargins(dp(4),dp(2),0,dp(2));providerChoices.addView(row,rowParams);row.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider",id,"providerModel","default"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Provider set to "+entry.optString("name"),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
+                if(active){providerMark.setImageResource(MarketplaceIcons.provider(id));providerMark.setVisibility(View.VISIBLE);providerName.setText(entry.optString("name")+"  \u2304");}}
+            providerChoices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
+            // The models are asked of the same place the subscriptions screen asks, so the two name them the same way.
+            if(!currentProvider.equals("byok"))marketplaceRequest("GET","/providers/"+currentProvider+"/models",null,modelsValue->{
+                modelChoices.removeAllViews();JSONObject catalogue=modelsValue instanceof JSONObject?(JSONObject)modelsValue:null;JSONArray models=catalogue==null?null:catalogue.optJSONArray("models");String modelText=currentModel;
+                if(models!=null)for(int j=0;j<models.length();j++){JSONObject model=models.optJSONObject(j);String modelId=model.optString("id");boolean modelActive=modelId.equals(currentModel);if(modelActive)modelText=model.optString("name",modelId);
+                    TextView modelItem=text(model.optString("name",modelId)+(modelActive?"  \u2713":""),14);modelItem.setPadding(dp(10),dp(8),dp(6),dp(8));modelItem.setTextColor(modelActive?AgentStyle.BLUE:AgentStyle.TEXT);
+                    LinearLayout.LayoutParams modelParams=new LinearLayout.LayoutParams(-1,-2);modelParams.setMargins(dp(4),dp(2),0,dp(2));modelChoices.addView(modelItem,modelParams);modelItem.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("providerModel",modelId),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Model set to "+model.optString("name",modelId),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the model",Toast.LENGTH_SHORT).show());});}
+                modelName.setText(modelText+"  \u2304");modelChoices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
+            },error->{});
         },error->{});
     }
     private void open(String id){animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
