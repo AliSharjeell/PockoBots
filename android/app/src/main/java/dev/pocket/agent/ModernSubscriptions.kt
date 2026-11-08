@@ -355,7 +355,7 @@ fun ModernSubscriptionsContent(
                         modifier = Modifier
                             .width(78.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (active) Color(0xFF1D2233) else Color.Transparent)
+                            .background(if (active) (if (dark) Color(0xFF1D2233) else Color(0xFFE2E8F0)) else Color.Transparent)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -656,7 +656,11 @@ class SubscriptionsController(
                     ?: providers.value.firstOrNull()?.id
                     ?: ""
             }
-            selectedModel.value = providers.value.firstOrNull { it.id == selectedId.value }?.models?.firstOrNull()?.id ?: ""
+            // The model in use stays chosen unless this provider does not offer it.
+            val models = providers.value.firstOrNull { it.id == selectedId.value }?.models.orEmpty()
+            val saved = app.currentState().optJSONObject("settings")?.optString("providerModel", "") ?: ""
+            val chosen = selectedModel.value.ifEmpty { saved }
+            selectedModel.value = if (models.any { it.id == chosen }) chosen else models.firstOrNull()?.id ?: ""
         }, { message ->
             if (current != epoch) return@marketplaceRequest
             loading.value = false
