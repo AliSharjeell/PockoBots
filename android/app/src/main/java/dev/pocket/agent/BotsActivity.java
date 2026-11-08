@@ -31,6 +31,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     int dp(int n){return AgentStyle.dp(this,n);}
     JSONObject json(Object...pairs){JSONObject value=new JSONObject();try{for(int i=0;i<pairs.length;i+=2)value.put((String)pairs[i],pairs[i+1]);}catch(Exception e){throw new IllegalArgumentException(e);}return value;}
     JSONObject currentState(){return state;}
+    Handler mainHandler(){return main;}
     LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
     LinearLayout row(){LinearLayout v=new LinearLayout(this);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     TextView text(String value,int size){TextView v=AgentStyle.text(this,value,size);v.setPadding(dp(8),dp(6),dp(8),dp(6));return v;}
