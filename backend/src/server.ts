@@ -21,6 +21,7 @@ import { Groups } from "./groups.js";
 import { registerProviderRoutes } from "./providers.js";
 import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
+import { BrowserBridge } from "./browser-bridge.js";
 import {Previews} from './previews.js';
 import {Webhooks} from './webhooks.js';
 import {BackupModel} from './backup-model.js';
@@ -34,6 +35,7 @@ export async function createApp(options: {
   port?: number;
   webDir?: string;
   mobileBridgeBase?: string;
+  browserBridgeBase?: string;
 }) {
   const port = options.port || 8787;
   const store = new Store(options.stateDir);
@@ -74,7 +76,8 @@ export async function createApp(options: {
   const mobile = new MobileTasks(store, () => backup.current(settings), token, publish, options.mobileBridgeBase);
   await mobile.init();
   const previews=new Previews(store);await previews.init();
-  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews);
+  const browserBridge = new BrowserBridge(token, options.browserBridgeBase);
+  const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews, browserBridge);
   await bots.init();
   const webhooks = new Webhooks(store, bots); await webhooks.init();
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
