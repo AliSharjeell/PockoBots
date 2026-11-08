@@ -44,8 +44,10 @@ public class BotBrowserInstance {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final WebView webView;
 
-    private volatile String currentUrl = "about:blank";
-    private volatile String currentTitle = "New Tab";
+    public static final String DEFAULT_HOME_URL = "https://www.google.com";
+
+    private volatile String currentUrl = DEFAULT_HOME_URL;
+    private volatile String currentTitle = "Google";
     private volatile int loadProgress = 100;
     private volatile boolean isLoading = false;
     private volatile String lastError = "";
@@ -157,6 +159,9 @@ public class BotBrowserInstance {
                 }
             }
         });
+
+        // 6. Navigate to default Google search home
+        mainHandler.post(() -> webView.loadUrl(DEFAULT_HOME_URL));
     }
 
     public String getBotId() {
@@ -202,13 +207,33 @@ public class BotBrowserInstance {
         }
     }
 
-    public void navigate(String url) {
-        if (url == null || url.trim().isEmpty()) return;
-        String trimmed = url.trim();
-        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && !trimmed.startsWith("about:")) {
-            trimmed = "https://" + trimmed;
+    public static String resolveInputUrl(String input) {
+        if (input == null || input.trim().isEmpty()) {
+            return DEFAULT_HOME_URL;
         }
-        final String target = trimmed;
+        String trimmed = input.trim();
+
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("about:") || trimmed.startsWith("file:")) {
+            return trimmed;
+        }
+
+        boolean hasSpace = trimmed.contains(" ");
+        boolean isLocalhost = trimmed.startsWith("localhost") || trimmed.startsWith("127.0.0.1");
+        boolean hasDotDomain = trimmed.matches("^[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)+(:[0-9]+)?(/.*)?$");
+
+        if (!hasSpace && (isLocalhost || hasDotDomain)) {
+            return "https://" + trimmed;
+        }
+
+        try {
+            return "https://www.google.com/search?q=" + java.net.URLEncoder.encode(trimmed, "UTF-8");
+        } catch (Exception e) {
+            return "https://www.google.com/search?q=" + trimmed.replace(" ", "+");
+        }
+    }
+
+    public void navigate(String url) {
+        final String target = resolveInputUrl(url);
         mainHandler.post(() -> webView.loadUrl(target));
     }
 
