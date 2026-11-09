@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp,rm } from "node:fs/promises";
+import { mkdtemp,rm,writeFile,chmod } from "node:fs/promises";
 import { MobileTasks } from "../src/mobile-tasks.js";
 import http from "node:http";
 import { Workspace } from "../src/workspace.js";
@@ -107,6 +107,43 @@ test("the providers route carries a model list for every provider",async()=>{
   assert.ok(Array.isArray(models.models)&&models.models.length>0);
   assert.ok(models.models.some((m:any)=>m.name.includes("Claude")));
  }finally{await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+
+test("a CLI that is on the phone is reported as installed even when it answers slowly",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"pocko-cli-"));
+ const script=join(dir,"codex");
+ await writeFile(script,"#!/bin/sh\nsleep 30\n");
+ await chmod(script,0o755);
+ const before=process.env.PATH;
+ process.env.PATH=dir+(process.platform==="win32"?";":":")+before;
+ try{
+  const providers=new SubscriptionProviders();
+  // The CLI is found without being started, so the reading does not wait for a slow start-up.
+  const status=await providers.status(true);
+  const codex=status.find(p=>p.id==="codex");
+  assert.equal(codex.installed,true);
+  assert.equal(codex.signInKnown,false);
+ }finally{process.env.PATH=before;await rm(dir,{recursive:true,force:true});}
+});
+
+// The version is asked of the CLI itself, and a Windows host cannot run a shell script as one.
+test("an installation that finishes lets the next reading find the CLI and its version",{skip:process.platform==="win32"},async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"pocko-cli-"));
+ const script=join(dir,"codex");
+ await writeFile(script,"#!/bin/sh\necho 1.2.3\n");
+ await chmod(script,0o755);
+ // Windows runs the batch file; the shell script is what the shell finds.
+ await writeFile(join(dir,"codex.cmd"),"@echo off\r\necho 1.2.3\r\n");
+ const before=process.env.PATH;
+ process.env.PATH=dir+(process.platform==="win32"?";":":")+before;
+ try{
+  const providers=new SubscriptionProviders();
+  await providers.status(true);
+  let version="";
+  for(let i=0;i<40;i++){await new Promise(r=>setTimeout(r,250));const rows=await providers.status();version=rows.find(p=>p.id==="codex")?.version??"";if(version)break;}
+  assert.equal(version,"1.2.3");
+ }finally{process.env.PATH=before;await rm(dir,{recursive:true,force:true});}
 });
 
 

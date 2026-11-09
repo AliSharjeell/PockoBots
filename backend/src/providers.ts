@@ -37,7 +37,23 @@ export function provider(id: string) {const p=(providerCatalog as readonly Provi
 /** npm takes flags that quieten its output. A vendor's own installer does not. */
 export function installCommand(p:{install:string}) {return p.install.startsWith("npm install")?p.install+" --no-fund --no-audit --loglevel=http":p.install;}
 
-async function probe(command:string,args:string[],timeout=8000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
+async function probe(command:string,args:string[],timeout=25000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"],env:{...process.env,PATH:`${process.env.PATH??""}:${join(homedir(),".local","bin")}`}});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
+
+/**
+ * Where a command lives, found without running it.
+ *
+ * A vendor CLI can take many seconds to answer `--version` on a phone, and a runtime that was
+ * just started takes longer still. Asking the shell where the file is answers the question of
+ * whether the CLI is installed without paying for a start-up at all.
+ *
+ * A vendor's own installer puts its CLI in `~/.local/bin`, which the runtime's PATH carries, so
+ * that directory is asked for as well.
+ */
+async function which(command:string):Promise<string|null>{
+  const result=await probe("bash",["-c",`PATH="$PATH:$HOME/.local/bin:$HOME/bin" command -v ${command}`],5000);
+  const path=result.text.trim().split("\n")[0]?.trim();
+  return result.code===0&&path?path:null;
+}
 
 /** The vendor CLI owns login and token refresh. No vendor credentials are imported. */
 export class SubscriptionProviders {
@@ -51,6 +67,9 @@ export class SubscriptionProviders {
  private refreshing=new Map<string,Promise<void>>();
  private statusCache:{value:any[];at:number}|null=null;
  private statusReading:Promise<any[]>|null=null;
+ /** What the last reading said about each provider's sign-in and version. */
+ private authState=new Map<string,boolean|null>();
+ private versionState=new Map<string,string>();
  configure(base:string,token:string,root?:string){this.base=base;this.apiToken=token;if(root)this.root=root;}
  /** The model list to show for a provider: the CLI's own list once it has answered, else the shipped one. */
  private catalog(id:string){const cached=this.catalogs.get(id);return cached?cached.catalog:catalogFor(id,null);}
@@ -90,7 +109,27 @@ export class SubscriptionProviders {
   if(!refresh&&cached&&Date.now()-cached.at<60000)return cached.value;
   // A reading of a moment ago is better than a wait, so it is served while a fresh one is asked for.
   if(!refresh&&cached){void this.refreshStatus();return cached.value;}
-  return this.refreshStatus();
+  // Nothing is known yet. Whether a CLI is installed is found without starting it, so the screen
+  // gets that answer at once, and the sign-in and the version are asked for behind it.
+  const quick=await this.quickStatus();
+  this.statusCache={value:quick,at:Date.now()};
+  void this.refreshStatus();
+  return quick;
+ }
+ /** Forgets the reading, so the next caller gets a fresh one. */
+ invalidateStatus(){this.statusCache=null;}
+ /** One provider's row, in the shape the app reads it. */
+ private row(p:ProviderEntry,installed:boolean,authenticated:boolean|null,version:string){
+  const catalog=this.catalog(p.id);
+  // The sign-in state is only known once the CLI has answered. The app says so rather than
+  // claiming that a provider is signed out when nobody has asked it yet.
+  const signInKnown=!installed||this.authState.has(p.id);
+  return {...p,installed,authenticated,signInKnown,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version,models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+ }
+ /** Whether each CLI is installed, found without starting any of them. */
+ private async quickStatus():Promise<any[]>{
+  const paths=await Promise.all(providerCatalog.map(p=>p.supported?which(p.command):Promise.resolve(null)));
+  return providerCatalog.map((p,i)=>this.row(p,paths[i]!==null,this.authState.get(p.id)??null,this.versionState.get(p.id)??""));
  }
  /** Asks every provider's CLI about itself, and keeps the answer for a minute. */
  private async refreshStatus():Promise<any[]>{
@@ -98,20 +137,22 @@ export class SubscriptionProviders {
   if(running)return running;
   const work=(async()=>{
    try{
-    const value=await Promise.all(providerCatalog.map(async p=>{
-     if(!p.supported)return {...p,installed:false,authenticated:false};
-     // The version and the sign-in are asked of at the same time, so a provider takes half as long.
-     const authArgs=p.id==="codex"?["login","status"]:p.id==="claude"?["auth","status"]:["login","status"];
-     const [version,auth]=await Promise.all([probe(p.command,["--version"]),probe(p.command,authArgs)]);
-     const installed=version.code===0;
-     let authenticated:boolean|null=null;
+    const paths=await Promise.all(providerCatalog.map(p=>p.supported?which(p.command):Promise.resolve(null)));
+    const value=await Promise.all(providerCatalog.map(async (p,i)=>{
+     const installed=paths[i]!==null;
+     let authenticated=this.authState.get(p.id)??null;
+     let version=this.versionState.get(p.id)??"";
      if(installed){
+      // The version and the sign-in are asked of at the same time, so a provider takes half as long.
+      const authArgs=p.id==="codex"?["login","status"]:p.id==="claude"?["auth","status"]:["login","status"];
+      const [v,a]=await Promise.all([probe(p.command,["--version"]),probe(p.command,authArgs)]);
+      version=v.text.trim().slice(0,100);
       if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
-      else authenticated=auth.code===0?true:null;
+      else authenticated=a.code===0?true:null;
+      this.versionState.set(p.id,version);this.authState.set(p.id,authenticated);
       void this.refreshCatalog(p.id);
      }
-     const catalog=this.catalog(p.id);
-     return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+     return this.row(p,installed,authenticated,version);
     }));
     this.statusCache={value,at:Date.now()};
     return value;
@@ -189,7 +230,10 @@ export function registerProviderRoutes(app:Express,options:{port:number;root:str
  app.get("/api/providers/:id/models",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.models(p.id,req.query.refresh==="1"));});
  app.get("/api/providers/:id/usage",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.usage(p.id,req.query.refresh==="1"));});
  app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(installCommand(p),options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
- app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}res.json(job);});
+ app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}
+   // The CLI is on the phone now, so the reading the app shows has to be a fresh one.
+   if(job.status!=="running")subscriptions.invalidateStatus();
+   res.json(job);});
  app.post("/api/providers/:id/login",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const terminal=options.terminals.start(options.root);options.terminals.input(terminal.id,p.login+"\n");res.status(201).json({...terminal,provider:p.id,instruction:"Complete the vendor's login in this terminal. Credentials stay in the vendor CLI's phone-owned account directory."});});
  app.post("/api/provider-tools/:run/:operation",async(req,res)=>res.json(await subscriptions.bridge(req.params.run,String(req.headers["x-provider-bridge-token"]||""),req.params.operation,req.body)));
 }
