@@ -37,8 +37,24 @@ export class BrowserBridge {
     return this.request(`/browser/${botId}/state`);
   }
 
-  async navigate(botId: string, url: string, waitForLoad = true, signal?: AbortSignal) {
-    return this.request(`/browser/${botId}/navigate`, { url, waitForLoad }, 30000, signal);
+  async navigate(botId: string, url: string, waitForLoad = true, signal?: AbortSignal, tab?: number) {
+    return this.request(`/browser/${botId}/navigate`, { url, waitForLoad, tab }, 30000, signal);
+  }
+
+  async tabs(botId: string, signal?: AbortSignal) {
+    return this.request(`/browser/${botId}/tabs`, undefined, 10000, signal);
+  }
+
+  async newTab(botId: string, url = "", signal?: AbortSignal) {
+    return this.request(`/browser/${botId}/newtab`, { url }, 20000, signal);
+  }
+
+  async switchTab(botId: string, index: number, signal?: AbortSignal) {
+    return this.request(`/browser/${botId}/switchtab`, { index }, 10000, signal);
+  }
+
+  async closeTab(botId: string, index: number, signal?: AbortSignal) {
+    return this.request(`/browser/${botId}/closetab`, { index }, 10000, signal);
   }
 
   async observe(botId: string, signal?: AbortSignal) {

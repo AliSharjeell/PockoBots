@@ -39,6 +39,8 @@ public class BotBrowserView extends LinearLayout {
     private LinearLayout handoffBanner;
     private TextView handoffReasonText;
     private ImageView backBtn, forwardBtn, homeBtn, externalBtn;
+    /** The strip of tabs, so the owner can see the pages that are open and open another one. */
+    private LinearLayout tabStrip;
 
     private BotBrowserInstance browser;
     private Runnable onHandbackCallback;
@@ -206,6 +208,16 @@ public class BotBrowserView extends LinearLayout {
 
         addView(topBar, new LayoutParams(-1, -2));
 
+        // --- The strip of tabs ---
+        HorizontalScrollView tabScroll = new HorizontalScrollView(context);
+        tabScroll.setHorizontalScrollBarEnabled(false);
+        tabStrip = new LinearLayout(context);
+        tabStrip.setOrientation(HORIZONTAL);
+        tabStrip.setGravity(Gravity.CENTER_VERTICAL);
+        tabStrip.setPadding(dp(8), dp(4), dp(8), dp(4));
+        tabScroll.addView(tabStrip, new LayoutParams(-2, -2));
+        addView(tabScroll, new LayoutParams(-1, dp(40)));
+
         // Subtle divider
         View divider = new View(context);
         divider.setBackgroundColor(AgentStyle.BORDER);
@@ -319,12 +331,16 @@ public class BotBrowserView extends LinearLayout {
 
         // Sync initial state
         updateState();
+        rebuildTabs();
 
         // Listen for live page updates
         browser.setListener(new BotBrowserInstance.BrowserListener() {
             @Override
-            public void onPageChanged(String url, String title, boolean loading, int progress) {
+            public void onPageChanged(int tabIndex, String url, String title, boolean loading, int progress) {
                 mainHandler.post(() -> {
+                    // A page in the back still shows its own title in the strip.
+                    rebuildTabs();
+                    if (browser == null || tabIndex != browser.getActiveIndex()) return;
                     if (loading) {
                         progressBar.setVisibility(VISIBLE);
                         progressBar.setProgress(Math.max(5, progress));
@@ -336,6 +352,14 @@ public class BotBrowserView extends LinearLayout {
                         updateUrlDisplay();
                     }
                     updateNavButtons();
+                });
+            }
+
+            @Override
+            public void onTabsChanged(String bId, int activeIndex, int tabCount) {
+                mainHandler.post(() -> {
+                    rebuildTabs();
+                    updateState();
                 });
             }
 
@@ -352,6 +376,90 @@ public class BotBrowserView extends LinearLayout {
                 mainHandler.post(() -> handoffBanner.setVisibility(GONE));
             }
         });
+    }
+
+    /** The title a tab is shown by. */
+    private static String tabLabel(BotBrowserInstance.Tab tab) {
+        if (tab == null) return "New tab";
+        if (tab.title != null && !tab.title.trim().isEmpty()) return tab.title.trim();
+        String url = tab.url == null ? "" : tab.url.trim();
+        if (url.isEmpty() || url.equals("about:blank")) return "New tab";
+        try {
+            String host = Uri.parse(url).getHost();
+            return host != null ? host : url;
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
+    /**
+     * The strip of tabs.
+     *
+     * Every tab of the browser is shown, the one in front is marked, and a tab can be closed or
+     * opened from here.
+     */
+    private void rebuildTabs() {
+        if (browser == null || tabStrip == null) return;
+        tabStrip.removeAllViews();
+        java.util.List<BotBrowserInstance.Tab> tabs = browser.getTabs();
+        int active = browser.getActiveIndex();
+        for (int i = 0; i < tabs.size(); i++) {
+            final int index = i;
+            BotBrowserInstance.Tab tab = tabs.get(i);
+            boolean isActive = i == active;
+            LinearLayout pill = new LinearLayout(context);
+            pill.setOrientation(HORIZONTAL);
+            pill.setGravity(Gravity.CENTER_VERTICAL);
+            TextView name = new TextView(context);
+            name.setText(tabLabel(tab));
+            name.setTextSize(12);
+            name.setTextColor(isActive ? AgentStyle.TEXT : AgentStyle.MUTED);
+            name.setMaxLines(1);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            name.setSingleLine(true);
+            pill.addView(name, new LayoutParams(0, -2, 1));
+            if (isActive && tabs.size() > 1) {
+                ImageView close = new ImageView(context);
+                close.setImageResource(R.drawable.lucide_x);
+                close.setColorFilter(AgentStyle.MUTED);
+                close.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                close.setPadding(dp(3), dp(3), dp(3), dp(3));
+                close.setContentDescription("Close tab");
+                close.setOnClickListener(v -> {
+                    if (browser == null) return;
+                    browser.closeTab(index);
+                    BotBrowserManager.get().showTab(botId, browser.getActiveIndex());
+                    rebuildTabs();
+                    updateState();
+                });
+                pill.addView(close, new LayoutParams(dp(18), dp(18)));
+            }
+            pill.setPadding(dp(10), dp(4), dp(6), dp(4));
+            pill.setBackground(AgentStyle.surface(context, isActive ? AgentStyle.PANEL : 0x00000000, 14, isActive));
+            LayoutParams pillParams = new LayoutParams(-2, dp(30));
+            pillParams.setMargins(dp(3), 0, dp(3), 0);
+            tabStrip.addView(pill, pillParams);
+            pill.setOnClickListener(v -> {
+                BotBrowserManager.get().showTab(botId, index);
+                rebuildTabs();
+                updateState();
+            });
+        }
+        ImageView add = new ImageView(context);
+        add.setImageResource(R.drawable.lucide_plus);
+        add.setColorFilter(AgentStyle.TEXT);
+        add.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        add.setPadding(dp(7), dp(7), dp(7), dp(7));
+        add.setContentDescription("New tab");
+        add.setBackground(AgentStyle.surface(context, AgentStyle.PANEL, 16, true));
+        add.setOnClickListener(v -> {
+            BotBrowserManager.get().openTab(botId, "about:blank");
+            rebuildTabs();
+            updateState();
+        });
+        LayoutParams addParams = new LayoutParams(dp(30), dp(30));
+        addParams.setMargins(dp(3), 0, dp(6), 0);
+        tabStrip.addView(add, addParams);
     }
 
     private void updateUrlDisplay() {

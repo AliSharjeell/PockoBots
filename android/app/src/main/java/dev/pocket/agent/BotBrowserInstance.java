@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -24,14 +23,17 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Isolated browser instance for a single bot.
  * Features:
  * - Multi-profile cookie and session isolation per bot (via AndroidX WebKit).
+ * - Tabs, so a bot can look something up without losing the page it was filling in.
  * - Background execution in app memory without OS accessibility or ADB.
  * - DOM distillation and Set-of-Marks indexing (browser-use / OpenBUA compatible).
  * - Off-screen vision screenshots in memory.
@@ -42,27 +44,36 @@ public class BotBrowserInstance {
     private final String botId;
     private final Context context;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final WebView webView;
 
     public static final String DEFAULT_HOME_URL = "https://www.google.com";
 
-    private volatile String currentUrl = DEFAULT_HOME_URL;
-    private volatile String currentTitle = "Google";
-    private volatile int loadProgress = 0;
-    private volatile boolean isLoading = false;
-    private volatile String lastError = "";
-    private final java.util.concurrent.atomic.AtomicLong navigationCount = new java.util.concurrent.atomic.AtomicLong(0);
+    /** One tab of this browser: a page of its own, with its own state. */
+    public static class Tab {
+        public final WebView webView;
+        public volatile String url = "about:blank";
+        public volatile String title = "";
+        public volatile int progress = 0;
+        public volatile boolean loading = false;
+        public volatile String lastError = "";
+        public final AtomicLong navigationCount = new AtomicLong(0);
+        volatile CompletableFuture<String> pendingDomFuture = null;
+
+        Tab(WebView webView) {
+            this.webView = webView;
+        }
+    }
+
+    private final List<Tab> tabs = new ArrayList<>();
+    private volatile int activeIndex = 0;
 
     // Human intervention state
     private volatile boolean waitingForHuman = false;
     private volatile String humanRequestReason = "";
     private volatile CompletableFuture<String> humanHandbackFuture = null;
 
-    // DOM callback
-    private volatile CompletableFuture<String> pendingDomFuture = null;
-
     public interface BrowserListener {
-        void onPageChanged(String url, String title, boolean loading, int progress);
+        void onPageChanged(int tabIndex, String url, String title, boolean loading, int progress);
+        void onTabsChanged(String botId, int activeIndex, int tabCount);
         void onHumanInterventionRequested(String botId, String reason);
         void onHumanInterventionResolved(String botId);
     }
@@ -77,13 +88,20 @@ public class BotBrowserInstance {
     public BotBrowserInstance(Context context, String botId) {
         this.context = context;
         this.botId = botId;
-        this.webView = new WebView(context);
+        createTab(DEFAULT_HOME_URL);
+    }
+
+    /** A tab of its own, with the same isolation and the same settings as the first one. */
+    @SuppressLint("SetJavaScriptEnabled")
+    private Tab createTab(String startUrl) {
+        final Tab tab = new Tab(new WebView(context));
+        WebView webView = tab.webView;
 
         // 1. Isolate cookies, localStorage, IndexedDB and cache per bot
         String profileName = "bot_" + botId.replaceAll("[^a-zA-Z0-9_]", "_");
         if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             try {
-                WebViewCompat.setProfile(this.webView, profileName);
+                WebViewCompat.setProfile(webView, profileName);
             } catch (Exception e) {
                 android.util.Log.w("BotBrowser", "Multi-profile setup failed for " + botId + ": " + e.getMessage());
             }
@@ -107,36 +125,36 @@ public class BotBrowserInstance {
         settings.setUserAgentString(customUa);
 
         // 3. Attach JavaScript Gateway Interface
-        webView.addJavascriptInterface(new BotJsBridge(), "PocketBotBridge");
+        webView.addJavascriptInterface(new BotJsBridge(tab), "PocketBotBridge");
 
         // 4. WebViewClient for navigation lifecycle
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                isLoading = true;
-                currentUrl = url != null ? url : "about:blank";
-                lastError = "";
-                notifyPageChanged();
+                tab.loading = true;
+                tab.url = url != null ? url : "about:blank";
+                tab.lastError = "";
+                notifyPageChanged(tab);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                isLoading = false;
-                loadProgress = 100;
-                if (url != null) currentUrl = url;
+                tab.loading = false;
+                tab.progress = 100;
+                if (url != null) tab.url = url;
                 String title = view.getTitle();
-                if (title != null && !title.isEmpty()) currentTitle = title;
-                notifyPageChanged();
+                if (title != null && !title.isEmpty()) tab.title = title;
+                notifyPageChanged(tab);
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request != null && request.isForMainFrame()) {
-                    lastError = error != null ? error.getDescription().toString() : "Page load error";
-                    notifyPageChanged();
+                    tab.lastError = error != null ? error.getDescription().toString() : "Page load error";
+                    notifyPageChanged(tab);
                 }
             }
         });
@@ -146,51 +164,85 @@ public class BotBrowserInstance {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 super.onProgressChanged(view, newProgress);
-                loadProgress = newProgress;
-                if (newProgress >= 100) isLoading = false;
-                notifyPageChanged();
+                tab.progress = newProgress;
+                if (newProgress >= 100) tab.loading = false;
+                notifyPageChanged(tab);
             }
 
             @Override
             public void onReceivedTitle(WebView view, String title) {
                 super.onReceivedTitle(view, title);
                 if (title != null && !title.isEmpty()) {
-                    currentTitle = title;
-                    notifyPageChanged();
+                    tab.title = title;
+                    notifyPageChanged(tab);
                 }
             }
         });
 
-        // 6. Navigate to default Google search home
-        mainHandler.post(() -> webView.loadUrl(DEFAULT_HOME_URL));
+        tabs.add(tab);
+        if (startUrl != null && !startUrl.isEmpty()) {
+            tab.url = startUrl;
+            mainHandler.post(() -> {
+                tab.navigationCount.incrementAndGet();
+                webView.loadUrl(startUrl);
+            });
+        }
+        return tab;
     }
 
     public String getBotId() {
         return botId;
     }
 
+    /** The tab that is in front. */
+    public Tab getActiveTab() {
+        List<Tab> all = tabs;
+        if (all.isEmpty()) return null;
+        int index = Math.max(0, Math.min(activeIndex, all.size() - 1));
+        return all.get(index);
+    }
+
+    /** Every tab of this browser, in the order they were opened. */
+    public List<Tab> getTabs() {
+        return new ArrayList<>(tabs);
+    }
+
+    public int getTabCount() {
+        return tabs.size();
+    }
+
+    public int getActiveIndex() {
+        return activeIndex;
+    }
+
     public WebView getWebView() {
-        return webView;
+        Tab active = getActiveTab();
+        return active == null ? null : active.webView;
     }
 
     public String getCurrentUrl() {
-        return currentUrl;
+        Tab active = getActiveTab();
+        return active == null ? "" : active.url;
     }
 
     public String getCurrentTitle() {
-        return currentTitle;
+        Tab active = getActiveTab();
+        return active == null ? "" : active.title;
     }
 
     public int getLoadProgress() {
-        return loadProgress;
+        Tab active = getActiveTab();
+        return active == null ? 0 : active.progress;
     }
 
     public boolean isLoading() {
-        return isLoading;
+        Tab active = getActiveTab();
+        return active != null && active.loading;
     }
 
     public String getLastError() {
-        return lastError;
+        Tab active = getActiveTab();
+        return active == null ? "" : active.lastError;
     }
 
     public boolean isWaitingForHuman() {
@@ -201,11 +253,23 @@ public class BotBrowserInstance {
         return humanRequestReason;
     }
 
-    private void notifyPageChanged() {
+    private int indexOf(Tab tab) {
+        List<Tab> all = tabs;
+        for (int i = 0; i < all.size(); i++) if (all.get(i) == tab) return i;
+        return -1;
+    }
+
+    private void notifyPageChanged(Tab tab) {
         BrowserListener l = listener;
-        if (l != null) {
-            mainHandler.post(() -> l.onPageChanged(currentUrl, currentTitle, isLoading, loadProgress));
-        }
+        if (l == null) return;
+        int index = indexOf(tab);
+        mainHandler.post(() -> l.onPageChanged(index, tab.url, tab.title, tab.loading, tab.progress));
+    }
+
+    private void notifyTabsChanged() {
+        BrowserListener l = listener;
+        if (l == null) return;
+        mainHandler.post(() -> l.onTabsChanged(botId, activeIndex, tabs.size()));
     }
 
     public static String resolveInputUrl(String input) {
@@ -235,7 +299,12 @@ public class BotBrowserInstance {
 
     public void navigate(String url) {
         final String target = resolveInputUrl(url);
-        mainHandler.post(() -> { navigationCount.incrementAndGet(); webView.loadUrl(target); });
+        mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active == null) return;
+            active.navigationCount.incrementAndGet();
+            active.webView.loadUrl(target);
+        });
     }
 
     /**
@@ -245,37 +314,137 @@ public class BotBrowserInstance {
      * been asked for anything reports neither loading nor progress, so a wait on those alone calls
      * the page settled before it has started.
      */
-    public long navigationCount() { return navigationCount.get(); }
+    public long navigationCount() { return navigationCountOf(getActiveTab()); }
+
+    /** How many pages one tab has been asked for. */
+    public long navigationCountOf(Tab tab) { return tab == null ? 0 : tab.navigationCount.get(); }
+
+    /**
+     * Opens a tab of its own.
+     *
+     * The page in front is left as it is, so a form that is half filled in survives a lookup.
+     */
+    public Tab openTab(String url) {
+        final String target = resolveInputUrl(url);
+        // A tab is made on the main thread. A caller that is already on it gets the tab at once.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Tab tab = createTab(target);
+            activeIndex = indexOf(tab);
+            notifyTabsChanged();
+            return tab;
+        }
+        Tab[] created = new Tab[1];
+        mainHandler.post(() -> {
+            Tab tab = createTab(target);
+            created[0] = tab;
+            activeIndex = indexOf(tab);
+            notifyTabsChanged();
+        });
+        // The tab is made on the main thread, so a caller that needs it waits for the thread to be
+        // free and reads it back.
+        long deadline = System.currentTimeMillis() + 3000;
+        while (created[0] == null && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return created[0];
+    }
+
+    /** Brings a tab to the front. */
+    public boolean switchTab(int index) {
+        if (index < 0 || index >= tabs.size()) return false;
+        activeIndex = index;
+        notifyTabsChanged();
+        return true;
+    }
+
+    /**
+     * Closes a tab.
+     *
+     * The last tab is never closed: a browser without a page has nothing to show.
+     */
+    public boolean closeTab(int index) {
+        if (index < 0 || index >= tabs.size() || tabs.size() <= 1) return false;
+        Tab tab = tabs.remove(index);
+        if (index < activeIndex) activeIndex--;
+        else if (index == activeIndex) activeIndex = Math.min(activeIndex, tabs.size() - 1);
+        final Tab closed = tab;
+        mainHandler.post(() -> {
+            if (closed.webView.getParent() != null) {
+                ((ViewGroup) closed.webView.getParent()).removeView(closed.webView);
+            }
+            closed.webView.destroy();
+        });
+        notifyTabsChanged();
+        return true;
+    }
+
+    /** Every tab of this browser, as the bot is told about them. */
+    public JSONArray tabSummaries() {
+        JSONArray list = new JSONArray();
+        List<Tab> all = tabs;
+        for (int i = 0; i < all.size(); i++) {
+            Tab tab = all.get(i);
+            try {
+                JSONObject entry = new JSONObject();
+                entry.put("index", i);
+                entry.put("url", tab.url);
+                entry.put("title", tab.title);
+                entry.put("active", i == activeIndex);
+                entry.put("loading", tab.loading);
+                list.put(entry);
+            } catch (Exception ignored) {
+            }
+        }
+        return list;
+    }
 
     public void goBack() {
         mainHandler.post(() -> {
-            if (webView.canGoBack()) webView.goBack();
+            Tab active = getActiveTab();
+            if (active != null && active.webView.canGoBack()) active.webView.goBack();
         });
     }
 
     public void goForward() {
         mainHandler.post(() -> {
-            if (webView.canGoForward()) webView.goForward();
+            Tab active = getActiveTab();
+            if (active != null && active.webView.canGoForward()) active.webView.goForward();
         });
     }
 
     public void reload() {
-        mainHandler.post(webView::reload);
+        mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active != null) active.webView.reload();
+        });
     }
 
     public boolean canGoBack() {
-        return webView.canGoBack();
+        Tab active = getActiveTab();
+        return active != null && active.webView.canGoBack();
     }
 
     public boolean canGoForward() {
-        return webView.canGoForward();
+        Tab active = getActiveTab();
+        return active != null && active.webView.canGoForward();
     }
 
     // --- JavaScript Bridge Gateway ---
     private class BotJsBridge {
+        private final Tab tab;
+
+        BotJsBridge(Tab tab) {
+            this.tab = tab;
+        }
+
         @JavascriptInterface
         public void onDomReady(String json) {
-            CompletableFuture<String> future = pendingDomFuture;
+            CompletableFuture<String> future = tab.pendingDomFuture;
             if (future != null && !future.isDone()) {
                 future.complete(json);
             }
@@ -284,8 +453,14 @@ public class BotBrowserInstance {
 
     // --- OBSERVE: Extract interactive DOM tree with numeric IDs ---
     public CompletableFuture<String> extractInteractiveDom() {
+        final Tab active = getActiveTab();
+        if (active == null) {
+            CompletableFuture<String> empty = new CompletableFuture<>();
+            empty.complete("{\"url\":\"\",\"title\":\"\",\"elements\":[]}");
+            return empty;
+        }
         CompletableFuture<String> future = new CompletableFuture<>();
-        pendingDomFuture = future;
+        active.pendingDomFuture = future;
 
         String domIndexerJs =
             "(function() {" +
@@ -329,12 +504,12 @@ public class BotBrowserInstance {
             "  }" +
             "})();";
 
-        mainHandler.post(() -> webView.evaluateJavascript(domIndexerJs, null));
+        mainHandler.post(() -> active.webView.evaluateJavascript(domIndexerJs, null));
 
         // Fallback timeout after 6 seconds if bridge doesn't respond
         mainHandler.postDelayed(() -> {
             if (!future.isDone()) {
-                future.complete("{\"url\":\"" + currentUrl + "\",\"title\":\"" + currentTitle + "\",\"elements\":[]}");
+                future.complete("{\"url\":\"" + active.url + "\",\"title\":\"" + active.title + "\",\"elements\":[]}");
             }
         }, 6000);
 
@@ -356,10 +531,17 @@ public class BotBrowserInstance {
             "  return 'false';" +
             "})();", id);
 
-        mainHandler.post(() -> webView.evaluateJavascript(js, result -> {
-            boolean success = result != null && result.contains("true");
-            future.complete(success);
-        }));
+        mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active == null) {
+                future.complete(false);
+                return;
+            }
+            active.webView.evaluateJavascript(js, result -> {
+                boolean success = result != null && result.contains("true");
+                future.complete(success);
+            });
+        });
         return future;
     }
 
@@ -373,7 +555,7 @@ public class BotBrowserInstance {
             "  if (el) {" +
             "    el.scrollIntoView({block: 'center', inline: 'center'});" +
             "    el.focus();" +
-            "    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ? " +
+            "    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ?" +
             "                   Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set : null;" +
             "    const val = %s ? '%s' : (el.value || '') + '%s';" +
             "    if (setter) { setter.call(el, val); } else { el.value = val; }" +
@@ -384,21 +566,30 @@ public class BotBrowserInstance {
             "  return 'false';" +
             "})();", id, clear ? "true" : "false", safeText, safeText);
 
-        mainHandler.post(() -> webView.evaluateJavascript(js, result -> {
-            boolean success = result != null && result.contains("true");
-            future.complete(success);
-        }));
+        mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active == null) {
+                future.complete(false);
+                return;
+            }
+            active.webView.evaluateJavascript(js, result -> {
+                boolean success = result != null && result.contains("true");
+                future.complete(success);
+            });
+        });
         return future;
     }
 
     // --- ACT: Tap coordinates directly on WebView memory buffer ---
     public void tapCoordinates(float x, float y) {
         mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active == null) return;
             long downTime = SystemClock.uptimeMillis();
             MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0);
             MotionEvent up = MotionEvent.obtain(downTime, downTime + 50, MotionEvent.ACTION_UP, x, y, 0);
-            webView.dispatchTouchEvent(down);
-            webView.dispatchTouchEvent(up);
+            active.webView.dispatchTouchEvent(down);
+            active.webView.dispatchTouchEvent(up);
             down.recycle();
             up.recycle();
         });
@@ -406,7 +597,11 @@ public class BotBrowserInstance {
 
     // --- ACT: Scroll page or element ---
     public void scroll(int dx, int dy) {
-        mainHandler.post(() -> webView.evaluateJavascript(String.format("window.scrollBy(%d, %d);", dx, dy), null));
+        mainHandler.post(() -> {
+            Tab active = getActiveTab();
+            if (active == null) return;
+            active.webView.evaluateJavascript(String.format("window.scrollBy(%d, %d);", dx, dy), null);
+        });
     }
 
     // --- VISION: Capture off-screen snapshot directly from WebView buffer ---
@@ -414,12 +609,17 @@ public class BotBrowserInstance {
         CompletableFuture<String> future = new CompletableFuture<>();
         mainHandler.post(() -> {
             try {
-                int width = webView.getWidth() > 0 ? webView.getWidth() : targetWidth > 0 ? targetWidth : 1080;
-                int height = webView.getHeight() > 0 ? webView.getHeight() : targetHeight > 0 ? targetHeight : 1920;
+                Tab active = getActiveTab();
+                if (active == null) {
+                    future.completeExceptionally(new IllegalStateException("The browser has no page open."));
+                    return;
+                }
+                int width = active.webView.getWidth() > 0 ? active.webView.getWidth() : targetWidth > 0 ? targetWidth : 1080;
+                int height = active.webView.getHeight() > 0 ? active.webView.getHeight() : targetHeight > 0 ? targetHeight : 1920;
 
                 Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(bitmap);
-                webView.draw(canvas);
+                active.webView.draw(canvas);
 
                 ByteArrayOutputStream stream = new ByteArrayOutputStream();
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream);
@@ -463,10 +663,13 @@ public class BotBrowserInstance {
 
     public void destroy() {
         mainHandler.post(() -> {
-            if (webView.getParent() != null) {
-                ((ViewGroup) webView.getParent()).removeView(webView);
+            for (Tab tab : new ArrayList<>(tabs)) {
+                if (tab.webView.getParent() != null) {
+                    ((ViewGroup) tab.webView.getParent()).removeView(tab.webView);
+                }
+                tab.webView.destroy();
             }
-            webView.destroy();
+            tabs.clear();
         });
     }
 }

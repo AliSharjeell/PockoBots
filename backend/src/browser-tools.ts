@@ -13,9 +13,10 @@ export function browserTools(botId: string, bridge: BrowserBridge): AgentTool<an
       name: "browser_navigate",
       label: "Navigate browser",
       description:
-        "Open an HTTP or HTTPS webpage in this bot's isolated in-app browser. Sessions, cookies, and logins are preserved across visits. Always observe the page after navigation. This is the default way to do anything on a website; do not take over the owner's phone to browse.",
+        "Open an HTTP or HTTPS webpage in this bot's isolated in-app browser. Sessions, cookies, and logins are preserved across visits. Always observe the page after navigation. This is the default way to do anything on a website; do not take over the owner's phone to browse. Pass 'tab' to open the page in another tab, so a form that is half filled in survives.",
       parameters: Type.Object({
         url: Type.String({ maxLength: 8000, description: "The full URL to navigate to (http:// or https://)" }),
+        tab: Type.Optional(Type.Integer({ minimum: 0, description: "The tab to open the page in. The tab in front is used when this is left out." })),
       }),
       execute: async (_id, p: any, signal) => {
         const raw = String(p.url || "").trim();
@@ -24,7 +25,65 @@ export function browserTools(botId: string, bridge: BrowserBridge): AgentTool<an
         if (!["http:", "https:"].includes(url.protocol)) {
           throw Error("Use an HTTP/HTTPS URL");
         }
-        const result = await bridge.navigate(botId, url.href, true, signal);
+        const result = await bridge.navigate(botId, url.href, true, signal, typeof p.tab === "number" ? p.tab : undefined);
+        return text(result);
+      },
+    },
+    {
+      name: "browser_list_tabs",
+      label: "List browser tabs",
+      description:
+        "List the tabs of this bot's browser, with the page each one is on and which one is in front. Use it before opening another tab, so you know what is already open.",
+      parameters: Type.Object({}),
+      execute: async (_id, _p: any, signal) => {
+        const result = await bridge.tabs(botId, signal);
+        return text(result);
+      },
+    },
+    {
+      name: "browser_new_tab",
+      label: "Open a new browser tab",
+      description:
+        "Open a new tab in this bot's browser and put it in front. The tab that was in front keeps its page, so a form that is half filled in is not lost. Give a URL to open a page in the new tab, or leave it out for an empty one.",
+      parameters: Type.Object({
+        url: Type.Optional(Type.String({ maxLength: 8000, description: "The page to open in the new tab" })),
+      }),
+      execute: async (_id, p: any, signal) => {
+        const raw = String(p.url || "").trim();
+        let target = "";
+        if (raw) {
+          const url = new URL(raw.includes("://") ? raw : `https://${raw}`);
+          if (!["http:", "https:"].includes(url.protocol)) {
+            throw Error("Use an HTTP/HTTPS URL");
+          }
+          target = url.href;
+        }
+        const result = await bridge.newTab(botId, target, signal);
+        return text(result);
+      },
+    },
+    {
+      name: "browser_switch_tab",
+      label: "Switch browser tab",
+      description:
+        "Bring another tab of this bot's browser to the front. The pages of the other tabs stay as they are.",
+      parameters: Type.Object({
+        index: Type.Integer({ minimum: 0, description: "The tab to bring to the front, as listed by browser_list_tabs" }),
+      }),
+      execute: async (_id, p: any, signal) => {
+        const result = await bridge.switchTab(botId, Number(p.index), signal);
+        return text(result);
+      },
+    },
+    {
+      name: "browser_close_tab",
+      label: "Close browser tab",
+      description: "Close a tab of this bot's browser. The last tab stays open.",
+      parameters: Type.Object({
+        index: Type.Integer({ minimum: 0, description: "The tab to close, as listed by browser_list_tabs" }),
+      }),
+      execute: async (_id, p: any, signal) => {
+        const result = await bridge.closeTab(botId, Number(p.index), signal);
         return text(result);
       },
     },

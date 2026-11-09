@@ -16,6 +16,10 @@ test("browser tools declare all required bot browser actions", () => {
   assert.ok(names.includes("browser_scroll"));
   assert.ok(names.includes("browser_ask_human"));
   assert.ok(names.includes("browser_action"));
+  assert.ok(names.includes("browser_list_tabs"));
+  assert.ok(names.includes("browser_new_tab"));
+  assert.ok(names.includes("browser_switch_tab"));
+  assert.ok(names.includes("browser_close_tab"));
 });
 
 test("browser tools execute actions and validate inputs via mock bridge", async () => {
@@ -61,6 +65,22 @@ test("browser tools execute actions and validate inputs via mock bridge", async 
       calls.push({ method: "action", args: [botId, cmd] });
       return { success: true, cmd };
     },
+    tabs: async (botId: string) => {
+      calls.push({ method: "tabs", args: [botId] });
+      return { activeTab: 0, tabCount: 2, tabs: [{ index: 0, title: "Form", active: true }, { index: 1, title: "Docs" }] };
+    },
+    newTab: async (botId: string, url: string) => {
+      calls.push({ method: "newTab", args: [botId, url] });
+      return { success: true, tabIndex: 1, tabCount: 2 };
+    },
+    switchTab: async (botId: string, index: number) => {
+      calls.push({ method: "switchTab", args: [botId, index] });
+      return { success: true, activeTab: index };
+    },
+    closeTab: async (botId: string, index: number) => {
+      calls.push({ method: "closeTab", args: [botId, index] });
+      return { success: true, tabCount: 1 };
+    },
   };
 
   const tools = browserTools("bot-test", mockBridge);
@@ -105,6 +125,16 @@ test("browser tools execute actions and validate inputs via mock bridge", async 
   // 7. Action
   const actRes = await tool("browser_action").execute("8", { cmd: "reload" });
   assert.match(JSON.stringify(actRes), /reload/);
+
+  // 8. Tabs
+  const tabsRes = await tool("browser_list_tabs").execute("9", {});
+  assert.match(JSON.stringify(tabsRes), /Form/);
+  const newTabRes = await tool("browser_new_tab").execute("10", { url: "https://example.com" });
+  assert.match(JSON.stringify(newTabRes), /tabIndex/);
+  const switchRes = await tool("browser_switch_tab").execute("11", { index: 1 });
+  assert.match(JSON.stringify(switchRes), /activeTab/);
+  const closeRes = await tool("browser_close_tab").execute("12", { index: 1 });
+  assert.match(JSON.stringify(closeRes), /tabCount/);
 });
 
 test("BrowserBridge communicates over HTTP with loopback server and token", async () => {

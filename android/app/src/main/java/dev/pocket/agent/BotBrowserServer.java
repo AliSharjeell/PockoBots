@@ -221,7 +221,60 @@ public class BotBrowserServer extends Thread {
                 res.put("canGoBack", browser.canGoBack());
                 res.put("canGoForward", browser.canGoForward());
                 res.put("lastError", browser.getLastError());
+                res.put("activeTab", browser.getActiveIndex());
+                res.put("tabCount", browser.getTabCount());
+                res.put("tabs", browser.tabSummaries());
                 sendJson(out, 200, res);
+                break;
+            }
+
+            case "tabs": {
+                JSONObject res = new JSONObject();
+                res.put("activeTab", browser.getActiveIndex());
+                res.put("tabCount", browser.getTabCount());
+                res.put("tabs", browser.tabSummaries());
+                sendJson(out, 200, res);
+                break;
+            }
+
+            case "newtab": {
+                String url = body.optString("url", "");
+                BotBrowserInstance.Tab tab = browser.openTab(url);
+                sendJson(out, 200, new JSONObject()
+                    .put("success", true)
+                    .put("tabIndex", browser.getActiveIndex())
+                    .put("tabCount", browser.getTabCount())
+                    .put("url", tab == null ? "" : tab.url)
+                    .put("tabs", browser.tabSummaries()));
+                break;
+            }
+
+            case "switchtab": {
+                int index = body.optInt("index", -1);
+                if (!browser.switchTab(index)) {
+                    sendJson(out, 400, new JSONObject().put("error", "No tab at index " + index));
+                    return;
+                }
+                sendJson(out, 200, new JSONObject()
+                    .put("success", true)
+                    .put("activeTab", browser.getActiveIndex())
+                    .put("url", browser.getCurrentUrl())
+                    .put("title", browser.getCurrentTitle())
+                    .put("tabs", browser.tabSummaries()));
+                break;
+            }
+
+            case "closetab": {
+                int index = body.optInt("index", -1);
+                if (!browser.closeTab(index)) {
+                    sendJson(out, 400, new JSONObject().put("error", "That tab cannot be closed."));
+                    return;
+                }
+                sendJson(out, 200, new JSONObject()
+                    .put("success", true)
+                    .put("activeTab", browser.getActiveIndex())
+                    .put("tabCount", browser.getTabCount())
+                    .put("tabs", browser.tabSummaries()));
                 break;
             }
 
@@ -231,6 +284,8 @@ public class BotBrowserServer extends Thread {
                     sendJson(out, 400, new JSONObject().put("error", "Missing url parameter"));
                     return;
                 }
+                // A page can be opened in a tab of its own, so the one in front is left as it is.
+                if (body.has("tab")) browser.switchTab(body.optInt("tab", -1));
                 boolean waitForLoad = body.optBoolean("waitForLoad", true);
                 long before = browser.navigationCount();
                 browser.navigate(url);

@@ -35,6 +35,8 @@ public class BotBrowserManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<String, BotBrowserInstance> instances = new ConcurrentHashMap<>();
     private final List<BotBrowserInstance.BrowserListener> globalListeners = new CopyOnWriteArrayList<>();
+    /** The container each browser is shown in, so a new tab can be put in front of it. */
+    private final Map<String, ViewGroup> visibleContainers = new ConcurrentHashMap<>();
 
     private volatile ViewGroup hiddenStage;
     private volatile Context appContext;
@@ -51,11 +53,7 @@ public class BotBrowserManager {
         if (stage != null) {
             mainHandler.post(() -> {
                 for (BotBrowserInstance botBrowser : instances.values()) {
-                    View wv = botBrowser.getWebView();
-                    if (wv.getParent() == null) {
-                        ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(1080, 1920);
-                        stage.addView(wv, lp);
-                    }
+                    mountHidden(botBrowser);
                 }
             });
         }
@@ -90,9 +88,16 @@ public class BotBrowserManager {
             BotBrowserInstance newInstance = new BotBrowserInstance(targetContext, botId);
             newInstance.setListener(new BotBrowserInstance.BrowserListener() {
                 @Override
-                public void onPageChanged(String url, String title, boolean loading, int progress) {
+                public void onPageChanged(int tabIndex, String url, String title, boolean loading, int progress) {
                     for (BotBrowserInstance.BrowserListener l : globalListeners) {
-                        l.onPageChanged(url, title, loading, progress);
+                        l.onPageChanged(tabIndex, url, title, loading, progress);
+                    }
+                }
+
+                @Override
+                public void onTabsChanged(String bId, int activeIndex, int tabCount) {
+                    for (BotBrowserInstance.BrowserListener l : globalListeners) {
+                        l.onTabsChanged(bId, activeIndex, tabCount);
                     }
                 }
 
@@ -114,12 +119,7 @@ public class BotBrowserManager {
             instances.put(botId, newInstance);
 
             // Mount to hidden stage if available
-            mainHandler.post(() -> {
-                if (hiddenStage != null && newInstance.getWebView().getParent() == null) {
-                    ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(1080, 1920);
-                    hiddenStage.addView(newInstance.getWebView(), lp);
-                }
-            });
+            mainHandler.post(() -> mountHidden(newInstance));
 
             return newInstance;
         }
@@ -137,8 +137,20 @@ public class BotBrowserManager {
     public void remove(String botId) {
         if (botId == null) return;
         BotBrowserInstance b = instances.remove(botId);
+        visibleContainers.remove(botId);
         if (b != null) {
             b.destroy();
+        }
+    }
+
+    /** Puts a tab of a browser on the hidden stage, so it keeps running while it is in the back. */
+    private void mountHidden(BotBrowserInstance browser) {
+        if (browser == null || hiddenStage == null) return;
+        for (BotBrowserInstance.Tab tab : browser.getTabs()) {
+            View wv = tab.webView;
+            if (wv.getParent() == null) {
+                hiddenStage.addView(wv, new ViewGroup.LayoutParams(1080, 1920));
+            }
         }
     }
 
@@ -148,18 +160,27 @@ public class BotBrowserManager {
     public void attachToVisibleContainer(String botId, ViewGroup visibleContainer) {
         BotBrowserInstance b = instances.get(botId);
         if (b == null || visibleContainer == null) return;
+        visibleContainers.put(botId, visibleContainer);
 
         mainHandler.post(() -> {
-            View wv = b.getWebView();
-            if (wv.getParent() != null) {
-                ((ViewGroup) wv.getParent()).removeView(wv);
+            BotBrowserInstance browser = instances.get(botId);
+            if (browser == null) return;
+            // Only the tab in front is shown. The rest keep running on the hidden stage.
+            for (BotBrowserInstance.Tab tab : browser.getTabs()) {
+                if (tab.webView.getParent() != null) {
+                    ((ViewGroup) tab.webView.getParent()).removeView(tab.webView);
+                }
             }
-            visibleContainer.addView(wv, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ));
-            wv.setVisibility(View.VISIBLE);
-            wv.requestFocus();
+            BotBrowserInstance.Tab active = browser.getActiveTab();
+            if (active != null) {
+                visibleContainer.addView(active.webView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                ));
+                active.webView.setVisibility(View.VISIBLE);
+                active.webView.requestFocus();
+            }
+            mountHidden(browser);
         });
     }
 
@@ -169,16 +190,58 @@ public class BotBrowserManager {
     public void returnToHiddenStage(String botId) {
         BotBrowserInstance b = instances.get(botId);
         if (b == null) return;
+        visibleContainers.remove(botId);
 
         mainHandler.post(() -> {
-            View wv = b.getWebView();
-            if (wv.getParent() != null) {
-                ((ViewGroup) wv.getParent()).removeView(wv);
-            }
-            if (hiddenStage != null) {
-                ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(1080, 1920);
-                hiddenStage.addView(wv, lp);
-            }
+            BotBrowserInstance browser = instances.get(botId);
+            if (browser == null) return;
+            mountHidden(browser);
         });
+    }
+
+    /**
+     * Shows a tab of a browser in front.
+     *
+     * A tab that was opened while the browser was on screen takes the place of the one that was in
+     * front, and the one it replaces goes back to the hidden stage.
+     */
+    public void showTab(String botId, int index) {
+        BotBrowserInstance b = instances.get(botId);
+        if (b == null) return;
+        ViewGroup container = visibleContainers.get(botId);
+        mainHandler.post(() -> {
+            BotBrowserInstance browser = instances.get(botId);
+            if (browser == null) return;
+            if (!browser.switchTab(index)) return;
+            if (container == null) {
+                mountHidden(browser);
+                return;
+            }
+            for (BotBrowserInstance.Tab tab : browser.getTabs()) {
+                if (tab.webView.getParent() != null) {
+                    ((ViewGroup) tab.webView.getParent()).removeView(tab.webView);
+                }
+            }
+            BotBrowserInstance.Tab active = browser.getActiveTab();
+            if (active != null) {
+                container.addView(active.webView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                ));
+                active.webView.setVisibility(View.VISIBLE);
+                active.webView.requestFocus();
+            }
+            mountHidden(browser);
+        });
+    }
+
+    /**
+     * Opens a tab of a browser and shows it.
+     */
+    public void openTab(String botId, String url) {
+        BotBrowserInstance b = instances.get(botId);
+        if (b == null) return;
+        b.openTab(url);
+        showTab(botId, b.getActiveIndex());
     }
 }
