@@ -128,10 +128,12 @@ Android instrumented tests need a connected emulator and a free device:
    building the other, because they share the output path.
 3. Name them `pockobots-v<version>-debug.apk` and
    `pockobots-mobileuse-v<version>-debug.apk`.
-4. Write the notes: keep the shape of the previous release (the warning, which
+4. Hash both files (`Get-FileHash`/`sha256sum`) and write the checksums
+   into the notes.
+5. Write the notes: keep the shape of the previous release (the warning, which
    edition to install, the SHA-256 checksums, how to install) and add what
    changed.
-5. Tag and publish:
+6. Tag and publish:
 
 ```powershell
 git tag -a v<version> -m "PockoBots v<version>"
@@ -139,7 +141,8 @@ git push origin main --tags
 gh release create v<version> .\pockobots-v<version>-debug.apk .\pockobots-mobileuse-v<version>-debug.apk --title "PockoBots v<version>" --notes-file <notes-file>
 ```
 
-6. Read the checksums back from the uploaded assets and put them in the notes.
+The upload of two universal APKs takes a while, and the release stays a draft
+until it finishes. Check it with `gh release view v<version>`.
 
 Never sign a release with anything other than the development key, and never
 put a vendor API key or a real owner credential into a build, a fixture or a
