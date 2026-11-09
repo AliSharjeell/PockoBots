@@ -87,6 +87,8 @@ test("the catalog carries the vendor CLIs that can be installed and signed in",(
 
 test("npm flags are only given to npm",()=>{
  assert.match(installCommand({install:"npm install -g @openai/codex"}),/--no-fund --no-audit/);
+ // The CLI lands in the app's own storage, so it survives the runtime being unpacked again.
+ assert.match(installCommand({install:"npm install -g @openai/codex"}),/--prefix "\$HOME\/.local"/);
  const cursor=providerCatalog.find(p=>p.id==="cursor")!;
  assert.doesNotMatch(installCommand(cursor),/--no-fund/);
  assert.match(installCommand(cursor),/cursor\.com\/install/);

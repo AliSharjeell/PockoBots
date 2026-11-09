@@ -34,8 +34,20 @@ export const FREE_TIER_PROVIDERS = new Set<string>(["opencode"]);
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
 export function provider(id: string) {const p=(providerCatalog as readonly ProviderEntry[]).find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
 
-/** npm takes flags that quieten its output. A vendor's own installer does not. */
-export function installCommand(p:{install:string}) {return p.install.startsWith("npm install")?p.install+" --no-fund --no-audit --loglevel=http":p.install;}
+/**
+ * The command that installs a vendor's CLI.
+ *
+ * npm takes flags that quieten its output. A vendor's own installer does not.
+ *
+ * The CLI is installed into `$HOME/.local`, which is the app's own storage, and not into the
+ * runtime image. The runtime is unpacked again under a new name whenever the app is updated, so a
+ * CLI that lived in it would be gone after the next update, and every old runtime would keep
+ * taking up the phone's storage.
+ */
+export function installCommand(p:{install:string}) {
+  if (!p.install.startsWith("npm install")) return p.install;
+  return p.install.replace("npm install -g", 'npm install -g --prefix "$HOME/.local"') + " --no-fund --no-audit --loglevel=http";
+}
 
 async function probe(command:string,args:string[],timeout=25000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"],env:{...process.env,PATH:`${process.env.PATH??""}:${join(homedir(),".local","bin")}`}});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
 

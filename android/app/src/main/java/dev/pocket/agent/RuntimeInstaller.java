@@ -28,7 +28,11 @@ final class RuntimeInstaller {
         String digest = metadata.getString("sha256");
         File root = new File(context.getFilesDir(), "runtimes/" + digest);
         File marker = new File(root, ".installed");
-        if (marker.isFile()) return root;
+        if (marker.isFile()) {
+            writeLocalBinProfile(root);
+            removeOlderRuntimes(context, digest);
+            return root;
+        }
         // Interrupted extraction is safely retried; projects and keys live elsewhere.
         root.mkdirs();
         progress.update("Unpacking the included coding environment…");
@@ -79,12 +83,57 @@ final class RuntimeInstaller {
             if (!Files.isSymbolicLink(path.toPath())) Os.symlink(link.getString("target"), path.getPath());
         }
         Io.write(marker, digest);
+        writeLocalBinProfile(root);
+        removeOlderRuntimes(context, digest);
         return root;
+    }
+
+    /**
+     * Puts the vendor CLIs on the path of a login shell.
+     *
+     * The terminal runs `bash --login`, and the profile of the runtime sets its own path, so the
+     * directory the CLIs are installed in is added after it.
+     */
+    private static void writeLocalBinProfile(File root) {
+        try {
+            File folder = new File(root, "etc/profile.d");
+            folder.mkdirs();
+            Io.write(new File(folder, "00-pocket-local-bin.sh"),
+                    "# The vendor CLIs live in the app's own storage.\nexport PATH=\"$PATH:/root/.local/bin\"\n");
+        } catch (Exception ignored) {
+            // A shell that does not see the directory still runs the CLIs the app starts.
+        }
     }
     private static File within(File root, String name) throws IOException {
         File dest = new File(root, name);
         if (name.startsWith("/") || !dest.getCanonicalPath().startsWith(root.getCanonicalPath() + "/"))
             throw new IOException("Invalid runtime archive path");
         return dest;
+    }
+
+    /**
+     * Removes the runtimes of older builds.
+     *
+     * Each runtime takes about a gigabyte, and an update unpacks its own beside the old one. The
+     * vendor CLIs live in the app's own storage, so the old images are of no use to anyone.
+     */
+    private static void removeOlderRuntimes(Context context, String digest) {
+        File folder = new File(context.getFilesDir(), "runtimes");
+        File[] folders = folder.listFiles();
+        if (folders == null) return;
+        for (File candidate : folders) {
+            if (!candidate.isDirectory() || candidate.getName().equals(digest)) continue;
+            try {
+                deleteTree(candidate);
+            } catch (Exception ignored) {
+                // A runtime that cannot be removed is a runtime that takes up space.
+            }
+        }
+    }
+
+    private static void deleteTree(File file) {
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteTree(child);
+        file.delete();
     }
 }
