@@ -71,6 +71,24 @@ data class SubscriptionProviderData(
 /** A provider's mark and the colour it is painted in. */
 data class ProviderBrand(val icon: Int, val mark: Color)
 
+/** One limit window a provider reported, such as its five-hour window or its weekly one. */
+data class UsageWindowData(
+    val label: String,
+    val usedPercent: Double,
+    val windowDurationMins: Int?,
+    /** When the window fills up again, in unix seconds. */
+    val resetsAt: Long?
+)
+
+/** The plan limits a provider reported, or the reason it reported none. */
+data class ProviderUsageData(
+    val providerId: String,
+    val providerName: String,
+    val reported: Boolean,
+    val windows: List<UsageWindowData>,
+    val note: String
+)
+
 /**
  * The colour of a provider's mark.
  *
@@ -318,6 +336,146 @@ private fun ModelRow(
     }
 }
 
+/** The colour a window is painted in, by how much of it is spent. */
+private fun usageTone(used: Double, dark: Boolean): Color = when {
+    used >= 90 -> PockoColors.RoseAttention
+    used >= 70 -> PockoColors.AmberWorking
+    else -> if (dark) Color(0xFF60A5FA) else PockoColors.PrimaryBlue
+}
+
+/** The time left in a window, in short units. */
+private fun resetsIn(resetsAt: Long?): String? {
+    if (resetsAt == null || resetsAt <= 0) return null
+    val minutes = (resetsAt * 1000 - System.currentTimeMillis()) / 60000
+    if (minutes <= 0) return null
+    val days = minutes / (60 * 24)
+    val hours = (minutes % (60 * 24)) / 60
+    return when {
+        days > 0 -> "${days}d ${hours}h left"
+        hours > 0 -> "${hours}h ${minutes % 60}m left"
+        else -> "${minutes % 60}m left"
+    }
+}
+
+/** The moment a window fills up again, as a person would read it. */
+private fun resetsAtText(resetsAt: Long?): String? {
+    if (resetsAt == null || resetsAt <= 0) return null
+    val format = java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.getDefault())
+    return format.format(java.util.Date(resetsAt * 1000))
+}
+
+/**
+ * How much of the plan is left.
+ *
+ * The provider's own CLI is asked, so a reading here is the plan the owner signed in to.
+ */
+@Composable
+private fun UsageSection(
+    usage: ProviderUsageData?,
+    loading: Boolean,
+    dark: Boolean,
+    onRefresh: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "USAGE",
+                color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.06).em,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = "Refresh usage",
+                tint = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onRefresh
+                    )
+                    .padding(7.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (dark) Color(0xFF131520) else Color(0xFFFFFFFF))
+                .border(1.dp, if (dark) Color(0xFF222738) else Color(0xFFE2E8F0), RoundedCornerShape(18.dp))
+                .padding(14.dp)
+        ) {
+            when {
+                loading -> {
+                    ShimmerBlock(dark, RoundedCornerShape(8.dp), Modifier.fillMaxWidth().height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ShimmerBlock(dark, RoundedCornerShape(8.dp), Modifier.fillMaxWidth(0.6f).height(14.dp))
+                }
+                usage == null -> Text(
+                    text = "Your provider's CLI is asked how much of the plan is left.",
+                    color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
+                    fontSize = 13.sp
+                )
+                !usage.reported -> Text(
+                    text = usage.note.ifEmpty { "This provider does not report usage limits." },
+                    color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
+                    fontSize = 13.sp
+                )
+                else -> usage.windows.forEachIndexed { index, window ->
+                    if (index > 0) Spacer(modifier = Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = window.label,
+                            color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "${window.usedPercent.toInt()}% used",
+                            color = if (dark) PockoColors.TextSecondaryDark else PockoColors.TextSecondaryLight,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(7.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (dark) Color(0xFF1F2433) else Color(0xFFE2E8F0))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth((window.usedPercent / 100.0).coerceIn(0.0, 1.0).toFloat())
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(usageTone(window.usedPercent, dark))
+                        )
+                    }
+                    val left = resetsIn(window.resetsAt)
+                    if (left != null) {
+                        Spacer(modifier = Modifier.height(5.dp))
+                        Text(
+                            text = "$left · resets ${resetsAtText(window.resetsAt)}",
+                            color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ModernSubscriptionsContent(
     providers: List<SubscriptionProviderData>,
@@ -328,6 +486,8 @@ fun ModernSubscriptionsContent(
     loading: Boolean,
     error: String,
     dark: Boolean,
+    usage: ProviderUsageData?,
+    usageLoading: Boolean,
     onSelectProvider: (String) -> Unit,
     onQuery: (String) -> Unit,
     onSelectModel: (String) -> Unit,
@@ -335,6 +495,7 @@ fun ModernSubscriptionsContent(
     onSignIn: (String) -> Unit,
     onUse: (String, String) -> Unit,
     onRetry: () -> Unit,
+    onRefreshUsage: () -> Unit,
     onOpenDocs: (String) -> Unit
 ) {
     val selected = providers.firstOrNull { it.id == selectedId }
@@ -558,6 +719,13 @@ fun ModernSubscriptionsContent(
         }
 
         if (selected.supported && selected.installed) {
+            // A provider that did not answer has no reading, so there is nothing to show.
+            if (usage != null && usage.reported && usage.windows.isNotEmpty()) {
+                item {
+                    UsageSection(usage, usageLoading, dark, onRefreshUsage)
+                }
+            }
+
             item {
                 Column {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -615,6 +783,8 @@ object ModernSubscriptions {
                 val query = controller.query.value
                 val loading = controller.loading.value
                 val error = controller.error.value
+                val usage = controller.usage.value
+                val usageLoading = controller.usageLoading.value
                 ModernSubscriptionsContent(
                     providers = providers,
                     selectedId = selectedId,
@@ -624,6 +794,8 @@ object ModernSubscriptions {
                     loading = loading,
                     error = error,
                     dark = AgentStyle.dark,
+                    usage = usage,
+                    usageLoading = usageLoading,
                     onSelectProvider = { controller.select(it) },
                     onQuery = { controller.query.value = it },
                     onSelectModel = { controller.selectedModel.value = it },
@@ -631,6 +803,7 @@ object ModernSubscriptions {
                     onSignIn = { controller.signIn(it) },
                     onUse = { id, model -> controller.use(id, model) },
                     onRetry = { controller.load() },
+                    onRefreshUsage = { controller.loadUsage(controller.selectedId.value, true) },
                     onOpenDocs = { controller.openDocs(it) }
                 )
             }
@@ -652,6 +825,9 @@ class SubscriptionsController(
     /** The provider every bot runs on, and the model it runs on. */
     val activeProvider = mutableStateOf("")
     val activeModel = mutableStateOf("")
+    /** How much of the plan is left, as the provider's own CLI reported it. */
+    val usage = mutableStateOf<ProviderUsageData?>(null)
+    val usageLoading = mutableStateOf(false)
 
     private var epoch = 0
 
@@ -682,6 +858,7 @@ class SubscriptionsController(
                 if (activeProvider.value == selectedId.value) activeModel.value else ""
             }
             selectedModel.value = if (models.any { it.id == chosen }) chosen else ""
+            if (selectedId.value.isNotEmpty()) loadUsage(selectedId.value)
         }, { message ->
             if (current != epoch) return@marketplaceRequest
             loading.value = false
@@ -689,10 +866,46 @@ class SubscriptionsController(
         })
     }
 
+    /**
+     * Asks a provider's CLI how much of the plan is left.
+     *
+     * The provider's own CLI is the one that knows, so the reading is asked of it and not guessed.
+     */
+    fun loadUsage(id: String, refresh: Boolean = false) {
+        if (id.isEmpty()) return
+        usageLoading.value = true
+        app.marketplaceRequest("GET", "/providers/$id/usage" + if (refresh) "?refresh=1" else "", null, { value ->
+            usageLoading.value = false
+            val json = value as? JSONObject ?: return@marketplaceRequest
+            val windows = json.optJSONArray("windows")
+            usage.value = ProviderUsageData(
+                providerId = json.optString("providerId", id),
+                providerName = json.optString("providerName"),
+                reported = json.optBoolean("reported"),
+                windows = (0 until (windows?.length() ?: 0)).mapNotNull { index ->
+                    val window = windows?.optJSONObject(index) ?: return@mapNotNull null
+                    UsageWindowData(
+                        label = window.optString("label"),
+                        usedPercent = window.optDouble("usedPercent", 0.0),
+                        windowDurationMins = if (window.has("windowDurationMins") && !window.isNull("windowDurationMins"))
+                            window.optInt("windowDurationMins") else null,
+                        resetsAt = if (window.has("resetsAt") && !window.isNull("resetsAt"))
+                            window.optLong("resetsAt") else null
+                    )
+                },
+                note = json.optString("note")
+            )
+        }, { message ->
+            usageLoading.value = false
+            usage.value = ProviderUsageData(id, "", false, emptyList(), message ?: "Couldn't read the usage limits.")
+        })
+    }
+
     /** Picks a provider and asks its CLI which models it can run. */
     fun select(id: String) {
         selectedId.value = id
         query.value = ""
+        loadUsage(id)
         val current = ++epoch
         app.marketplaceRequest("GET", "/providers/$id/models", null, { value ->
             if (current != epoch) return@marketplaceRequest
@@ -846,6 +1059,17 @@ private fun PreviewSubscriptionsDark() {
             loading = false,
             error = "",
             dark = true,
+            usage = ProviderUsageData(
+                providerId = "claude",
+                providerName = "Claude",
+                reported = true,
+                windows = listOf(
+                    UsageWindowData("5-hour limit", 42.0, 300, System.currentTimeMillis() / 1000 + 3600),
+                    UsageWindowData("Weekly limit", 18.0, 10080, System.currentTimeMillis() / 1000 + 86400 * 3)
+                ),
+                note = ""
+            ),
+            usageLoading = false,
             onSelectProvider = {},
             onQuery = {},
             onSelectModel = {},
@@ -853,6 +1077,7 @@ private fun PreviewSubscriptionsDark() {
             onSignIn = {},
             onUse = { _, _ -> },
             onRetry = {},
+            onRefreshUsage = {},
             onOpenDocs = {}
         )
     }

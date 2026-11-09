@@ -10,6 +10,7 @@ import type { Processes } from "./processes.js";
 import type { Terminals } from "./terminals.js";
 import { Value } from "typebox/value";
 import { catalogFor, discoverModels, type ModelCatalog } from "./provider-models.js";
+import { readUsage, type ProviderUsage } from "./provider-usage.js";
 
 export const providerCatalog = [
  { id:"codex", name:"ChatGPT", command:"codex", install:"npm install -g @openai/codex", login:"codex login --device-auth", docs:"https://developers.openai.com/codex/cli", supported:true },
@@ -46,7 +47,9 @@ export class SubscriptionProviders {
  private root="";
  private runs=new Map<string,{secret:string;tools:AgentTool<any>[];signal:AbortSignal;onActivity?:(event:any)=>void}>();
  private catalogs=new Map<string,{catalog:ModelCatalog;at:number}>();
+ private usages=new Map<string,{usage:ProviderUsage;at:number}>();
  private refreshing=new Map<string,Promise<void>>();
+ private statusCache:{value:any[];at:number}|null=null;
  configure(base:string,token:string,root?:string){this.base=base;this.apiToken=token;if(root)this.root=root;}
  /** The model list to show for a provider: the CLI's own list once it has answered, else the shipped one. */
  private catalog(id:string){const cached=this.catalogs.get(id);return cached?cached.catalog:catalogFor(id,null);}
@@ -67,6 +70,20 @@ export class SubscriptionProviders {
   * names travel with the state instead of being fetched again.
   */
  describe(providerId:string,modelId:string){if(!providerId||providerId==="byok")return {providerId:"byok",providerName:"",modelId:modelId||"",modelName:modelId||"Default"};const p=providerCatalog.find(x=>x.id===providerId);const catalog=this.catalog(providerId);const model=catalog.models.find(m=>m.id===modelId);return {providerId,providerName:p?.name||providerId,modelId:modelId||"",modelName:model?.name||modelId||""};}
+ /**
+  * The plan limits a provider reports.
+  *
+  * The reading is kept for a couple of minutes, so opening the screen does not start the provider's
+  * CLI over and over.
+  */
+ async usage(id:string,refresh=false):Promise<ProviderUsage>{
+  const cached=this.usages.get(id);
+  if(!refresh&&cached&&Date.now()-cached.at<120000)return cached.usage;
+  const p=provider(id);
+  const usage=await readUsage(p.id,p.name,{command:p.command,cwd:this.root||process.cwd(),env:process.env});
+  this.usages.set(id,{usage,at:Date.now()});
+  return usage;
+ }
  async status(refresh=false){
   const cached=this.statusCache;
   if(!refresh&&cached&&Date.now()-cached.at<60000)return cached.value;
@@ -153,6 +170,7 @@ export function registerProviderRoutes(app:Express,options:{port:number;root:str
  const installations=new Map<string,string>();
  app.get("/api/providers",async(req,res)=>res.json((await subscriptions.status(req.query.refresh==="1")).map(p=>({...p,installation:options.processes.jobs.get(installations.get(p.id)||"")||null}))));
  app.get("/api/providers/:id/models",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.models(p.id,req.query.refresh==="1"));});
+ app.get("/api/providers/:id/usage",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.usage(p.id,req.query.refresh==="1"));});
  app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(installCommand(p),options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
  app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}res.json(job);});
  app.post("/api/providers/:id/login",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const terminal=options.terminals.start(options.root);options.terminals.input(terminal.id,p.login+"\n");res.status(201).json({...terminal,provider:p.id,instruction:"Complete the vendor's login in this terminal. Credentials stay in the vendor CLI's phone-owned account directory."});});
