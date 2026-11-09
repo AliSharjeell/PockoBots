@@ -103,12 +103,12 @@ test("the prompt index is compact, capped, and never grants missing tools", asyn
 
 test("skill routes require the pairing token and bots see the index and loader", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pocko-skill-api-"));
-  const runtime = await createApp({stateDir: join(directory, "state"), workspace: join(directory, "workspace"), port: 19127});
-  const server = runtime.app.listen(19127, "127.0.0.1"); await new Promise<void>(r => server.on("listening", r));
+  const runtime = await createApp({stateDir: join(directory, "state"), workspace: join(directory, "workspace"), port: 19131});
+  const server = runtime.app.listen(19131, "127.0.0.1"); await new Promise<void>(r => server.on("listening", r));
   const headers = {Authorization: "Bearer " + runtime.token, "Content-Type": "application/json"};
-  const call = async (method: string, path: string, body?: unknown) => { const r = await fetch("http://127.0.0.1:19127/api" + path, {method, headers, body: body === undefined ? undefined : JSON.stringify(body)}); return {status: r.status, body: await r.json() as any}; };
+  const call = async (method: string, path: string, body?: unknown) => { const r = await fetch("http://127.0.0.1:19131/api" + path, {method, headers, body: body === undefined ? undefined : JSON.stringify(body)}); return {status: r.status, body: await r.json() as any}; };
   try {
-    assert.equal((await fetch("http://127.0.0.1:19127/api/skills")).status, 401);
+    assert.equal((await fetch("http://127.0.0.1:19131/api/skills")).status, 401);
     const src = await folder(directory, "api", {"SKILL.md": skillMd("api-skill"), "ref.md": "ref"});
     assert.equal((await call("POST", "/skills", {path: 42})).status, 400);
     assert.equal((await call("POST", "/skills", {path: src})).status, 201);

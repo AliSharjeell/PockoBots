@@ -115,8 +115,8 @@ test('handoff, cancel and lease renewal follow the rules',async()=>{
 
 test('task routes require the pairing token and validate input',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'pocko-task-api-'));
- const runtime=await createApp({stateDir:join(directory,'state'),workspace:join(directory,'workspace'),port:19127});const server=runtime.app.listen(19127,'127.0.0.1');await new Promise<void>(r=>server.on('listening',r));
- const base='http://127.0.0.1:19127/api/tasks',headers={Host:'127.0.0.1:19127',Authorization:'Bearer '+runtime.token,'Content-Type':'application/json'};
+ const runtime=await createApp({stateDir:join(directory,'state'),workspace:join(directory,'workspace'),port:19132});const server=runtime.app.listen(19132,'127.0.0.1');await new Promise<void>(r=>server.on('listening',r));
+ const base='http://127.0.0.1:19132/api/tasks',headers={Host:'127.0.0.1:19132',Authorization:'Bearer '+runtime.token,'Content-Type':'application/json'};
  const call=(path:string,body?:unknown)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)});
  try{
   assert.equal((await fetch(base,{headers:{Host:headers.Host}})).status,401);
