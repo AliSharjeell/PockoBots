@@ -97,7 +97,11 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     @Override protected void onSaveInstanceState(Bundle out){out.putString("bot",selected);out.putString("screen",screen);out.putString("homeSearch",homeSearchQuery);super.onSaveInstanceState(out);}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(oauthReturn(intent)){selected="";screen="Marketplace";if(api!=null)showScreen("Marketplace");return;}String id=intent.getStringExtra("botId");if(id!=null&&id.matches("[0-9a-f-]{36}")){if(api==null)selected=id;else open(id);}}
     @Override protected void onResume(){super.onResume();visible=true;foreground=true;if(BotLocationService.enabled(this)){if(BotLocationService.permitted(this))try{BotLocationService.enable(this);}catch(RuntimeException ignored){}else BotLocationService.disable(this);}getSharedPreferences("bot-runtime",0).edit().putBoolean("enabled",true).apply();startForegroundService(new Intent(this,RuntimeService.class).putExtra("botsEnabled",true));connect();}
-    private void connect(){if(!visible)return;if(!RuntimeService.ready){showLoadingScreen(RuntimeService.status);main.postDelayed(this::connect,1000);return;}try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());refresh(true);}catch(Exception e){error(e);}}
+    private void connect(){if(!visible)return;if(!RuntimeService.ready){showLoadingScreen(RuntimeService.status);main.postDelayed(this::connect,1000);return;}try{api=new AgentApi((String)new JSONTokener(Io.text(new File(getFilesDir(),"state/token.json"))).nextValue());refresh(true);
+        // The subscriptions screen asks for the providers of every vendor, which takes a moment.
+        // The list is asked for now, so the screen opens at once when it is opened.
+        marketplaceRequest("GET","/providers",null,value->{},error->{});
+    }catch(Exception e){error(e);}}
     @Override protected void onPause(){saveDraft();visible=false;foreground=false;main.removeCallbacks(poll);workspace.stop();super.onPause();}
     @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);workspace.stop();io.shutdownNow();inputs.shutdownNow();super.onDestroy();}
     private void saveDraft(){if(composer!=null)getSharedPreferences("bot-chats",0).edit().putString("draft-"+selected,composer.getText().toString()).apply();}
