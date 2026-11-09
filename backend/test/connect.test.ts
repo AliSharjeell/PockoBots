@@ -7,6 +7,12 @@ import { join } from "node:path";
 const { createApp } = process.env.POCKET_TEST_BUNDLE
   ? await import("../../dist/server.js")
   : await import("../src/server.js");
+const { Connect } = process.env.POCKET_TEST_BUNDLE
+  ? await import("../../dist/connect.js")
+  : await import("../src/connect.js");
+const { Store } = process.env.POCKET_TEST_BUNDLE
+  ? await import("../../dist/storage.js")
+  : await import("../src/storage.js");
 
 /**
  * A paired device reaches the phone through a tunnel, so it comes from another host. It carries a
@@ -121,8 +127,7 @@ test("a paired device reaches the chats from another host and nothing else", asy
 });
 
 /** A device that is given the whole phone may use the rest of it. */
-test("a device with the whole phone may use the rest of it", async () => {
-  const temp = await mkdtemp(join(tmpdir(), "pocket-connect-full-"));
+test("a device with the whole phone may use the rest of it", async () => {  const temp = await mkdtemp(join(tmpdir(), "pocket-connect-full-"));
   const socket = http.createServer();
   await new Promise<void>((r) => socket.listen(0, "127.0.0.1", r));
   const port = (socket.address() as any).port;
@@ -161,6 +166,69 @@ test("a device with the whole phone may use the rest of it", async () => {
   } finally {
     server.closeAllConnections();
     await new Promise<void>((r) => server.close(() => r()));
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The phone asks for the sign-in it needs before it makes a link.
+ *
+ * The Dev Tunnels CLI will not make a tunnel without an account, so the phone asks for one, shows
+ * the code the owner has to enter on another device, and makes the link once the sign-in is done.
+ */
+test("the phone asks for the sign-in before it makes a link", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "pocket-connect-signin-"));
+  const store = new Store(join(temp, "state"));
+  await store.init();
+  let signedIn = false;
+  let loginOutput = "";
+  const hosted: string[] = [];
+  const connect = new Connect(
+    store,
+    {
+      create: () => ({ id: "made", output: "", status: "running" }),
+      host: (name: string) => {
+        hosted.push(name);
+        return { id: "host", output: "https://phone-1234.usw2.devtunnels.ms", status: "running" };
+      },
+      stop: () => {},
+      output: () => loginOutput,
+      status: () => "running",
+      userShow: async () => (signedIn ? "Some Person\nuser@example.com" : "Not logged in."),
+      login: () => ({ id: "login", output: "", status: "running" }),
+    },
+    8787,
+  );
+  try {
+    await connect.init();
+    // The phone is not signed in, so it says so.
+    let view = await connect.poll();
+    assert.equal(view.signedIn, false);
+    assert.equal(view.devices.length, 0);
+    assert.equal(hosted.length, 0);
+
+    // A device paired now waits for the sign-in.
+    await connect.create("iPad");
+    view = await connect.poll();
+    assert.equal(view.devices.length, 1);
+    assert.equal(view.devices[0].url, "", "the link waits for the sign-in");
+    assert.equal(hosted.length, 0, "no tunnel is made before the sign-in");
+
+    // The sign-in starts, and the code is read from what the CLI says.
+    loginOutput = "Browse to https://github.com/login/device and enter the code: 3556-4454";
+    await connect.signIn();
+    view = await connect.poll();
+    assert.equal(view.signedIn, false);
+    assert.equal(view.login?.code, "3556-4454");
+    assert.equal(view.login?.url, "https://github.com/login/device");
+
+    // Once the sign-in is done, the link is made and the device carries it.
+    signedIn = true;
+    view = await connect.checkNow();
+    assert.equal(view.signedIn, true);
+    assert.equal(hosted.length, 1);
+    assert.equal(view.devices[0].url, "https://phone-1234.usw2.devtunnels.ms");
+  } finally {
     await rm(temp, { recursive: true, force: true });
   }
 });
