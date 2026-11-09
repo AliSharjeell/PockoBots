@@ -48,10 +48,10 @@ export const FALLBACK_MODELS: Record<string, ProviderModel[]> = {
     { id: "opencode/space-bunny-free", name: "Space Bunny Free", description: "Free OpenCode model." },
   ],
   gemini: [
-    { id: "gemini-3-pro", name: "Gemini 3 Pro", description: "The strongest Gemini model." },
-    { id: "gemini-3-flash", name: "Gemini 3 Flash", description: "A fast model for everyday work." },
+    { id: "auto", name: "Auto", description: "Let the Gemini CLI choose the model for the task." },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "A long-context Gemini model." },
-    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "The fastest Gemini model." },
+    { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", description: "A fast model for everyday work." },
+    { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", description: "The lightest and fastest Gemini model." },
   ],
   grok: [
     { id: "default", name: "Grok default", description: "Let the Grok CLI choose its own model." },
@@ -101,7 +101,41 @@ export const DISCOVERY_ARGS: Record<string, string[][]> = {
   opencode: [["acp"]],
   cursor: [["acp"]],
   grok: [["--no-auto-update", "agent", "stdio"]],
+  gemini: [["--acp"]],
 };
+
+/**
+ * A CLI that lists its models in plain text.
+ *
+ * The Gemini CLI answers `--list-models` with the models its own account can run, which is how its
+ * list stays current without anyone updating a table here.
+ */
+const LIST_COMMANDS: Record<string, { args: string[]; parse: (text: string) => ProviderModel[] }> = {
+  gemini: { args: ["--list-models"], parse: parseGeminiModels },
+};
+
+/**
+ * The models of a Gemini CLI listing.
+ *
+ * The listing puts each model at the left margin and its detail under it:
+ *
+ *   gemini-3.5-flash (gemini-3.5-flash)
+ *     Context limit: 1,048,576 input tokens / 8,192 output tokens
+ */
+export function parseGeminiModels(text: string): ProviderModel[] {
+  const models: ProviderModel[] = [];
+  const seen = new Set<string>();
+  for (const line of text.split("\n")) {
+    if (!line || /^\s/.test(line)) continue;
+    const match = /^(\S+)(?:\s+\(([^)]*)\))?\s*$/.exec(line.trim());
+    if (!match) continue;
+    const id = match[1]!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    models.push({ id, name: match[2]?.trim() || id, description: "" });
+  }
+  return models;
+}
 
 interface Rpc {
   request(method: string, params: unknown): Promise<any>;
@@ -244,10 +278,17 @@ export interface DiscoveryOptions {
  */
 export async function discoverModels(provider: string, options: DiscoveryOptions): Promise<ProviderModel[] | null> {
   const timeoutMs = options.timeoutMs ?? 10000;
-  const spellings = options.args ? [options.args] : DISCOVERY_ARGS[provider];
-  if (!spellings) return null;
+  const spelling = options.args ? [options.args] : DISCOVERY_ARGS[provider];
+  const listing = LIST_COMMANDS[provider];
+  // A CLI that lists its models in plain text answers faster than a protocol handshake, but it
+  // still has to start, and a vendor CLI starts slowly on a phone.
+  if (listing) {
+    const models = await modelsFromListing(options.command, options.args ?? listing.args, listing.parse, Math.max(timeoutMs, 40000), options);
+    if (models.length) return models;
+  }
+  if (!spelling) return null;
   const jsonrpc = provider !== "codex";
-  for (const args of spellings) {
+  for (const args of spelling) {
     const rpc = openRpc(options.command, args, { cwd: options.cwd, env: options.env, jsonrpc });
     try {
       if (provider === "codex") {
@@ -273,6 +314,46 @@ export async function discoverModels(provider: string, options: DiscoveryOptions
     }
   }
   return null;
+}
+
+/** The models a CLI listed in plain text. */
+async function modelsFromListing(
+  command: string,
+  args: string[],
+  parse: (text: string) => ProviderModel[],
+  timeoutMs: number,
+  options: DiscoveryOptions
+): Promise<ProviderModel[]> {
+  try {
+    const text = await runToText(command, args, timeoutMs, options);
+    return parse(text);
+  } catch {
+    return [];
+  }
+}
+
+/** Runs a command and keeps what it printed. */
+function runToText(command: string, args: string[], timeoutMs: number, options: DiscoveryOptions): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: options.cwd, env: options.env, stdio: ["ignore", "pipe", "pipe"] });
+    let text = "";
+    const append = (chunk: Buffer) => (text = (text + chunk.toString()).slice(-20000));
+    child.stdout.on("data", append);
+    child.stderr.on("data", append);
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("The vendor CLI did not answer in time."));
+    }, timeoutMs);
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(text);
+      else reject(new Error("The vendor CLI did not answer."));
+    });
+  });
 }
 
 /**

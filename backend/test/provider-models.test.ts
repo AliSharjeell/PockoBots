@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { discoverModels, catalogFor, claudeModelName, FALLBACK_MODELS, DISCOVERY_ARGS } from "../src/provider-models.js";
+import { discoverModels, catalogFor, claudeModelName, parseGeminiModels, FALLBACK_MODELS, DISCOVERY_ARGS } from "../src/provider-models.js";
 
 const fixture = (name: string) => fileURLToPath(new URL("./fixtures/" + name, import.meta.url));
 
@@ -64,4 +64,35 @@ test("a Claude model id becomes the name a person would say", () => {
   assert.equal(claudeModelName("claude-haiku-4-5[1m]"), "Claude Haiku 4.5 (1M context)");
   assert.equal(claudeModelName("gpt-6-luna"), null);
   assert.equal(claudeModelName("claude-opus"), null);
+});
+
+test("a CLI that lists its models in plain text is read", () => {
+  const listing = [
+    "Available Gemini Models:",
+    "",
+    "auto (Auto)",
+    "  Description:   Let Gemini CLI decide the best model for the task",
+    "  Context limit: 1,048,576 input tokens / 8,192 output tokens",
+    "",
+    "gemini-3.5-flash (gemini-3.5-flash)",
+    "  Context limit: 1,048,576 input tokens / 8,192 output tokens",
+    "",
+    "gemini-2.5-pro (gemini-2.5-pro)",
+    "  Context limit: 1,048,576 input tokens / 8,192 output tokens",
+  ].join("\n");
+  const models = parseGeminiModels(listing);
+  assert.deepEqual(models.map((m) => m.id), ["auto", "gemini-3.5-flash", "gemini-2.5-pro"]);
+  assert.equal(models[0].name, "Auto");
+  assert.equal(models[1].name, "gemini-3.5-flash");
+});
+
+test("a Gemini model list is asked of the Gemini CLI", async () => {
+  const listing = "Available Gemini Models:\n\ngemini-3.5-flash (gemini-3.5-flash)\n";
+  const models = await discoverModels("gemini", {
+    command: process.execPath,
+    args: ["-e", `console.log(${JSON.stringify(listing)})`],
+    cwd: process.cwd(),
+    env: process.env,
+  });
+  assert.deepEqual(models?.map((m) => m.id), ["gemini-3.5-flash"]);
 });
