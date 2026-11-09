@@ -25,6 +25,7 @@ import { BrowserBridge } from "./browser-bridge.js";
 import {Previews} from './previews.js';
 import {Webhooks} from './webhooks.js';
 import {BackupModel} from './backup-model.js';
+import {Memory,registerMemoryRoutes} from "./memory.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -79,6 +80,7 @@ export async function createApp(options: {
   const browserBridge = new BrowserBridge(token, options.browserBridgeBase);
   const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews, browserBridge);
   await bots.init();
+  const memory=new Memory(store);await memory.init();bots.memory=memory;
   const webhooks = new Webhooks(store, bots); await webhooks.init();
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
@@ -182,6 +184,7 @@ export async function createApp(options: {
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
   registerProviderRoutes(app,{port,root:workspace.root,processes,terminals,token});
   registerMarketplaceApi(app,connectors,()=>sessions.anyBusy()||mobile.anyBusy());
+  registerMemoryRoutes(app,memory);
   app.get("/api/groups",(_req,res)=>res.type("json").send(redact(groups.list())));
   app.post("/api/groups",async(req,res)=>res.status(201).json(await groups.create(req.body.name,req.body.botIds)));
   app.get("/api/groups/:id",(req,res)=>res.type("json").send(redact(groups.state(req.params.id))));
