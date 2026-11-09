@@ -62,13 +62,13 @@ $env:JAVA_HOME = 'C:\tmp\pocket-runtime-research\jdk17\jdk-17.0.20.1+1'
 .\android\gradlew.bat -p android --no-daemon :app:assembleDebug -PenableMobileUse
 ```
 
-**The Artemis accessibility service is deliberately not declared in that
-manifest.** Declaring `BIND_ACCESSIBILITY_SERVICE` made Google Play Protect's
-fraud checks block the sideload ("Blocked to protect your device"), and the
-install failed for people who never intended to grant accessibility. The helper
-classes stay in the source set, so the phone-control code still compiles and
-still reports whether accessibility was enabled. Do not add the service back
-without a way to install around the block.
+**That manifest declares the Artemis accessibility service**, which is what
+makes this edition the phone-control build. Declaring
+`BIND_ACCESSIBILITY_SERVICE` is what Google Play Protect's fraud checks block,
+so the release notes have to carry the way around it: turn off *"Scan apps with
+Play Protect"* for the install, or use **Files > More details > Install
+anyway**. The Standard manifest declares no accessibility service and installs
+without any of that.
 
 ### One ABI, or both
 

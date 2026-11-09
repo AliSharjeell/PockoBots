@@ -112,11 +112,11 @@ Two builds are available under **[GitHub Releases](https://github.com/AliSharjee
 | Edition | File | Best for | Google Play Protect |
 | --- | --- | --- | --- |
 | **PockoBots (Standard)** *(Recommended)* | `pockobots-v0.2-debug.apk` | Most users. Full local coding agent, interactive Node.js/Python/Git runtime, floating pill overlay, Chrome previews, background services, ringing alerts, and webhooks. | **Installs seamlessly.** Zero sensitive permission triggers or fraud blocks. |
-| **PockoBots Mobile Use** | `pockobots-mobileuse-v0.2-debug.apk` | Power users. Everything in Standard, with its own label and the phone-control build. | **Installs seamlessly.** The accessibility service is no longer declared, so Play Protect does not block the sideload. |
+| **PockoBots Mobile Use** | `pockobots-mobileuse-v0.2-debug.apk` | Power users. Everything in Standard + the on-device Artemis accessibility service for automated on-screen third-party app interaction. | May trigger Play Protect's sensitive permission warning because it declares `BIND_ACCESSIBILITY_SERVICE`. |
 
 > [!TIP]
 > **Installing the Mobile Use Edition:**
-> The Mobile Use APK no longer declares the accessibility service, so Google Play Protect's fraud checks do not block it and no Play Protect setting has to be changed. If an older build was blocked with *"Blocked to protect your device"*, install this release instead of turning off *"Scan apps with Play Protect"*.
+> Google Play Protect's Enhanced Fraud Protection automatically blocks browser sideloads declaring accessibility services. If your phone shows *"Blocked to protect your device"*, simply open **Google Play Store > tap your profile icon > Play Protect > tap Settings ⚙️ > toggle off "Scan apps with Play Protect"** temporarily to install, or install via your phone's built-in **Files** app using *"More details → Install anyway"*.
 
 ### How to install on your phone
 
