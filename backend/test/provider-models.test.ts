@@ -58,6 +58,15 @@ test("a CLI that answers owns the list the app shows", () => {
   assert.equal(catalog.models[0]?.id, "from-cli");
 });
 
+test("Gemini shows the names the app ships, not the older ones its CLI lists", () => {
+  const catalog = catalogFor("gemini", [
+    { id: "auto", name: "Auto", description: "" },
+    { id: "gemini-2.5-pro", name: "gemini-2.5-pro", description: "" },
+  ]);
+  assert.equal(catalog.source, "fallback");
+  assert.deepEqual(catalog.models.map((m) => m.id), ["gemini-3.8-flash", "gemini-4-argon"]);
+});
+
 test("a Claude model id becomes the name a person would say", () => {
   assert.equal(claudeModelName("claude-opus-4-6"), "Claude Opus 4.6");
   assert.equal(claudeModelName("claude-sonnet-4-6-20260101"), "Claude Sonnet 4.6");

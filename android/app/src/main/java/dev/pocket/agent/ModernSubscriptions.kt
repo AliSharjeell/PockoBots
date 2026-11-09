@@ -826,7 +826,7 @@ fun ModernSubscriptionsContent(
                     SearchField(query, "Search models", dark, onQuery)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = if (selected.modelSource == "cli") "Asked of your ${selected.name} CLI" else "Built-in list · ask the CLI for a fresh one",
+                        text = if (selected.modelSource == "cli") "Asked of your ${selected.name} CLI" else "Built-in list · type a model of your own above",
                         color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 4.dp)

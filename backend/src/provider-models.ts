@@ -48,10 +48,8 @@ export const FALLBACK_MODELS: Record<string, ProviderModel[]> = {
     { id: "opencode/space-bunny-free", name: "Space Bunny Free", description: "Free OpenCode model." },
   ],
   gemini: [
-    { id: "auto", name: "Auto", description: "Let the Gemini CLI choose the model for the task." },
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "A long-context Gemini model." },
-    { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", description: "A fast model for everyday work." },
-    { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", description: "The lightest and fastest Gemini model." },
+    { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", description: "A fast model for everyday work." },
+    { id: "gemini-4-argon", name: "Gemini 4 Argon", description: "A model for hard problems." },
   ],
   grok: [
     { id: "default", name: "Grok default", description: "Let the Grok CLI choose its own model." },
@@ -119,7 +117,7 @@ const LIST_COMMANDS: Record<string, { args: string[]; parse: (text: string) => P
  *
  * The listing puts each model at the left margin and its detail under it:
  *
- *   gemini-3.5-flash (gemini-3.5-flash)
+ *   gemini-3.8-flash (gemini-3.8-flash)
  *     Context limit: 1,048,576 input tokens / 8,192 output tokens
  */
 export function parseGeminiModels(text: string): ProviderModel[] {
@@ -359,10 +357,12 @@ function runToText(command: string, args: string[], timeoutMs: number, options: 
 /**
  * The model list to show for a provider.
  *
- * A CLI that answered owns the list. A CLI that did not leaves the shipped list in place, and the
- * source says which one the app is showing.
+ * A CLI that answered owns the list, with Gemini as the exception: its CLI answers with an older
+ * set of names than the app ships, so the shipped list is the one shown for it. The app never
+ * claims a provider said something it did not, so the source says which list is on the screen.
  */
 export function catalogFor(provider: string, discovered: ProviderModel[] | null): ModelCatalog {
+  if (provider === "gemini") return { models: FALLBACK_MODELS.gemini, source: "fallback" };
   if (discovered && discovered.length) return { models: discovered, source: "cli" };
   return { models: FALLBACK_MODELS[provider] ?? [], source: "fallback" };
 }
