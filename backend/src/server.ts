@@ -29,6 +29,8 @@ import {Jev,registerJevRoutes} from './jev.js';
 import {registerCardRoutes} from './cards.js';
 import {Skills, registerSkillRoutes} from "./skills.js";
 import { Tasks, registerTaskRoutes } from "./tasks.js";
+import {Memory,registerMemoryRoutes} from "./memory.js";
+import {Tracking,registerTrackingRoutes} from "./tracking.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -87,6 +89,8 @@ export async function createApp(options: {
   const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews, browserBridge);
   await bots.init();
   const skills = new Skills(store); await skills.init(); bots.setSkills(skills);
+  const memory=new Memory(store);await memory.init();bots.memory=memory;
+  const tracking=new Tracking(store,id=>bots.find(id)?.id===id,(id,text)=>bots.alert(id,text,false));await tracking.init();bots.checks=now=>tracking.run(now);
   const webhooks = new Webhooks(store, bots); await webhooks.init();
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
@@ -195,6 +199,7 @@ export async function createApp(options: {
   registerCardRoutes(app,{cards:id=>sessions.cards(id),redact,select:(id,card,option)=>{const bot=bots.list().find(b=>b.sessionId===id);return sessions.selectCard(id,card,option,bot?async text=>(await bots.sendOwnerMessage(bot.id,text)).delivery:undefined);}});
   registerSkillRoutes(app, skills);
   registerTaskRoutes(app, tasks);
+  registerMemoryRoutes(app,memory);registerTrackingRoutes(app,tracking);
   app.get("/api/groups",(_req,res)=>res.type("json").send(redact(groups.list())));
   app.post("/api/groups",async(req,res)=>res.status(201).json(await groups.create(req.body.name,req.body.botIds)));
   app.get("/api/groups/:id",(req,res)=>res.type("json").send(redact(groups.state(req.params.id))));
