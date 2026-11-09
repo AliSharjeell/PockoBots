@@ -78,8 +78,27 @@ public class BotBrowserManager {
         BotBrowserInstance existing = instances.get(botId);
         if (existing != null) return existing;
 
+        // A WebView belongs to the main thread. A bot that asks for a browser it has never had
+        // would otherwise make one on a worker thread, and the page would never open.
+        if (Looper.myLooper() == Looper.getMainLooper()) return create(context, botId);
+        BotBrowserInstance[] made = new BotBrowserInstance[1];
+        mainHandler.post(() -> made[0] = create(context, botId));
+        long deadline = System.currentTimeMillis() + 5000;
+        while (made[0] == null && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return made[0];
+    }
+
+    /** Makes the browser of a bot and keeps it. */
+    private BotBrowserInstance create(Context context, String botId) {
         synchronized (instances) {
-            existing = instances.get(botId);
+            BotBrowserInstance existing = instances.get(botId);
             if (existing != null) return existing;
 
             Context targetContext = context != null ? context : appContext;
