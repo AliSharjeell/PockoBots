@@ -127,3 +127,25 @@ export function validPort(port: unknown): number {
 export function tunnelCommand(port: number, anonymous: boolean) {
   return `devtunnel host -p ${validPort(port)}${anonymous ? " --allow-anonymous" : ""}`;
 }
+
+/**
+ * The name a tunnel keeps.
+ *
+ * A tunnel that is made once and hosted under that name keeps the same link, so a device that was
+ * paired keeps working when the phone restarts.
+ */
+export function tunnelName(value: unknown): string {
+  const name = String(value || "").trim();
+  if (!/^[a-zA-Z0-9-]{3,60}$/.test(name)) throw Error("That tunnel name cannot be used");
+  return name;
+}
+
+/** The command that makes a tunnel that keeps its name. */
+export function tunnelCreateCommand(name: string, port: number) {
+  return `devtunnel create ${tunnelName(name)} --port ${port}`;
+}
+
+/** The command that serves a tunnel that keeps its name. */
+export function tunnelHostCommand(name: string, port: number, anonymous = true) {
+  return `devtunnel host ${tunnelName(name)} --port ${port}${anonymous ? " --allow-anonymous" : ""}`;
+}

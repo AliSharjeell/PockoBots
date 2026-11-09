@@ -11,7 +11,8 @@ import {
   type Settings,
 } from "./storage.js";
 import { Workspace } from "./workspace.js";
-import { Processes, validPort, tunnelCommand } from "./processes.js";
+import { Processes, validPort, tunnelCommand, tunnelCreateCommand, tunnelHostCommand } from "./processes.js";
+import { Connect, allowsChatRoute } from "./connect.js";
 import { Sessions } from "./sessions.js";
 import { Projects } from "./projects.js";
 import { Terminals } from "./terminals.js";
@@ -64,6 +65,20 @@ export async function createApp(options: {
   };
   const processes = new Processes(publish);
   const terminals = new Terminals(publish);
+  // The devices that may talk to this phone, and the tunnels that carry them.
+  const connect = new Connect(
+    store,
+    {
+      create: (name: string, p: number) =>
+        processes.start(tunnelCreateCommand(name, p), workspace.root, "tunnel", p, "Pair device tunnel " + name),
+      host: (name: string, p: number) =>
+        processes.start(tunnelHostCommand(name, p), workspace.root, "tunnel", p, "Pair device tunnel " + name),
+      stop: (id: string) => processes.stop(id),
+      output: (id: string) => processes.jobs.get(id)?.output || "",
+    },
+    port,
+  );
+  await connect.init();
   const sessions = new Sessions(
     store,
     workspace,
@@ -83,10 +98,18 @@ export async function createApp(options: {
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
   app.disable("x-powered-by");
+  // A paired device carries a key of its own. It reaches the phone through a tunnel, so it comes
+  // from another host, and the owner's own key stays on this phone.
   app.use((req, res, next) => {
     const isWebhook = req.path === "/api/webhooks/bot" || req.path.startsWith("/api/webhooks/bot/");
+    const candidate = req.headers.authorization?.replace(/^Bearer /, "") || "";
+    const digest = (x: string) => createHash("sha256").update(x).digest();
+    const owner = timingSafeEqual(digest(candidate), digest(token));
+    const paired = !owner && !!connect.find(candidate);
     const host = req.headers.host;
-    if (!isWebhook && host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
+    // The owner's own key only opens the phone from the phone itself. A paired device is the one
+    // thing that may come from another host, because that is where it lives.
+    if (!isWebhook && !paired && host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
       res.status(403).json({ error: "Invalid host" });
       return;
     }
@@ -95,7 +118,8 @@ export async function createApp(options: {
       req.headers.origin &&
       ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(
         req.headers.origin,
-      )
+      ) &&
+      !paired
     ) {
       res.status(403).json({ error: "Invalid origin" });
       return;
@@ -117,8 +141,18 @@ export async function createApp(options: {
     const candidate = req.headers.authorization?.replace(/^Bearer /, "") || "";
     const digest = (x: string) => createHash("sha256").update(x).digest();
     if (!timingSafeEqual(digest(candidate), digest(token))) {
-      res.status(401).json({ error: "Pairing token required" });
-      return;
+      const device = connect.find(candidate);
+      if (!device) {
+        res.status(401).json({ error: "Pairing token required" });
+        return;
+      }
+      // A device with the chat scope reaches the conversations and nothing else.
+      const wanted = (req.originalUrl || req.path).split("?")[0];
+      if (device.scope === "chat" && !allowsChatRoute(wanted)) {
+        res.status(403).json({ error: "This device may only use the chats" });
+        return;
+      }
+      void connect.seen(candidate);
     }
     res.set("Cache-Control", "no-store");
     next();
@@ -387,6 +421,22 @@ export async function createApp(options: {
         ),
       ),
   );
+  // The devices that may talk to this phone. Only the owner's own key reaches these.
+  app.get("/api/clients", (_req, res) => res.json(connect.view()));
+  app.post("/api/clients", async (req, res) => {
+    const name = String(req.body?.name || "A device").slice(0, 60);
+    const scope = req.body?.scope === "full" ? "full" : "chat";
+    res.status(201).json(await connect.create(name, scope));
+  });
+  app.put("/api/clients/:id/scope", async (req, res) => {
+    const device = await connect.setScope(req.params.id, req.body?.scope === "full" ? "full" : "chat");
+    if (!device) throw Error("That device is not paired any more");
+    res.json(device);
+  });
+  app.delete("/api/clients/:id", async (req, res) => {
+    await connect.remove(req.params.id);
+    res.json({ ok: true });
+  });
   app.post("/api/tunnels", (req, res) => {
     const p = validPort(req.body.port);
     if (p === port) throw Error("Do not tunnel the agent control port");
