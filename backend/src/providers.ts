@@ -37,7 +37,7 @@ export function provider(id: string) {const p=(providerCatalog as readonly Provi
 /** npm takes flags that quieten its output. A vendor's own installer does not. */
 export function installCommand(p:{install:string}) {return p.install.startsWith("npm install")?p.install+" --no-fund --no-audit --loglevel=http":p.install;}
 
-async function probe(command:string,args:string[],timeout=15000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
+async function probe(command:string,args:string[],timeout=8000):Promise<{code:number|null;text:string}>{return new Promise(resolve=>{const child=spawn(command,args,{stdio:["ignore","pipe","pipe"]});let text="";const append=(b:Buffer)=>text=(text+b.toString()).slice(-8000);child.stdout.on("data",append);child.stderr.on("data",append);const timer=setTimeout(()=>{child.kill();resolve({code:null,text:""});},timeout);child.once("error",()=>{clearTimeout(timer);resolve({code:null,text:""});});child.once("close",code=>{clearTimeout(timer);resolve({code,text});});});}
 
 /** The vendor CLI owns login and token refresh. No vendor credentials are imported. */
 export class SubscriptionProviders {
@@ -50,6 +50,7 @@ export class SubscriptionProviders {
  private usages=new Map<string,{usage:ProviderUsage;at:number}>();
  private refreshing=new Map<string,Promise<void>>();
  private statusCache:{value:any[];at:number}|null=null;
+ private statusReading:Promise<any[]>|null=null;
  configure(base:string,token:string,root?:string){this.base=base;this.apiToken=token;if(root)this.root=root;}
  /** The model list to show for a provider: the CLI's own list once it has answered, else the shipped one. */
  private catalog(id:string){const cached=this.catalogs.get(id);return cached?cached.catalog:catalogFor(id,null);}
@@ -87,21 +88,37 @@ export class SubscriptionProviders {
  async status(refresh=false){
   const cached=this.statusCache;
   if(!refresh&&cached&&Date.now()-cached.at<60000)return cached.value;
-  const value=await Promise.all(providerCatalog.map(async p=>{
-   if(!p.supported)return {...p,installed:false,authenticated:false};
-   const version=await probe(p.command,["--version"]),installed=version.code===0;
-   let authenticated:boolean|null=null;
-   if(installed){
-    if(p.id==="codex"||p.id==="claude"){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}
-    else if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
-    else{const auth=await probe(p.command,["login","status"]);authenticated=auth.code===0?true:null;}
-    void this.refreshCatalog(p.id);
-   }
-   const catalog=this.catalog(p.id);
-   return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
-  }));
-  this.statusCache={value,at:Date.now()};
-  return value;
+  // A reading of a moment ago is better than a wait, so it is served while a fresh one is asked for.
+  if(!refresh&&cached){void this.refreshStatus();return cached.value;}
+  return this.refreshStatus();
+ }
+ /** Asks every provider's CLI about itself, and keeps the answer for a minute. */
+ private async refreshStatus():Promise<any[]>{
+  const running=this.statusReading;
+  if(running)return running;
+  const work=(async()=>{
+   try{
+    const value=await Promise.all(providerCatalog.map(async p=>{
+     if(!p.supported)return {...p,installed:false,authenticated:false};
+     // The version and the sign-in are asked of at the same time, so a provider takes half as long.
+     const authArgs=p.id==="codex"?["login","status"]:p.id==="claude"?["auth","status"]:["login","status"];
+     const [version,auth]=await Promise.all([probe(p.command,["--version"]),probe(p.command,authArgs)]);
+     const installed=version.code===0;
+     let authenticated:boolean|null=null;
+     if(installed){
+      if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
+      else authenticated=auth.code===0?true:null;
+      void this.refreshCatalog(p.id);
+     }
+     const catalog=this.catalog(p.id);
+     return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+    }));
+    this.statusCache={value,at:Date.now()};
+    return value;
+   }finally{this.statusReading=null;}
+  })();
+  this.statusReading=work;
+  return work;
  }
  async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");const callId=randomUUID();run.onActivity?.({type:"tool_execution_start",toolCallId:callId,toolName:tool.name,args:input.arguments||{}});try{const result=await tool.execute(callId,input.arguments||{},run.signal);run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result,isError:!!(result as any).isError});return result;}catch(error){run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result:"Tool failed",isError:true});throw error;}}
  async run(id:string,options:{effort?:Effort;cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}){
