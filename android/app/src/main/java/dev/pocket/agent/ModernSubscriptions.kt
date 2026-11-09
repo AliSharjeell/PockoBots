@@ -59,6 +59,8 @@ data class SubscriptionProviderData(
     val installed: Boolean,
     val authenticated: Boolean,
     val signInRequired: Boolean = true,
+    /** False while the CLI has not said yet whether it is signed in. */
+    val signInKnown: Boolean = true,
     val version: String,
     val docs: String,
     val models: List<SubscriptionModelData>,
@@ -194,6 +196,8 @@ private fun statusLine(provider: SubscriptionProviderData): String = when {
     !provider.supported -> "Not available on this phone"
     provider.installing -> "Installing on this phone"
     !provider.installed -> "Not installed on this phone"
+    // The CLI has not answered yet, so nothing is claimed about its sign-in.
+    !provider.signInKnown -> if (provider.version.isEmpty()) "Installed · checking" else "Installed ${provider.version} · checking"
     provider.authenticated -> if (provider.version.isEmpty()) "Signed in" else "Signed in · ${provider.version}"
     !provider.signInRequired -> if (provider.version.isEmpty()) "Installed · free models" else "Installed ${provider.version} · free models"
     else -> "Installed · sign-in needed"
@@ -250,6 +254,78 @@ private fun SearchField(value: String, placeholder: String, dark: Boolean, onCha
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+}
+
+/**
+ * A model name of the owner's own.
+ *
+ * A provider's list is the list it knows, and a model that is newer than that list is still worth
+ * trying, so the name can be written down and used as it is.
+ */
+@Composable
+private fun CustomModelField(
+    value: String,
+    dark: Boolean,
+    onChange: (String) -> Unit,
+    onUse: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (dark) Color(0xFF1D2233) else Color(0xFFF1F5F9))
+                    .border(1.dp, if (dark) Color(0xFF222738) else Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "Model name to try",
+                            color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                            fontSize = 14.sp
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onChange,
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = if (dark) PockoColors.TextPrimaryDark else PockoColors.TextPrimaryLight,
+                            fontSize = 14.sp
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = { onUse(value.trim()) },
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PockoColors.PrimaryBlue.copy(alpha = 0.18f)),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.height(46.dp),
+                enabled = value.isNotBlank()
+            ) {
+                Text(
+                    text = "Use",
+                    color = PockoColors.PrimaryBlue,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Try a model the list does not name yet.",
+            color = if (dark) Color(0xFF64748B) else Color(0xFF94A3B8),
+            fontSize = 11.sp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }
 
@@ -488,9 +564,12 @@ fun ModernSubscriptionsContent(
     dark: Boolean,
     usage: ProviderUsageData?,
     usageLoading: Boolean,
+    customModel: String,
     onSelectProvider: (String) -> Unit,
     onQuery: (String) -> Unit,
     onSelectModel: (String) -> Unit,
+    onCustomModel: (String) -> Unit,
+    onUseCustomModel: (String) -> Unit,
     onInstall: (String) -> Unit,
     onSignIn: (String) -> Unit,
     onUse: (String, String) -> Unit,
@@ -506,6 +585,8 @@ fun ModernSubscriptionsContent(
             it.name.contains(needle, ignoreCase = true) || it.id.contains(needle, ignoreCase = true)
         }
     }
+    // A model the owner wrote down is shown even when the provider does not list it.
+    val custom = customModel.trim().takeIf { it.isNotEmpty() && filtered.none { model -> model.id == it } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -675,6 +756,7 @@ fun ModernSubscriptionsContent(
                         when {
                             selected.installing -> Unit
                             !selected.installed -> onInstall(selected.id)
+                            !selected.signInKnown -> Unit
                             !selected.authenticated && selected.signInRequired -> onSignIn(selected.id)
                             else -> onUse(selected.id, selectedModel)
                         }
@@ -685,12 +767,13 @@ fun ModernSubscriptionsContent(
                     ),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                     modifier = Modifier.height(42.dp),
-                    enabled = !selected.installing
+                    enabled = !selected.installing && selected.signInKnown
                 ) {
                     Text(
                         text = when {
                             selected.installing -> "Installing…"
                             !selected.installed -> "Install CLI"
+                            !selected.signInKnown -> "Checking…"
                             !selected.authenticated && selected.signInRequired -> "Sign in"
                             else -> "Use this subscription"
                         },
@@ -738,6 +821,8 @@ fun ModernSubscriptionsContent(
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    CustomModelField(customModel, dark, onCustomModel, onUseCustomModel)
+                    Spacer(modifier = Modifier.height(10.dp))
                     SearchField(query, "Search models", dark, onQuery)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -746,6 +831,17 @@ fun ModernSubscriptionsContent(
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
+                }
+            }
+
+            // A model of the owner's own is shown above the list, so it is the one in use.
+            if (custom != null && filtered.none { it.id == custom }) {
+                item {
+                    ModelRow(
+                        SubscriptionModelData(custom, custom, "Your own model name."),
+                        custom == selectedModel,
+                        dark
+                    ) { onSelectModel(custom) }
                 }
             }
 
@@ -785,6 +881,7 @@ object ModernSubscriptions {
                 val error = controller.error.value
                 val usage = controller.usage.value
                 val usageLoading = controller.usageLoading.value
+                val customModel = controller.customModel.value
                 ModernSubscriptionsContent(
                     providers = providers,
                     selectedId = selectedId,
@@ -796,9 +893,12 @@ object ModernSubscriptions {
                     dark = AgentStyle.dark,
                     usage = usage,
                     usageLoading = usageLoading,
+                    customModel = customModel,
                     onSelectProvider = { controller.select(it) },
                     onQuery = { controller.query.value = it },
                     onSelectModel = { controller.selectedModel.value = it },
+                    onCustomModel = { controller.customModel.value = it },
+                    onUseCustomModel = { controller.useCustom(it) },
                     onInstall = { controller.install(it) },
                     onSignIn = { controller.signIn(it) },
                     onUse = { id, model -> controller.use(id, model) },
@@ -828,8 +928,14 @@ class SubscriptionsController(
     /** How much of the plan is left, as the provider's own CLI reported it. */
     val usage = mutableStateOf<ProviderUsageData?>(null)
     val usageLoading = mutableStateOf(false)
+    /** A model name the owner wrote down, for a model the provider does not list. */
+    val customModel = mutableStateOf("")
 
     private var epoch = 0
+    /** The install has a generation of its own, so a reload cannot stop its poll. */
+    private var installEpoch = 0
+    /** How many times the list is read again while a sign-in state is still unknown. */
+    private var signInReads = 0
 
     fun load() {
         val current = ++epoch
@@ -839,8 +945,14 @@ class SubscriptionsController(
             if (current != epoch) return@marketplaceRequest
             loading.value = false
             val list = (value as? JSONArray) ?: JSONArray()
-            providers.value = (0 until list.length()).mapNotNull { index ->
+            val fresh = (0 until list.length()).mapNotNull { index ->
                 (list.optJSONObject(index) ?: return@mapNotNull null).let(::parseProvider)
+            }
+            // An installation that is running here is kept: the reading says nothing about it.
+            providers.value = fresh.map { next ->
+                val current = providers.value.firstOrNull { it.id == next.id }
+                if (current == null || !current.installing) next
+                else next.copy(installing = true, installOutput = current.installOutput, installFailed = current.installFailed)
             }
             val settings = app.currentState().optJSONObject("settings")
             activeProvider.value = settings?.optString("executionProvider", "byok") ?: "byok"
@@ -859,6 +971,9 @@ class SubscriptionsController(
             }
             selectedModel.value = if (models.any { it.id == chosen }) chosen else ""
             if (selectedId.value.isNotEmpty()) loadUsage(selectedId.value)
+            // A CLI that is installed answers whether it is signed in a moment later, so the
+            // list is read again when that answer is still missing.
+            if (providers.value.any { it.installed && !it.signInKnown }) scheduleSignInRead()
         }, { message ->
             if (current != epoch) return@marketplaceRequest
             loading.value = false
@@ -901,6 +1016,39 @@ class SubscriptionsController(
         })
     }
 
+    /**
+     * Reads the list of providers again, without touching the selection or the models.
+     *
+     * The install state of a card is kept: the reading says nothing about it.
+     */
+    private fun refreshProviders() {
+        app.marketplaceRequest("GET", "/providers", null, { value ->
+            val list = (value as? JSONArray) ?: return@marketplaceRequest
+            val fresh = (0 until list.length()).mapNotNull { index ->
+                (list.optJSONObject(index) ?: return@mapNotNull null).let(::parseProvider)
+            }
+            providers.value = providers.value.map { current ->
+                val next = fresh.firstOrNull { it.id == current.id } ?: return@map current
+                current.copy(
+                    installed = next.installed,
+                    authenticated = next.authenticated,
+                    signInKnown = next.signInKnown,
+                    version = next.version,
+                    models = if (next.models.isEmpty()) current.models else next.models,
+                    modelSource = next.modelSource
+                )
+            }
+            if (providers.value.any { it.installed && !it.signInKnown }) scheduleSignInRead()
+        }, { })
+    }
+
+    /** Reads the list again in a moment, until every sign-in state is known. */
+    private fun scheduleSignInRead() {
+        if (signInReads >= 5) return
+        signInReads++
+        app.mainHandler().postDelayed({ refreshProviders() }, 4000)
+    }
+
     /** Picks a provider and asks its CLI which models it can run. */
     fun select(id: String) {
         selectedId.value = id
@@ -929,14 +1077,16 @@ class SubscriptionsController(
     }
 
     fun install(id: String) {
-        val current = ++epoch
+        // An install has its own generation. Picking another provider or reloading the list must
+        // not stop the poll, or the button waits for ever and the CLI lands on the phone unseen.
+        val current = ++installEpoch
         update(id) { it.copy(installing = true, installOutput = "", installFailed = false) }
         app.marketplaceRequest("POST", "/providers/$id/install", app.json(), { value ->
-            if (current != epoch) return@marketplaceRequest
+            if (current != installEpoch) return@marketplaceRequest
             val job = value as? JSONObject ?: return@marketplaceRequest
             pollInstall(id, job.optString("id"), current)
         }, { message ->
-            if (current != epoch) return@marketplaceRequest
+            if (current != installEpoch) return@marketplaceRequest
             update(id) { it.copy(installing = false, installFailed = true, installOutput = message ?: "Installation failed.") }
         })
     }
@@ -944,7 +1094,7 @@ class SubscriptionsController(
     private fun pollInstall(id: String, jobId: String, current: Int) {
         if (jobId.isEmpty()) return
         app.marketplaceRequest("GET", "/providers/$id/install/$jobId", null, { value ->
-            if (current != epoch) return@marketplaceRequest
+            if (current != installEpoch) return@marketplaceRequest
             val job = value as? JSONObject ?: return@marketplaceRequest
             val output = job.optString("output")
             if (job.optString("status") == "running") {
@@ -960,9 +1110,10 @@ class SubscriptionsController(
                     installOutput = if (ok) "Installation complete. Sign in to finish." else output.takeLast(400)
                 )
             }
+            // The CLI is on the phone now, so the list is read again and the card says so.
             if (ok) load()
         }, { message ->
-            if (current != epoch) return@marketplaceRequest
+            if (current != installEpoch) return@marketplaceRequest
             update(id) { it.copy(installing = true, installOutput = message ?: "Reconnecting to installation…") }
             app.mainHandler().postDelayed({ pollInstall(id, jobId, current) }, 2000)
         })
@@ -999,12 +1150,31 @@ class SubscriptionsController(
         if (docs.isNotEmpty()) app.openUrl(docs)
     }
 
+    /**
+     * Uses a model the provider does not list.
+     *
+     * The name is written down as it is, so a model that is newer than the CLI's list can still
+     * be tried.
+     */
+    fun useCustom(model: String) {
+        val name = model.trim()
+        if (name.isEmpty()) return
+        customModel.value = name
+        val id = selectedId.value
+        if (id.isEmpty()) return
+        selectedModel.value = name
+        use(id, name)
+    }
+
     private fun update(id: String, change: (SubscriptionProviderData) -> SubscriptionProviderData) {
         providers.value = providers.value.map { if (it.id == id) change(it) else it }
     }
 
     private fun parseProvider(json: JSONObject): SubscriptionProviderData {
         val models = json.optJSONArray("models")
+        // An installation that is still running is reported by the backend, so a card says so even
+        // when the screen was opened again while the CLI was being installed.
+        val installation = json.optJSONObject("installation")
         return SubscriptionProviderData(
             id = json.optString("id"),
             name = json.optString("name"),
@@ -1013,6 +1183,7 @@ class SubscriptionsController(
             installed = json.optBoolean("installed"),
             authenticated = json.optBoolean("authenticated"),
             signInRequired = json.optBoolean("signInRequired", true),
+            signInKnown = json.optBoolean("signInKnown", true),
             version = json.optString("version"),
             docs = json.optString("docs"),
             models = (0 until (models?.length() ?: 0)).mapNotNull { index ->
@@ -1023,7 +1194,9 @@ class SubscriptionsController(
                     description = model.optString("description")
                 )
             }.filter { it.id.isNotEmpty() },
-            modelSource = json.optString("modelSource")
+            modelSource = json.optString("modelSource"),
+            installing = installation != null && installation.optString("status") == "running",
+            installOutput = installation?.optString("output")?.takeLast(400) ?: ""
         )
     }
 }
@@ -1070,9 +1243,12 @@ private fun PreviewSubscriptionsDark() {
                 note = ""
             ),
             usageLoading = false,
+            customModel = "",
             onSelectProvider = {},
             onQuery = {},
             onSelectModel = {},
+            onCustomModel = {},
+            onUseCustomModel = {},
             onInstall = {},
             onSignIn = {},
             onUse = { _, _ -> },
