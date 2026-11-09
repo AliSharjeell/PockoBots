@@ -58,7 +58,7 @@ setting. Amber dots identify a waiting task, and green dots identify completion.
 
 The APK includes the actual Artemis native accessibility helper, pinned to
 [`google/artemis` commit 351ca842](https://github.com/google/artemis/tree/351ca8422f7b5b54e80a9c1ce03a222e02415b6b).
-Since v0.7.0 the released APK does not **declare** that accessibility service.
+Since v0.2 the released APK does not **declare** that accessibility service.
 Declaring `BIND_ACCESSIBILITY_SERVICE` made Google Play Protect's fraud checks
 block the sideload, and the install failed for people who never intended to
 grant accessibility. The helper stays in the build, so the code still reports

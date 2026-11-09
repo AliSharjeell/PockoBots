@@ -28,7 +28,7 @@ android {
     compileSdk 36
     ndkVersion '27.2.12479018'
     externalNativeBuild { ndkBuild { path file('src/main/cpp/Android.mk') } }
-    defaultConfig { applicationId providers.gradleProperty('qaInstall').isPresent() ? 'dev.pocket.agent.qa' : 'dev.pocket.agent'; minSdk 26; targetSdk 35; versionCode 8; versionName '0.7.0' }
+    defaultConfig { applicationId providers.gradleProperty('qaInstall').isPresent() ? 'dev.pocket.agent.qa' : 'dev.pocket.agent'; minSdk 26; targetSdk 35; versionCode 8; versionName '0.2' }
     defaultConfig { testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }

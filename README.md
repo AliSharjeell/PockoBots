@@ -8,7 +8,7 @@
 An open-source, phone-hosted alternative to Muse, Grok Bot and Dots.<br>
 **Free app · No platform subscription · Bring your own model · Local execution**
 
-[Website](https://pockobots.com) · [Download v0.7.0 APK (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.7.0) · [Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.7.0) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
+[Website](https://pockobots.com) · [Download v0.2 APK (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.2) · [Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.2) · [See the app](#see-it-in-action) · [Try a task](#try-a-task) · [Get started](#get-started) · [How it compares](#how-it-compares) · [Build it](#build-from-source) · [Contact](mailto:alisharjeelofficial@gmail.com)
 
 </div>
 
@@ -98,21 +98,21 @@ LinkedIn or Instagram account is claimed. See the [measured display results](doc
 ## Get started
 
 > [!WARNING]
-> **This is v0.7.0 beta — it may have issues.**
+> **This is v0.2 beta — it may have issues.**
 > PockoBots runs complex local agent runtimes, package managers, and background services directly on your Android device. Android battery management, vendor-specific background killers, and device sleep may cause unexpected interruptions. Please report any issues or edge cases on GitHub!
 
 <p align="center">
-  <img src="docs/images/landing-install.png" width="800" alt="PockoBots v0.7.0 Beta Installation Guide" />
+  <img src="docs/images/landing-install.png" width="800" alt="PockoBots v0.2 Beta Installation Guide" />
 </p>
 
 ### Choose your edition
 
-Two builds are available under **[GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.7.0)**:
+Two builds are available under **[GitHub Releases](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.2)**:
 
 | Edition | File | Best for | Google Play Protect |
 | --- | --- | --- | --- |
-| **PockoBots (Standard)** *(Recommended)* | `pockobots-v0.7.0-debug.apk` | Most users. Full local coding agent, interactive Node.js/Python/Git runtime, floating pill overlay, Chrome previews, background services, ringing alerts, and webhooks. | **Installs seamlessly.** Zero sensitive permission triggers or fraud blocks. |
-| **PockoBots Mobile Use** | `pockobots-mobileuse-v0.7.0-debug.apk` | Power users. Everything in Standard, with its own label and the phone-control build. | **Installs seamlessly.** The accessibility service is no longer declared, so Play Protect does not block the sideload. |
+| **PockoBots (Standard)** *(Recommended)* | `pockobots-v0.2-debug.apk` | Most users. Full local coding agent, interactive Node.js/Python/Git runtime, floating pill overlay, Chrome previews, background services, ringing alerts, and webhooks. | **Installs seamlessly.** Zero sensitive permission triggers or fraud blocks. |
+| **PockoBots Mobile Use** | `pockobots-mobileuse-v0.2-debug.apk` | Power users. Everything in Standard, with its own label and the phone-control build. | **Installs seamlessly.** The accessibility service is no longer declared, so Play Protect does not block the sideload. |
 
 > [!TIP]
 > **Installing the Mobile Use Edition:**
@@ -121,7 +121,7 @@ Two builds are available under **[GitHub Releases](https://github.com/AliSharjee
 ### How to install on your phone
 
 1. **Download the APK:**
-   Download either **[PockoBots (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.7.0)** or the **[Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.7.0)** directly to your Android device.
+   Download either **[PockoBots (Standard)](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.2)** or the **[Mobile Use Edition](https://github.com/AliSharjeell/PockoBots/releases/tag/v0.2)** directly to your Android device.
 2. **Allow installation from your browser or file manager:**
    Tap the downloaded `.apk` file. If Android displays a security prompt saying your phone isn't allowed to install unknown apps from this source, tap **Settings** and enable **Allow from this source**, then tap **Install**.
 3. **First launch & runtime unpack:**

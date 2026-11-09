@@ -85,7 +85,7 @@ Both write to the same output path, so copy the APK before building the other
 ABI:
 
 ```powershell
-Copy-Item .\android\app\build\outputs\apk\debug\app-debug.apk .\pockobots-v0.7.0-x86_64-debug.apk
+Copy-Item .\android\app\build\outputs\apk\debug\app-debug.apk .\pockobots-v0.2-x86_64-debug.apk
 ```
 
 ## Install and run on the emulator
