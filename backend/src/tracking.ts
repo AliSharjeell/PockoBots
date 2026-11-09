@@ -47,7 +47,7 @@ export async function safeFetchText(href: string, options: FetchOptions = {}): P
         const status = response.statusCode || 0;
         if (status >= 300 && status < 400 && response.headers.location) { response.resume(); resolve({status, location: response.headers.location, text: ""}); return; }
         const chunks: Buffer[] = []; let size = 0;
-        response.on("data", (chunk: Buffer) => { size += chunk.length; if (size > maxBytes) { request.destroy(Error("The page is larger than " + maxBytes + " bytes")); return; } chunks.push(chunk); });
+        response.on("data", (chunk: Buffer) => { size += chunk.length; if (size > maxBytes) { reject(Error("The page is larger than " + maxBytes + " bytes")); request.destroy(); return; } chunks.push(chunk); });
         response.on("end", () => resolve({status, text: Buffer.concat(chunks).toString("utf8")}));
         response.on("error", reject);
       });
@@ -134,7 +134,9 @@ export class Tracking {
   async createWatch(input: any, now = Date.now()) {
     if (this.watches.length >= 50) throw Error("Page check limit reached (50)");
     if (typeof input?.botId !== "string" || !this.botExists(input.botId)) throw Error("Choose a bot to send the alerts");
-    const url = checkUrl(typeof input.url === "string" && input.url.length <= 2000 ? input.url : "").href;
+    const parsed = checkUrl(typeof input.url === "string" && input.url.length <= 2000 ? input.url : ""), url = parsed.href;
+    const host = parsed.hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host.endsWith(".localhost") || (isIP(host) && isBlockedAddress(host))) throw Error("This address is private or local and cannot be checked");
     const kind = input.kind ?? "changed";
     if (!["changed", "text", "price"].includes(kind)) throw Error("Choose changed, text or price");
     const intervalMinutes = input.intervalMinutes ?? 60;
