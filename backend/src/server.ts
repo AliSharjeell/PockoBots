@@ -26,6 +26,7 @@ import {Previews} from './previews.js';
 import {Webhooks} from './webhooks.js';
 import {BackupModel} from './backup-model.js';
 import {Memory,registerMemoryRoutes} from "./memory.js";
+import {Tracking,registerTrackingRoutes} from "./tracking.js";
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -81,6 +82,7 @@ export async function createApp(options: {
   const bots = new Bots(store, projects, sessions, mobile, connectors, publish, text => backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text)),previews, browserBridge);
   await bots.init();
   const memory=new Memory(store);await memory.init();bots.memory=memory;
+  const tracking=new Tracking(store,id=>bots.find(id)?.id===id,(id,text)=>bots.alert(id,text,false));await tracking.init();bots.checks=now=>tracking.run(now);
   const webhooks = new Webhooks(store, bots); await webhooks.init();
   const groups = new Groups(store,bots,publish,text=>backup.redact(connectors.redact(settings.apiKey ? text.split(settings.apiKey).join("[redacted]") : text))); await groups.init();
   const app = express();
@@ -184,7 +186,7 @@ export async function createApp(options: {
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
   registerProviderRoutes(app,{port,root:workspace.root,processes,terminals,token});
   registerMarketplaceApi(app,connectors,()=>sessions.anyBusy()||mobile.anyBusy());
-  registerMemoryRoutes(app,memory);
+  registerMemoryRoutes(app,memory);registerTrackingRoutes(app,tracking);
   app.get("/api/groups",(_req,res)=>res.type("json").send(redact(groups.list())));
   app.post("/api/groups",async(req,res)=>res.status(201).json(await groups.create(req.body.name,req.body.botIds)));
   app.get("/api/groups/:id",(req,res)=>res.type("json").send(redact(groups.state(req.params.id))));
