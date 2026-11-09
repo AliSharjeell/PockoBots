@@ -25,6 +25,8 @@ import { BrowserBridge } from "./browser-bridge.js";
 import {Previews} from './previews.js';
 import {Webhooks} from './webhooks.js';
 import {BackupModel} from './backup-model.js';
+import {Jev,registerJevRoutes} from './jev.js';
+import {registerCardRoutes} from './cards.js';
 import { testConnection } from "./models.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -42,6 +44,7 @@ export async function createApp(options: {
   await store.init();
   const token = await store.token();
   const backup=new BackupModel(store);await backup.init();
+  const jev=new Jev(store);await jev.init();
   let settings = validateSettings(
     await store.read<Settings>("settings", defaults),
     defaults,
@@ -54,9 +57,9 @@ export async function createApp(options: {
   const connectors = new Connectors(store, `http://127.0.0.1:${port}/api/oauth/mcp/callback`); await connectors.init();
   const redact = (value: unknown) => {
     const json = JSON.stringify(value);
-    return backup.redact(connectors.redact(settings.apiKey
+    return jev.redact(backup.redact(connectors.redact(settings.apiKey
       ? json.split(settings.apiKey).join("[redacted]")
-      : json));
+      : json)));
   };
   const publish = (e: unknown) => {
     const data = `data: ${redact(e)}\n\n`;
@@ -73,6 +76,7 @@ export async function createApp(options: {
     projects,
   );
   await sessions.init();
+  sessions.jev=jev;
   const mobile = new MobileTasks(store, () => backup.current(settings), token, publish, options.mobileBridgeBase);
   await mobile.init();
   const previews=new Previews(store);await previews.init();
@@ -182,6 +186,9 @@ export async function createApp(options: {
   app.get("/api/projects", (_req, res) => res.json(projects.list()));
   registerProviderRoutes(app,{port,root:workspace.root,processes,terminals,token});
   registerMarketplaceApi(app,connectors,()=>sessions.anyBusy()||mobile.anyBusy());
+  registerJevRoutes(app,jev);
+  // A bot's session is answered through its queue, so the run keeps the bot's role and tools.
+  registerCardRoutes(app,{cards:id=>sessions.cards(id),redact,select:(id,card,option)=>{const bot=bots.list().find(b=>b.sessionId===id);return sessions.selectCard(id,card,option,bot?async text=>(await bots.sendOwnerMessage(bot.id,text)).delivery:undefined);}});
   app.get("/api/groups",(_req,res)=>res.type("json").send(redact(groups.list())));
   app.post("/api/groups",async(req,res)=>res.status(201).json(await groups.create(req.body.name,req.body.botIds)));
   app.get("/api/groups/:id",(req,res)=>res.type("json").send(redact(groups.state(req.params.id))));
