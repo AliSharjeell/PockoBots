@@ -31,6 +31,21 @@ if applicable. The current app does not bundle an offline language model. With a
 cloud provider, model requests and relevant conversation, tool output or phone
 screenshots leave the device.
 
+## What's new in v0.2
+
+- **Each Bot inside PockoBots now gets a Browser to control.** Every bot has its
+  own browser with its own tabs, its own logins and its own place in the chat, so
+  a bot can open a page, sign in and keep working on the site while you do
+  something else.
+- **Bring your own existing subscriptions (GPT, Claude, Gemini, etc).** Sign in
+  to the vendor CLI you already pay for — Codex, Claude Code, Gemini, Grok or
+  Cursor — and PockoBots runs on it. Your credentials stay in the vendor's own
+  storage on your phone; PockoBots never imports or copies them. The app shows
+  your plan's usage limits where they belong.
+- **Free OpenCode Models Available Inside PockoBots (DeepSeek v4.1 Flash, GLM
+  5.3 Flash, +10 more).** OpenCode's free models run without an account and
+  without a key, so a bot can answer before you have signed in to anything.
+
 ## See it in action
 
 PockoBots live demo: autonomous AI bots running on an Android phone, executing tasks, and managing workflows.
@@ -62,6 +77,8 @@ Repeated app/page reopening pauses instead of looping indefinitely.
 | --- | --- |
 | Build and run software | Edit files, clone repositories, run Git, install dependencies, execute commands and start development servers. |
 | Read the web | Every bot includes [Agent-Reach](docs/AGENT_REACH.md) for public web and platform readers. No separate installation; internet access and upstream service limits apply. |
+| Work in its own browser | Every bot gets a browser of its own, with tabs, saved logins and remembered sessions. You can open, switch and close those tabs yourself while the bot works. |
+| Run on your own plan | Bring the subscription you already pay for — Codex, Claude Code, Gemini, Grok or Cursor — or use OpenCode's free models (DeepSeek V4.1 Flash, GLM 5.3 Flash and more) with no account at all. |
 | Use your phone | Operate visible Android apps and the browser through the integrated Artemis helper. The bot chooses its tools from the task. |
 | Keep working in the background | Queue tasks, run proactive routines, retain notes and notify you while the app is closed. |
 | Work as a team | Create customized bots with separate chats and workspaces; group chats retain each speaker, and bots can delegate bounded tasks to teammates. |
@@ -79,9 +96,13 @@ coding, browsing and phone capabilities. There are no mode switches or default
 daily run caps.
 
 Settings supports BYOK and phone-side CLI adapters for Codex, Claude Code,
-OpenCode and Gemini. Vendor login, eligibility and usage limits remain with the
-vendor. See [subscription setup and limits](docs/SUBSCRIPTIONS.md) and the
-[MCP marketplace guide](docs/MCP_MARKETPLACE.md). Google Workspace needs your
+OpenCode, Gemini, Grok and Cursor. You can install a vendor's CLI from the app,
+sign in to it, and PockoBots asks that CLI for the models it can run rather than
+trusting a shipped table — and you can type a model name of your own when a new
+one appears. Vendor login, eligibility and usage limits remain with the vendor:
+the app shows your plan's limits when the CLI reports them, and shows no reading
+when it does not. See [subscription setup and limits](docs/SUBSCRIPTIONS.md) and
+the [MCP marketplace guide](docs/MCP_MARKETPLACE.md). Google Workspace needs your
 OAuth client configuration; a catalog entry alone is not an authorized connection.
 
 Hidden native-app control is experimental. A YouTube secondary-display experiment
