@@ -137,7 +137,7 @@ export function browserTools(botId: string, bridge: BrowserBridge): AgentTool<an
       name: "browser_type",
       label: "Enter text into input",
       description:
-        "Focus and enter text into an input field, search box, or textarea by its numeric ID.",
+        "Focus and enter text into an input field, search box, textarea or rich-text box by its numeric ID. A dropdown picks the option with that value or that visible label. When the text does not go in, the reason comes back with it.",
       parameters: Type.Object({
         id: Type.Integer({ minimum: 1, description: "Numeric element ID from browser_observe" }),
         text: Type.String({ maxLength: 4000, description: "Text to enter into the field" }),

@@ -524,7 +524,7 @@ public class BotBrowserInstance {
         String domIndexerJs =
             "(function() {" +
             "  try {" +
-            "    const selectors = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], [role=\"checkbox\"], [role=\"menuitem\"], [onclick], [tabindex=\"0\"]';" +
+            "    const selectors = 'a, button, input, select, textarea, [contenteditable], [role=\"button\"], [role=\"link\"], [role=\"checkbox\"], [role=\"menuitem\"], [onclick], [tabindex=\"0\"]';" +
             "    const elements = Array.from(document.querySelectorAll(selectors));" +
             "    const items = [];" +
             "    let index = 1;" +
@@ -605,38 +605,106 @@ public class BotBrowserInstance {
     }
 
     // --- ACT: Input text by bot index ---
-    public CompletableFuture<Boolean> inputTextById(int id, String text, boolean clear) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        String safeText = text != null ? text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "") : "";
+    /**
+     * Types text into the element that carries the given index.
+     *
+     * The setter for a field's value lives on the prototype of the element's own kind, and an
+     * input and a textarea each have their own. Calling the wrong one throws, which is why a
+     * textarea used to come back as a failure while an input was fine. The prototype of the
+     * element itself is asked instead, so a text field, a textarea and a dropdown are all typed
+     * into.
+     *
+     * The answer carries the reason when the text did not go in, so the agent is told what went
+     * wrong instead of only that something did.
+     */
+    public CompletableFuture<JSONObject> inputTextById(int id, String text, boolean clear) {
+        CompletableFuture<JSONObject> future = new CompletableFuture<>();
+        String safeText = org.json.JSONObject.quote(text != null ? text : "");
         String js = String.format(
             "(function() {" +
-            "  const el = document.querySelector('[data-bot-idx=\"%d\"]');" +
-            "  if (el) {" +
-            "    el.scrollIntoView({block: 'center', inline: 'center'});" +
+            "  try {" +
+            "    const el = document.querySelector('[data-bot-idx=\"%d\"]');" +
+            "    if (!el) return JSON.stringify({ ok: false, error: 'No element with that ID is on the page.' });" +
+            "    if (el.disabled || el.readOnly) return JSON.stringify({ ok: false, error: 'That field cannot be typed into.' });" +
+            "    const tag = (el.tagName || '').toLowerCase();" +
+            "    if (tag === 'select') {" +
+            "      const wanted = %s;" +
+            "      const options = Array.from(el.options || []);" +
+            "      const match = options.find(o => o.value === wanted)" +
+            "                 || options.find(o => (o.label || o.textContent || '').trim() === wanted.trim());" +
+            "      if (!match) return JSON.stringify({ ok: false, error: 'That dropdown has no option called ' + wanted," +
+            "                                                          options: options.map(o => o.value) });" +
+            "      el.value = match.value;" +
+            "      el.dispatchEvent(new Event('input', { bubbles: true }));" +
+            "      el.dispatchEvent(new Event('change', { bubbles: true }));" +
+            "      return JSON.stringify({ ok: true, value: el.value });" +
+            "    }" +
+            "    el.scrollIntoView({ block: 'center', inline: 'center' });" +
             "    el.focus();" +
-            "    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ?" +
-            "                   Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set : null;" +
-            "    const val = %s ? '%s' : (el.value || '') + '%s';" +
-            "    if (setter) { setter.call(el, val); } else { el.value = val; }" +
+            "    const value = %s ? %s : (el.value || '') + %s;" +
+            "    if (el.isContentEditable) {" +
+            "      el.textContent = value;" +
+            "    } else {" +
+            "      let setter = null;" +
+            "      let proto = Object.getPrototypeOf(el);" +
+            "      while (proto && !setter) {" +
+            "        const desc = Object.getOwnPropertyDescriptor(proto, 'value');" +
+            "        if (desc && desc.set) setter = desc.set;" +
+            "        else proto = Object.getPrototypeOf(proto);" +
+            "      }" +
+            "      if (setter) { setter.call(el, value); } else { el.value = value; }" +
+            "    }" +
             "    el.dispatchEvent(new Event('input', { bubbles: true }));" +
             "    el.dispatchEvent(new Event('change', { bubbles: true }));" +
-            "    return 'true';" +
+            "    return JSON.stringify({ ok: true, value: el.value === undefined ? '' : el.value });" +
+            "  } catch (err) {" +
+            "    return JSON.stringify({ ok: false, error: String((err && err.message) || err) });" +
             "  }" +
-            "  return 'false';" +
-            "})();", id, clear ? "true" : "false", safeText, safeText);
+            "})();", id, safeText, clear ? "true" : "false", safeText, safeText);
 
         mainHandler.post(() -> {
             Tab active = getActiveTab();
             if (active == null) {
-                future.complete(false);
+                future.complete(answer(false, "The browser has no page open."));
                 return;
             }
-            active.webView.evaluateJavascript(js, result -> {
-                boolean success = result != null && result.contains("true");
-                future.complete(success);
-            });
+            active.webView.evaluateJavascript(js, result -> future.complete(readAnswer(result)));
         });
         return future;
+    }
+
+    /** The answer of a page, with the reason when there is one. */
+    private static JSONObject answer(boolean ok, String message) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("ok", ok);
+            if (message != null) json.put("error", message);
+            return json;
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    /**
+     * Reads the answer of a script that answers with a JSON string.
+     *
+     * A script that answers with a string arrives here quoted, so the string is read first and
+     * the JSON inside it after that.
+     */
+    private static JSONObject readAnswer(String raw) {
+        if (raw == null || raw.isEmpty() || "null".equals(raw)) {
+            return answer(false, "The page did not answer.");
+        }
+        try {
+            String text = raw.trim();
+            if (text.startsWith("\"")) {
+                Object value = new org.json.JSONTokener(text).nextValue();
+                text = value == null ? "" : String.valueOf(value);
+            }
+            return new JSONObject(text);
+        } catch (Exception e) {
+            return answer(false, "The page did not answer.");
+        }
     }
 
     // --- ACT: Tap coordinates directly on WebView memory buffer ---

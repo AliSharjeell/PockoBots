@@ -349,8 +349,14 @@ public class BotBrowserServer extends Thread {
                     sendJson(out, 400, new JSONObject().put("error", "Missing or invalid element id"));
                     return;
                 }
-                boolean success = browser.inputTextById(id, text, clear).get(5, TimeUnit.SECONDS);
-                sendJson(out, 200, new JSONObject().put("success", success).put("id", id));
+                JSONObject answer = browser.inputTextById(id, text, clear).get(5, TimeUnit.SECONDS);
+                boolean success = answer.optBoolean("ok", false);
+                JSONObject res = new JSONObject().put("success", success).put("id", id);
+                // The reason travels with the answer, so the agent is told why the text did not go in.
+                if (!success && answer.has("error")) res.put("error", answer.optString("error"));
+                if (answer.has("options")) res.put("options", answer.optJSONArray("options"));
+                if (answer.has("value")) res.put("value", answer.optString("value"));
+                sendJson(out, 200, res);
                 break;
             }
 
