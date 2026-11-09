@@ -132,22 +132,28 @@ final class BotWorkspace {
         EditText name=app.field(content,"Device name",Build.MODEL,false);
         LinearLayout actions=row();content.addView(actions);
         app.button(actions,"Pair a new device",()->{
-            try{app.requestQuiet("POST","/clients",app.json("name",name.getText().toString().trim()),value->{if(epoch==generation)loadClients(content,epoch);},()->Toast.makeText(app,"That device could not be paired",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}
+            try{app.requestQuiet("POST","/clients",app.json("name",name.getText().toString().trim()),value->{if(epoch==generation)loadClients(list,epoch);},()->Toast.makeText(app,"That device could not be paired",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}
         },true);
-        content.addView(app.muted("The link is made with a Microsoft Dev Tunnel. Sign in to Dev Tunnels once under Servers & sharing if the link does not appear.",12));
-        loadClients(content,epoch);
+        LinearLayout list=column();content.addView(list);
+        loadClients(list,epoch);
     }
     /** Reads the paired devices and draws what the owner needs to see. */
-    private void loadClients(LinearLayout content,int epoch){
+    private void loadClients(LinearLayout list,int epoch){
         app.marketplaceRequest("GET","/clients",null,value->{
             if(epoch!=generation)return;
-            JSONArray devices=value instanceof JSONArray?(JSONArray)value:new JSONArray();
-            if(devices.length()==0){content.addView(app.muted("No device is paired yet.",13));return;}
-            for(int i=0;i<devices.length();i++){
+            JSONObject state=value instanceof JSONObject?(JSONObject)value:new JSONObject();
+            boolean signedIn=state.optBoolean("signedIn",true);
+            JSONArray devices=state.optJSONArray("devices");
+            list.removeAllViews();
+            if(!signedIn)signInCard(list,state.optJSONObject("login"),epoch);
+            boolean waiting=false;
+            if(devices==null||devices.length()==0){list.addView(app.muted("No device is paired yet.",13));}
+            for(int i=0;devices!=null&&i<devices.length();i++){
                 JSONObject device=devices.optJSONObject(i);if(device==null)continue;
                 String link=device.optString("url"),key=device.optString("token"),title=device.optString("name");
-                content.addView(text(title,17));
-                content.addView(app.muted(link.isEmpty()?"Making the link…":link,12));
+                if(link.isEmpty())waiting=true;
+                list.addView(text(title,17));
+                list.addView(app.muted(link.isEmpty()?"Making the link…":link,12));
                 if(!link.isEmpty()&&!key.isEmpty()){
                     JSONObject pairing=new JSONObject();try{pairing.put("url",link);pairing.put("token",key);pairing.put("device",Build.MODEL);}catch(Exception ignored){}
                     ImageView code=qrCode(pairing.toString(),dp(220));
@@ -157,15 +163,39 @@ final class BotWorkspace {
                         holder.setBackground(AgentStyle.surface(app,0xffffffff,18,true));
                         holder.addView(code,new LinearLayout.LayoutParams(dp(220),dp(220)));
                         holder.addView(app.muted("Scan with the PockoBots client",11));
-                        content.addView(holder,new LinearLayout.LayoutParams(-1,-2));
+                        list.addView(holder,new LinearLayout.LayoutParams(-1,-2));
                     }
                 }
-                LinearLayout row=row();content.addView(row);
+                LinearLayout row=row();list.addView(row);
                 button(row,"Copy the link",()->{android.content.ClipboardManager clip=(android.content.ClipboardManager)app.getSystemService(Context.CLIPBOARD_SERVICE);clip.setPrimaryClip(android.content.ClipData.newPlainText("PockoBots",link+"  key: "+key));Toast.makeText(app,"Copied",Toast.LENGTH_SHORT).show();});
                 button(row,"Unpair",()->{try{app.requestQuiet("DELETE","/clients/"+device.optString("id"),app.json(),v->{if(epoch==generation)show(body,"Connect",project);},()->Toast.makeText(app,"That device could not be paired",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}});
-                View divider=new View(app);divider.setBackgroundColor(AgentStyle.BORDER);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+                View divider=new View(app);divider.setBackgroundColor(AgentStyle.BORDER);list.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
             }
-        },error->{if(epoch==generation)content.addView(app.muted("The paired devices could not be read: "+error,12));});
+            // The sign-in is done on another device and the link takes a moment to appear, so the
+            // page keeps looking until both are done.
+            if(!signedIn||waiting)main.postDelayed(()->{if(epoch==generation)loadClients(list,epoch);},2500);
+        },error->{if(epoch==generation)list.addView(app.muted("The paired devices could not be read: "+error,12));});
+    }
+    /** The card that asks for the sign-in the phone still owes. */
+    private void signInCard(LinearLayout list,JSONObject login,int epoch){
+        list.addView(text("Sign in to Dev Tunnels",17));
+        list.addView(app.muted("A Microsoft Dev Tunnel needs this phone to sign in once. Open the page on any other device, enter the code, and come back here.",12));
+        String code=login==null?"":login.optString("code"),url=login==null?"":login.optString("url");
+        LinearLayout row=row();list.addView(row);
+        if(code.isEmpty()){
+            button(row,"Sign in to Dev Tunnels",()->{
+                try{app.requestQuiet("POST","/clients/login",app.json(),value->{if(epoch==generation)loadClients(list,epoch);},()->Toast.makeText(app,"The sign-in could not be started",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}
+            },true);
+            list.addView(app.muted("Waiting for the code…",12));
+            return;
+        }
+        TextView shown=text(code,26);shown.setTypeface(Typeface.MONOSPACE);shown.setTextColor(AgentStyle.TEXT);shown.setGravity(android.view.Gravity.CENTER);list.addView(shown);
+        list.addView(app.muted("Enter this code on the page below.",12));
+        button(row,"Copy the code",()->{android.content.ClipboardManager clip=(android.content.ClipboardManager)app.getSystemService(Context.CLIPBOARD_SERVICE);clip.setPrimaryClip(android.content.ClipData.newPlainText("PockoBots",code));Toast.makeText(app,"Copied",Toast.LENGTH_SHORT).show();});
+        if(!url.isEmpty())button(row,"Open the page",()->app.openUrl(url));
+        button(row,"Check again",()->{
+            try{app.requestQuiet("POST","/clients/check",app.json(),value->{if(epoch==generation)loadClients(list,epoch);},()->Toast.makeText(app,"The phone could not be asked",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}
+        });
     }
     /** The code that pairs a device, drawn as a picture. */
     private ImageView qrCode(String payload,int size){
