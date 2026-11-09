@@ -20,6 +20,9 @@ export const providerCatalog = [
  { id:"cursor", name:"Cursor", command:"cursor-agent", install:"mkdir -p \"$HOME/.local/bin\" && curl -fsSL https://cursor.com/install -fsS | bash", login:"cursor-agent login", docs:"https://cursor.com/docs/cli/overview", supported:true },
 ] as const;
 
+/** One provider of the catalogue, in the shape a caller reads it. */
+export type ProviderEntry = { readonly id:string; readonly name:string; readonly command:string; readonly install:string; readonly login:string; readonly docs:string; readonly supported:boolean; readonly reason?:string };
+
 /**
  * Providers that run without an account.
  *
@@ -28,7 +31,7 @@ export const providerCatalog = [
  */
 export const FREE_TIER_PROVIDERS = new Set<string>(["opencode"]);
 export type ExecutionProvider = "byok" | typeof providerCatalog[number]["id"];
-export function provider(id: string) {const p=providerCatalog.find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
+export function provider(id: string) {const p=(providerCatalog as readonly ProviderEntry[]).find(p=>p.id===id);if(!p)throw Error("Unknown subscription provider");return p;}
 
 /** npm takes flags that quieten its output. A vendor's own installer does not. */
 export function installCommand(p:{install:string}) {return p.install.startsWith("npm install")?p.install+" --no-fund --no-audit --loglevel=http":p.install;}
@@ -57,6 +60,13 @@ export class SubscriptionProviders {
  }
  /** The models a provider can run. A caller that wants fresh ones asks the CLI again. */
  async models(id:string,refresh=false){if(refresh)await this.refreshCatalog(id,true);else void this.refreshCatalog(id);return this.catalog(id);}
+ /**
+  * The names a provider and a model are shown by.
+  *
+  * A menu that shows these cannot show a raw identifier while it waits for the provider list, so the
+  * names travel with the state instead of being fetched again.
+  */
+ describe(providerId:string,modelId:string){if(!providerId||providerId==="byok")return {providerId:"byok",providerName:"",modelId:modelId||"",modelName:modelId||"Default"};const p=providerCatalog.find(x=>x.id===providerId);const catalog=this.catalog(providerId);const model=catalog.models.find(m=>m.id===modelId);return {providerId,providerName:p?.name||providerId,modelId:modelId||"",modelName:model?.name||modelId||""};}
  async status(){return Promise.all(providerCatalog.map(async p=>{
   if(!p.supported)return {...p,installed:false,authenticated:false};
   const version=await probe(p.command,["--version"]),installed=version.code===0;

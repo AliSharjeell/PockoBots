@@ -113,16 +113,19 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         TextView floating=text(MobileOverlayService.pinnedFor(selected)?"Dismiss floating bot":"Floating bot",14);floating.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(floating);floating.setOnClickListener(v->{popup.dismiss();toggleFloatingBot();});
         View divider=new View(this);divider.setBackgroundColor(AgentStyle.BORDER);menu.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
         JSONObject settings=state.optJSONObject("settings");String currentProvider=settings==null?"byok":settings.optString("executionProvider","byok"),currentModel=settings==null?"default":settings.optString("providerModel","default");
+        // The state carries the names the provider and the model are shown by, so the menu never has
+        // to show a raw identifier while it waits for the provider list.
+        JSONObject selection=state.optJSONObject("selection");String providerTitle=selection==null?"":selection.optString("providerName"),modelTitle=selection==null?"":selection.optString("modelName");
         LinearLayout providerChoices=column();providerChoices.setVisibility(View.GONE);
         LinearLayout providerRow=row();providerRow.setPadding(dp(10),dp(12),dp(10),dp(12));
         TextView providerLabel=text("Provider:",14);providerLabel.setPadding(0,0,dp(8),0);providerRow.addView(providerLabel);
         ImageView providerMark=new ImageView(this);providerMark.setColorFilter(AgentStyle.MUTED);providerMark.setImageResource(MarketplaceIcons.provider(currentProvider));providerRow.addView(providerMark,new LinearLayout.LayoutParams(dp(19),dp(19)));
-        TextView providerName=text(currentProvider.equals("byok")?"your own key":currentProvider+"  \u2304",14);providerName.setPadding(dp(6),0,dp(0),0);providerRow.addView(providerName,new LinearLayout.LayoutParams(0,-2,1));
+        TextView providerName=text(currentProvider.equals("byok")?"your own key":(providerTitle.isEmpty()?currentProvider:providerTitle)+"  \u2304",14);providerName.setPadding(dp(6),0,dp(0),0);providerRow.addView(providerName,new LinearLayout.LayoutParams(0,-2,1));
         menu.addView(providerRow);menu.addView(providerChoices);
         LinearLayout modelChoices=column();modelChoices.setVisibility(View.GONE);
         LinearLayout modelRow=row();modelRow.setPadding(dp(10),dp(12),dp(10),dp(12));
         TextView modelLabel=text("Model:",14);modelLabel.setPadding(0,0,dp(8),0);modelRow.addView(modelLabel);
-        TextView modelName=text(currentModel+"  \u2304",14);modelName.setPadding(dp(6),0,dp(0),0);modelRow.addView(modelName,new LinearLayout.LayoutParams(0,-2,1));
+        TextView modelName=text((modelTitle.isEmpty()?currentModel:modelTitle)+"  \u2304",14);modelName.setPadding(dp(6),0,dp(0),0);modelName.setSingleLine(true);modelName.setEllipsize(android.text.TextUtils.TruncateAt.END);modelRow.addView(modelName,new LinearLayout.LayoutParams(0,-2,1));
         menu.addView(modelRow);menu.addView(modelChoices);
         View divider2=new View(this);divider2.setBackgroundColor(AgentStyle.BORDER);menu.addView(divider2,new LinearLayout.LayoutParams(-1,dp(1)));
         String current=bot.optString("effort","high");TextView effort=text("Effort: "+current+"  \u2304",14);effort.setPadding(dp(10),dp(14),dp(10),dp(14));menu.addView(effort);

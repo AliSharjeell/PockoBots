@@ -18,7 +18,7 @@ import { Terminals } from "./terminals.js";
 import { MobileTasks } from "./mobile-tasks.js";
 import { Connectors } from "./connectors.js";
 import { Groups } from "./groups.js";
-import { registerProviderRoutes } from "./providers.js";
+import { registerProviderRoutes, subscriptions } from "./providers.js";
 import { registerMarketplaceApi, registerMarketplaceCallback } from "./marketplace-routes.js";
 import { Bots } from "./bots.js";
 import { BrowserBridge } from "./browser-bridge.js";
@@ -123,18 +123,24 @@ export async function createApp(options: {
     res.set("Cache-Control", "no-store");
     next();
   });
-  app.get("/api/state", (_req, res) =>
+  app.get("/api/state", (_req, res) => {
+    const view = backup.view(settings);
+    // Your own key runs the model of its own settings, not the model of the provider that was
+    // chosen before it.
+    const byok = (view.executionProvider ?? "byok") === "byok";
     res.json({
       workspace: workspace.root,
-      settings: backup.view(settings),
+      settings: view,
+      // The names the provider and the model are shown by, so a menu can name them without waiting.
+      selection: subscriptions.describe(view.executionProvider ?? "", byok ? (view.model ?? "") : (view.providerModel ?? "")),
       sessions: sessions.list(),
       jobs: [...processes.jobs.values()],
       projects: projects.list(),
       mobileTasks: mobile.list(),
       groups: groups.list(), bots: bots.list(), botEngineEnabled: bots.enabled, connectors: connectors.list(),
       webhooks: webhooks.getConfig(port),
-    }),
-  );
+    });
+  });
   app.get("/api/events", (req, res) => {
     if (clients.size >= 8) {
       res.status(429).json({ error: "Too many connections" });
