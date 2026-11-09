@@ -194,15 +194,23 @@ test("the phone asks for the sign-in before it makes a link", async () => {
       stop: () => {},
       output: () => loginOutput,
       status: () => "running",
-      userShow: async () => (signedIn ? "Some Person\nuser@example.com" : "Not logged in."),
+      userShow: async () => {
+        // The CLI takes seconds to start on the phone, so the page must not wait for it.
+        await new Promise((r) => setTimeout(r, 200));
+        return signedIn ? "Some Person\nuser@example.com" : "Not logged in.";
+      },
       login: () => ({ id: "login", output: "", status: "running" }),
     },
     8787,
   );
   try {
     await connect.init();
-    // The phone is not signed in, so it says so.
+    // The page is answered at once, without waiting for the CLI.
+    const started = Date.now();
     let view = await connect.poll();
+    assert.ok(Date.now() - started < 100, "the page is not held up by the CLI");
+    // The phone is not signed in, so it says so.
+    view = await connect.checkNow();
     assert.equal(view.signedIn, false);
     assert.equal(view.devices.length, 0);
     assert.equal(hosted.length, 0);
@@ -217,7 +225,7 @@ test("the phone asks for the sign-in before it makes a link", async () => {
     // The sign-in starts, and the code is read from what the CLI says.
     loginOutput = "Browse to https://github.com/login/device and enter the code: 3556-4454";
     await connect.signIn();
-    view = await connect.poll();
+    view = await connect.checkNow();
     assert.equal(view.signedIn, false);
     assert.equal(view.login?.code, "3556-4454");
     assert.equal(view.login?.url, "https://github.com/login/device");

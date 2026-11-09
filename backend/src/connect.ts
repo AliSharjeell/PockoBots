@@ -53,6 +53,7 @@ export class Connect {
   private signedIn: boolean | null = null;
   private checkedAt = 0;
   private checking: Promise<boolean> | null = null;
+  private refreshing: Promise<void> | null = null;
   /** The sign-in the phone is in the middle of. */
   private login: { id: string; output: string; status: string } | null = null;
   /** The tunnels that are open now, by the device they carry. */
@@ -77,12 +78,10 @@ export class Connect {
   async init() {
     this.devices = await this.store.read<PairedDevice[]>("clients", []);
     for (const device of this.devices) if (device.url) device.url = device.url.replace(/\/+$/, "");
-    // The sign-in is checked in the background, so the phone is ready straight away. A device
-    // that was paired before the phone restarted gets its tunnel back under the same name, so
-    // the link it was given still works.
-    void this.checkSignIn().then((signedIn) => {
-      if (signedIn) for (const device of this.devices) if (device.tunnel) this.openTunnel(device);
-    });
+    // The look is made in the background, so the phone is ready straight away. A device that was
+    // paired before the phone restarted gets its tunnel back under the same name, so the link it
+    // was given still works.
+    void this.refresh();
   }
 
   list(): PairedDevice[] {
@@ -134,12 +133,18 @@ export class Connect {
    * rather than waiting for a link that never comes.
    */
   private async checkSignIn(force = false): Promise<boolean> {
-    if (this.checking) return this.checking;
-    if (!force && Date.now() - this.checkedAt < 3000) return this.signedIn !== false;
+    if (this.checking) {
+      // Wait for the look that is running, then look again if the owner asked for it.
+      await this.checking;
+      if (!force) return this.signedIn !== false;
+    }
+    if (!force && Date.now() - this.checkedAt < 10000) return this.signedIn !== false;
     this.checking = (async () => {
       this.checkedAt = Date.now();
       try {
         const text = (await this.tunnel.userShow()).toLowerCase();
+        // A CLI that says nothing is a CLI that did not answer. The last answer stands.
+        if (!text.trim()) return this.signedIn !== false;
         const signedOut =
           text.includes("not logged in") ||
           text.includes("not signed in") ||
@@ -177,7 +182,8 @@ export class Connect {
    */
   async checkNow() {
     await this.checkSignIn(true);
-    return this.poll();
+    await this.refresh();
+    return this.view();
   }
 
   /** The page to open and the code to type into it, when the phone is signing in. */
@@ -213,29 +219,47 @@ export class Connect {
   }
 
   /**
-   * Looks at the phone now: whether the CLI is signed in, and the state of every tunnel.
+   * Looks at the phone: whether the CLI is signed in, and the state of every tunnel.
    *
-   * This is called when the Connect page is opened and while it is open, so a sign-in that is
-   * finished on another device is picked up, and the tunnels are made as soon as it is.
+   * The Dev Tunnels CLI takes a few seconds to start on the phone, so this is made in the
+   * background and the page is never held up by it.
+   */
+  private async refresh() {
+    if (this.refreshing) return this.refreshing;
+    this.refreshing = (async () => {
+      try {
+        await this.checkSignIn();
+        if (this.login) {
+          const output = this.tunnel.output(this.login.id);
+          if (output) this.login.output = output;
+          this.login.status = this.tunnel.status(this.login.id);
+        }
+        const now = Date.now();
+        if (this.signedIn) {
+          for (const device of this.devices) {
+            if (!device.tunnel) continue;
+            const open = this.tunnels.get(device.id);
+            // A tunnel that died is made again, but not too often.
+            if (open && open.host.status === "running") continue;
+            if (open && now - open.at < 30000) continue;
+            this.openTunnel(device);
+          }
+        }
+      } finally {
+        this.refreshing = null;
+      }
+    })();
+    return this.refreshing;
+  }
+
+  /**
+   * What the Connect page shows, and the start of the look behind it.
+   *
+   * A sign-in that is finished on another device is picked up here, and the tunnels are made as
+   * soon as it is.
    */
   async poll() {
-    const now = Date.now();
-    await this.checkSignIn();
-    if (this.login) {
-      const output = this.tunnel.output(this.login.id);
-      if (output) this.login.output = output;
-      this.login.status = this.tunnel.status(this.login.id);
-    }
-    if (this.signedIn) {
-      for (const device of this.devices) {
-        if (!device.tunnel) continue;
-        const open = this.tunnels.get(device.id);
-        // A tunnel that died is made again, but not too often.
-        if (open && open.host.status === "exited" && now - open.at < 30000) continue;
-        if (open && open.host.status === "running") continue;
-        this.openTunnel(device);
-      }
-    }
+    void this.refresh();
     return this.view();
   }
 
