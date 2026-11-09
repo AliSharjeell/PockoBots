@@ -565,16 +565,18 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         // The card says which page the bot is on, so it only belongs there while the bot is working.
         if(botBrowser!=null&&busy&&!botBrowser.getCurrentUrl().equals("about:blank")){
             LinearLayout liveChip=row();
-            liveChip.setPadding(dp(12),dp(6),dp(12),dp(6));
-            liveChip.setBackground(AgentStyle.surface(this,AgentStyle.PANEL,16,true));
-            LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));clp.gravity=Gravity.CENTER_HORIZONTAL;
-            liveChip.setLayoutParams(clp);
-            TextView liveText=text("🌐 Browser: "+botBrowser.getCurrentTitle(),12);
+            liveChip.setPadding(dp(14),dp(8),dp(10),dp(8));
+            String pageTitle=botBrowser.getCurrentTitle();
+            if(pageTitle==null||pageTitle.trim().isEmpty())pageTitle=botBrowser.getCurrentUrl();
+            TextView liveText=text(pageTitle,12);
             liveText.setMaxWidth(dp(200));liveText.setSingleLine(true);liveText.setEllipsize(android.text.TextUtils.TruncateAt.END);
             liveChip.addView(liveText);
             Button viewBtn=button(liveChip,"View live",()->showScreen("Browser"),false);
             viewBtn.setTextSize(11);
-            thread.addView(liveChip);
+            // The same liquid glass the activity card wears.
+            View livePanel=GlassControls.wrap(liveChip,20f,false);
+            LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2);clp.setMargins(0,dp(4),0,dp(4));clp.gravity=Gravity.CENTER_HORIZONTAL;
+            thread.addView(livePanel,clp);
         }
         if(needsPhoneAccess){thread.addView(muted("Enable phone permissions and unlock your device to continue.",12));button(thread,"Open Settings",this::showSetup,false);}
         if(busy){
