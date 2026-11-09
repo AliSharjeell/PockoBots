@@ -56,6 +56,19 @@ A repeated navigation guard pauses after three attempts to open the same app
 or URL within one minute, instead of looping through a welcome/sign-in screen.
 Complete the browser's setup if necessary, then resume or ask the bot to retry.
 
+## Browser tabs
+
+A bot's browser has tabs, so a lookup no longer costs the page in front. A bot
+opens one with `browser_new_tab`, looks at what is open with
+`browser_list_tabs`, brings another one to the front with `browser_switch_tab`
+and closes one with `browser_close_tab`. `browser_navigate` takes a `tab` as
+well, so a page can be opened in a tab of its own.
+
+The owner sees the same tabs in the browser screen: the strip under the address
+bar shows every tab, a tap brings one to the front, the mark on the tab in
+front closes it, and the plus sign opens another one. A tab in the back keeps
+running, so a form that is half filled in survives a lookup.
+
 ## Previews and public links
 
 Local preview links such as http://127.0.0.1:3000 open on the device running the

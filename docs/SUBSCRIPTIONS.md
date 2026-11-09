@@ -45,7 +45,25 @@ billing. The app's Installed or authenticated state is not a guarantee of
 paid-plan access.
 
 The provider and the model can be changed from the subscriptions screen or from
-the menu in the top right of a chat.
+the menu in the top right of a chat. The state carries the names both are shown
+by, so the menu never shows a raw identifier while it waits for the provider
+list. Your own key shows the model of its own settings.
+
+## Usage limits
+
+A vendor CLI knows its own plan, so it is asked about it over the protocol that
+CLI speaks: `account/rateLimits/read` on the Codex app server and on the Agent
+Client Protocol agents. The reading sits above the model list of the
+subscriptions screen and names each window the way a person would say it, such
+as a five-hour limit or a weekly limit, with how much of it is spent and when
+it fills up again.
+
+A provider that does not report its limits shows nothing at all, so an absent
+reading is never a reading of zero. A provider with no way to be asked says so
+in the same sentence, and the app keeps the last reading for a couple of
+minutes. The provider list and the model lists are kept as well, and the
+subscriptions screen is handed the list the app already asked for, so it opens
+at once.
 
 CLI adapters are an original implementation. OpenBot's provider architecture was
 inspected read-only as a reference; its PolyForm-licensed code was not copied.
