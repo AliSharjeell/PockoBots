@@ -112,10 +112,72 @@ final class BotWorkspace {
         LinearLayout content=scrolling();
         settingsRow(content,"Bring your own subscription","Install and sign in to a vendor CLI",()->app.showSettingsPage("Subscriptions"),R.drawable.lucide_store);
         settingsRow(content,"Bring your own key","Choose your model connection",()->app.showSettingsPage("BYOK"),R.drawable.lucide_key_round);
+        settingsRow(content,"Connect a device","Pair a phone, a computer or a browser",()->app.showSettingsPage("Connect"),R.drawable.lucide_link);
         settingsRow(content,"Permissions & background","Review access and Android permissions",()->app.showSettingsPage("Permissions"),R.drawable.lucide_shield_check);
         if(!app.getSharedPreferences("bot-setup",0).getBoolean("seen-v2",false))app.button(content,"Continue to Home",app::completeSetup,true);
     }
     private void connectionsPage(){LinearLayout content=scrolling();settingsRow(content,"Custom MCP connections","Manage advanced connections",app::showAdvancedConnections,R.drawable.lucide_link);settingsRow(content,"Servers & sharing","Local servers and Dev Tunnels",()->app.showSettingsPage("Servers"),R.drawable.lucide_square_terminal);settingsRow(content,"External webhooks","Trigger bots and calls from external apps",()->app.showSettingsPage("Webhooks"),R.drawable.lucide_external_link);}
+
+    /**
+     * The page that pairs another device to this phone.
+     *
+     * The device reads the chats and can answer them. The terminal, the files and the model keys
+     * stay on this phone, and the code below says so where it is shown.
+     */
+    private void connectPage(){
+        final int epoch=generation;
+        LinearLayout content=scrolling();
+        content.addView(text("Connect a device",22));
+        content.addView(app.muted("Pair a phone, a computer or a browser to this one. Scan the code with the PockoBots client and it opens the same bots from then on, as long as this phone is running.",13));
+        EditText name=app.field(content,"Device name",Build.MODEL,false);
+        LinearLayout actions=row();content.addView(actions);
+        app.button(actions,"Pair a new device",()->{
+            try{app.requestQuiet("POST","/clients",app.json("name",name.getText().toString().trim()),value->{if(epoch==generation)loadClients(content,epoch);},()->Toast.makeText(app,"That device could not be paired",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}
+        },true);
+        content.addView(app.muted("The link is made with a Microsoft Dev Tunnel. Sign in to Dev Tunnels once under Servers & sharing if the link does not appear.",12));
+        loadClients(content,epoch);
+    }
+    /** Reads the paired devices and draws what the owner needs to see. */
+    private void loadClients(LinearLayout content,int epoch){
+        app.marketplaceRequest("GET","/clients",null,value->{
+            if(epoch!=generation)return;
+            JSONArray devices=value instanceof JSONArray?(JSONArray)value:new JSONArray();
+            if(devices.length()==0){content.addView(app.muted("No device is paired yet.",13));return;}
+            for(int i=0;i<devices.length();i++){
+                JSONObject device=devices.optJSONObject(i);if(device==null)continue;
+                String link=device.optString("url"),key=device.optString("token"),title=device.optString("name");
+                content.addView(text(title,17));
+                content.addView(app.muted(link.isEmpty()?"Making the link…":link,12));
+                if(!link.isEmpty()&&!key.isEmpty()){
+                    JSONObject pairing=new JSONObject();try{pairing.put("url",link);pairing.put("token",key);pairing.put("device",Build.MODEL);}catch(Exception ignored){}
+                    ImageView code=qrCode(pairing.toString(),dp(220));
+                    if(code!=null){
+                        LinearLayout holder=column();holder.setGravity(android.view.Gravity.CENTER);
+                        holder.setPadding(dp(12),dp(12),dp(12),dp(12));
+                        holder.setBackground(AgentStyle.surface(app,0xffffffff,18,true));
+                        holder.addView(code,new LinearLayout.LayoutParams(dp(220),dp(220)));
+                        holder.addView(app.muted("Scan with the PockoBots client",11));
+                        content.addView(holder,new LinearLayout.LayoutParams(-1,-2));
+                    }
+                }
+                LinearLayout row=row();content.addView(row);
+                button(row,"Copy the link",()->{android.content.ClipboardManager clip=(android.content.ClipboardManager)app.getSystemService(Context.CLIPBOARD_SERVICE);clip.setPrimaryClip(android.content.ClipData.newPlainText("PockoBots",link+"  key: "+key));Toast.makeText(app,"Copied",Toast.LENGTH_SHORT).show();});
+                button(row,"Unpair",()->{try{app.requestQuiet("DELETE","/clients/"+device.optString("id"),app.json(),v->{if(epoch==generation)show(body,"Connect",project);},()->Toast.makeText(app,"That device could not be paired",Toast.LENGTH_LONG).show());}catch(Exception e){app.error(e);}});
+                View divider=new View(app);divider.setBackgroundColor(AgentStyle.BORDER);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+            }
+        },error->{if(epoch==generation)content.addView(app.muted("The paired devices could not be read: "+error,12));});
+    }
+    /** The code that pairs a device, drawn as a picture. */
+    private ImageView qrCode(String payload,int size){
+        try{
+            com.google.zxing.BarcodeFormat format=com.google.zxing.BarcodeFormat.QR_CODE;
+            com.google.zxing.common.BitMatrix matrix=new com.google.zxing.qrcode.QRCodeWriter().encode(payload,format,size,size);
+            android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(size,size,android.graphics.Bitmap.Config.RGB_565);
+            for(int x=0;x<size;x++)for(int y=0;y<size;y++)bitmap.setPixel(x,y,matrix.get(x,y)?0xff09090b:0xffffffff);
+            ImageView view=new ImageView(app);view.setImageBitmap(bitmap);view.setScaleType(ImageView.ScaleType.FIT_CENTER);view.setBackgroundColor(0xffffffff);
+            return view;
+        }catch(Exception e){return null;}
+    }
     private void subscriptions(){
         final int epoch=generation;
         body.removeAllViews();

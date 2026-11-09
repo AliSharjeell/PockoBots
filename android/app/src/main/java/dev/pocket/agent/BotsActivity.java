@@ -187,7 +187,7 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     void showSettingsPage(String name){showScreen(name);}
     void completeSetup(){getSharedPreferences("bot-setup",0).edit().putBoolean("seen-v2",true).apply();open("");}
     void showAdvancedConnections(){connections();}
-    private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers","Webhooks").contains(screen);}
+    private boolean settingsChild(){return Arrays.asList("BYOK","Subscriptions","Permissions","Connections","Servers","Webhooks","Connect").contains(screen);}
     private void toggleAppearance(){saveDraft();getSharedPreferences("appearance",0).edit().putString("theme",AgentStyle.dark?"light":"dark").apply();AgentStyle.applyTheme(this);setTheme(AgentStyle.dark?R.style.AppTheme:R.style.AppThemeLight);androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());bars.setAppearanceLightStatusBars(!AgentStyle.dark);bars.setAppearanceLightNavigationBars(!AgentStyle.dark);pendingMotion=0;animatePage=true;shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
 
     void showScreen(String next){pendingMotion=0;animatePage=!(next.equals("Chat")&&selected.isEmpty());if(page!=null){View current=root==null?page:root;getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(current.getWindowToken(),0);current.clearFocus();}saveDraft();screen=next;signature="";shell();if(screen.equals("Chat")){if(selected.isEmpty())inbox();else renderThread();}}
