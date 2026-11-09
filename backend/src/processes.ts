@@ -116,6 +116,42 @@ export class Processes {
       cancelled: !!signal?.aborted,
     };
   }
+
+  /**
+   * Runs a command and keeps it out of the list of jobs the owner sees.
+   *
+   * This is for the small questions the phone asks itself, such as whether the Dev Tunnels CLI is
+   * signed in. They are not work the owner started and do not belong in the list.
+   */
+  runQuiet(command: string, cwd: string, timeout = 15000) {
+    return new Promise<{ exitCode: number | null; output: string }>((resolve) => {
+      const child = spawn("bash", ["-c", command], {
+        cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, TERM: "dumb", FORCE_COLOR: "0" },
+      });
+      let output = "";
+      const append = (chunk: Buffer | string) => {
+        output = (output + chunk.toString()).slice(-8000);
+      };
+      child.stdout?.on("data", append);
+      child.stderr?.on("data", append);
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+      }, timeout);
+      const done = (exitCode: number | null) => {
+        clearTimeout(timer);
+        resolve({ exitCode, output });
+      };
+      child.on("close", done);
+      child.on("error", e => {
+        append(e.message);
+        done(null);
+      });
+    });
+  }
 }
 export function validPort(port: unknown): number {
   const n = Number(port);
@@ -140,12 +176,30 @@ export function tunnelName(value: unknown): string {
   return name;
 }
 
-/** The command that makes a tunnel that keeps its name. */
-export function tunnelCreateCommand(name: string, port: number) {
-  return `devtunnel create ${tunnelName(name)} --port ${port}`;
+/**
+ * The command that makes a tunnel that keeps its name.
+ *
+ * The port is not given here. The Dev Tunnels CLI takes the port when the tunnel is served, and
+ * the command fails when it is given one here.
+ */
+export function tunnelCreateCommand(name: string) {
+  return `devtunnel create ${tunnelName(name)} --allow-anonymous`;
 }
 
 /** The command that serves a tunnel that keeps its name. */
 export function tunnelHostCommand(name: string, port: number, anonymous = true) {
-  return `devtunnel host ${tunnelName(name)} --port ${port}${anonymous ? " --allow-anonymous" : ""}`;
+  return `devtunnel host ${tunnelName(name)} -p ${hostPort(port)}${anonymous ? " --allow-anonymous" : ""}`;
+}
+
+/**
+ * The port a tunnel is served on.
+ *
+ * The control port of this phone is allowed here, because that is the port a paired device
+ * reaches. It is only the other pages that keep this port to themselves.
+ */
+export function hostPort(port: unknown): number {
+  const n = Number(port);
+  if (!Number.isInteger(n) || n < 1024 || n > 65535)
+    throw Error("Port must be between 1024 and 65535");
+  return n;
 }
