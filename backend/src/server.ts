@@ -70,11 +70,14 @@ export async function createApp(options: {
     store,
     {
       create: (name: string, p: number) =>
-        processes.start(tunnelCreateCommand(name, p), workspace.root, "tunnel", p, "Pair device tunnel " + name),
+        processes.start(tunnelCreateCommand(name), workspace.root, "tunnel", p, "Pair device tunnel " + name),
       host: (name: string, p: number) =>
         processes.start(tunnelHostCommand(name, p), workspace.root, "tunnel", p, "Pair device tunnel " + name),
       stop: (id: string) => processes.stop(id),
       output: (id: string) => processes.jobs.get(id)?.output || "",
+      status: (id: string) => processes.jobs.get(id)?.status || "exited",
+      userShow: async () => (await processes.runQuiet("devtunnel user show", workspace.root)).output,
+      login: () => processes.start("devtunnel user login -g -d", workspace.root, "command", undefined, "Microsoft Dev Tunnels sign-in"),
     },
     port,
   );
@@ -440,7 +443,9 @@ export async function createApp(options: {
       ),
   );
   // The devices that may talk to this phone. Only the owner's own key reaches these.
-  app.get("/api/clients", (_req, res) => res.json(connect.view()));
+  app.get("/api/clients", async (_req, res) => res.json(await connect.poll()));
+  app.post("/api/clients/check", async (_req, res) => res.json(await connect.checkNow()));
+  app.post("/api/clients/login", async (_req, res) => res.json(await connect.signIn()));
   app.post("/api/clients", async (req, res) => {
     const name = String(req.body?.name || "A device").slice(0, 60);
     const scope = req.body?.scope === "full" ? "full" : "chat";
