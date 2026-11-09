@@ -87,6 +87,32 @@ test("a paired device reaches the chats from another host and nothing else", asy
     assert.equal(stranger.status, 403);
     const strangerAtHome = await call("/api/bots", "not-a-key");
     assert.equal(strangerAtHome.status, 401);
+
+    // A browser on another origin is told it may read the answer, so a client on the web can.
+    const preflight = await new Promise<{ status: number; headers: any }>((resolve, reject) => {
+      const request = http.request(
+        {
+          host: "127.0.0.1",
+          port,
+          path: "/api/bots",
+          method: "OPTIONS",
+          headers: {
+            Host: "phone.devtunnels.ms",
+            Origin: "https://client.example",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+          },
+        },
+        (response) => {
+          response.resume();
+          resolve({ status: response.statusCode || 0, headers: response.headers });
+        },
+      );
+      request.on("error", reject);
+      request.end();
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers["access-control-allow-origin"], "https://client.example");
   } finally {
     server.closeAllConnections();
     await new Promise<void>((r) => server.close(() => r()));

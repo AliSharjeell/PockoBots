@@ -106,7 +106,25 @@ export async function createApp(options: {
     const digest = (x: string) => createHash("sha256").update(x).digest();
     const owner = timingSafeEqual(digest(candidate), digest(token));
     const paired = !owner && !!connect.find(candidate);
-    const host = req.headers.host;
+    const host = req.headers.host || "";
+    const origin = req.headers.origin;
+    // A browser on another origin has to be told it may read the answer. The key is still what
+    // opens the phone: a page that has no key is turned away by the check below.
+    const throughTunnel = /\.devtunnels\.ms$/i.test(host.split(":")[0] || "");
+    const nearbyOrigin = !!origin && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(origin);
+    if (origin && (throughTunnel || nearbyOrigin)) {
+      res.set({
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Max-Age": "600",
+        Vary: "Origin",
+      });
+      if (req.method === "OPTIONS") {
+        res.status(204).end();
+        return;
+      }
+    }
     // The owner's own key only opens the phone from the phone itself. A paired device is the one
     // thing that may come from another host, because that is where it lives.
     if (!isWebhook && !paired && host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
@@ -115,11 +133,11 @@ export async function createApp(options: {
     }
     if (
       !isWebhook &&
-      req.headers.origin &&
-      ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(
-        req.headers.origin,
-      ) &&
-      !paired
+      origin &&
+      ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(origin) &&
+      !nearbyOrigin &&
+      !paired &&
+      !throughTunnel
     ) {
       res.status(403).json({ error: "Invalid origin" });
       return;
