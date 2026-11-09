@@ -532,6 +532,8 @@ public class BotBrowserView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        // The session of the pages that were open is written to disk, so it is still there later.
+        BotBrowserInstance.flushCookies();
         BotBrowserManager.get().returnToHiddenStage(botId);
     }
 }

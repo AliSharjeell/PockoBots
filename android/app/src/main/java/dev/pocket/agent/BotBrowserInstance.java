@@ -44,8 +44,38 @@ public class BotBrowserInstance {
     private final String botId;
     private final Context context;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** The logins the owner typed, kept in the app's private storage. */
+    private final BotCredentials credentials;
 
     public static final String DEFAULT_HOME_URL = "https://www.google.com";
+
+    /**
+     * The script that watches for a login and asks for a known one back.
+     *
+     * The WebView has no password store of its own, so a login the owner typed is reported to the
+     * app and kept there, and a page that asks is given the login it had last time.
+     */
+    private static final String CREDENTIAL_SCRIPT =
+            "(function(){try{" +
+            "if(!window.__pockoCredentials){window.__pockoCredentials=true;" +
+            "document.addEventListener('submit',function(event){try{" +
+            "var form=event.target;if(!form||!form.querySelector)return;" +
+            "var password=form.querySelector('input[type=\"password\"]');if(!password||!password.value)return;" +
+            "var user=form.querySelector('input[type=\"email\"],input[type=\"text\"],input:not([type])');" +
+            "window.PocketBotBridge.onCredentials(location.hostname,user?user.value:'',password.value);" +
+            "}catch(e){}},true);}" +
+            "try{var password=document.querySelector('input[type=\"password\"]');" +
+            "if(password)window.PocketBotBridge.requestCredentials(location.hostname);}catch(e){}" +
+            "}catch(e){}})();";
+
+    /** Writes the browser's cookies to disk, so a session survives a restart. */
+    static void flushCookies() {
+        try {
+            android.webkit.CookieManager.getInstance().flush();
+        } catch (Throwable ignored) {
+            // A browser that cannot write its cookies now writes them later.
+        }
+    }
 
     /** One tab of this browser: a page of its own, with its own state. */
     public static class Tab {
@@ -88,6 +118,7 @@ public class BotBrowserInstance {
     public BotBrowserInstance(Context context, String botId) {
         this.context = context;
         this.botId = botId;
+        this.credentials = new BotCredentials(context);
         createTab(DEFAULT_HOME_URL);
     }
 
@@ -146,6 +177,9 @@ public class BotBrowserInstance {
                 if (url != null) tab.url = url;
                 String title = view.getTitle();
                 if (title != null && !title.isEmpty()) tab.title = title;
+                // The session of this page is written to disk now, so a restart does not lose it.
+                flushCookies();
+                view.evaluateJavascript(CREDENTIAL_SCRIPT, null);
                 notifyPageChanged(tab);
             }
 
@@ -448,6 +482,31 @@ public class BotBrowserInstance {
             if (future != null && !future.isDone()) {
                 future.complete(json);
             }
+        }
+
+        /** A login the owner typed on a page. It is kept in the app's private storage. */
+        @JavascriptInterface
+        public void onCredentials(String host, String username, String password) {
+            if (host == null || host.isEmpty()) return;
+            credentials.remember(host, username, password);
+        }
+
+        /** The page asks for the login of the site it is on. */
+        @JavascriptInterface
+        public void requestCredentials(String host) {
+            BotCredentials.Entry entry = credentials.find(host);
+            if (entry == null) return;
+            String username = org.json.JSONObject.quote(entry.username);
+            String password = org.json.JSONObject.quote(entry.password);
+            String fill = "(function(){try{" +
+                    "var password=document.querySelector('input[type=\"password\"]');if(!password)return;" +
+                    "var user=document.querySelector('input[type=\"email\"],input[type=\"text\"],input:not([type])');" +
+                    "if(user){var set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;" +
+                    "set.call(user," + username + ");user.dispatchEvent(new Event('input',{bubbles:true}));}" +
+                    "var set2=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;" +
+                    "set2.call(password," + password + ");password.dispatchEvent(new Event('input',{bubbles:true}));" +
+                    "}catch(e){}})();";
+            mainHandler.post(() -> tab.webView.evaluateJavascript(fill, null));
         }
     }
 
