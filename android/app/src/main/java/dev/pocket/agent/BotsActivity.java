@@ -22,6 +22,8 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
     private String replyQuote="",homeSearchQuery="",pendingRead="";
     private final ArrayList<String> messageRows=new ArrayList<>();private View jumpToLatest;private MarketplaceUi marketplaceUi;private WorkingAvatarView headerAvatar;private AgentIcon composerAction;private boolean chatBusy;private JSONObject currentJob;
     private int pendingMotion=0,navigationEpoch=0;private boolean animatePage;private BotWorkspace workspace;private ChatMarkdown markdown;private final Runnable poll=()->refresh(false);
+    /** The provider and model lists of the chat menu, kept so a tap on them shows something at once. */
+    private JSONArray providerList;private JSONObject modelCatalogue;private String modelCatalogueProvider="";
     interface Result {void done(Object value)throws Exception;}
     void marketplaceRequest(String method,String path,JSONObject data,Result done,java.util.function.Consumer<String> failed){
         if(api==null)return;AgentApi connection=api;io.execute(()->{try{Object value=connection.request(method,path,data);main.post(()->{if(!isDestroyed())try{done.done(value);}catch(Exception e){failed.accept(e.getMessage());}});}catch(Exception e){main.post(()->{if(!isDestroyed())failed.accept(e.getMessage());});}});
@@ -136,29 +138,45 @@ public class BotsActivity extends androidx.activity.ComponentActivity {
         providerRow.setOnClickListener(v->{providerChoices.setVisibility(providerChoices.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);modelChoices.setVisibility(View.GONE);popup.update(dp(280),-2);});
         modelRow.setOnClickListener(v->{modelChoices.setVisibility(modelChoices.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);providerChoices.setVisibility(View.GONE);popup.update(dp(280),-2);});
         popup.showAsDropDown(anchor,0,dp(8),Gravity.END);
-        marketplaceRequest("GET","/providers",null,value->{
-            if(!(value instanceof JSONArray))return;JSONArray providers=(JSONArray)value;providerChoices.removeAllViews();
-            // Your own key is a provider too: the one connection you made yourself.
-            boolean byokActive=currentProvider.equals("byok");
-            LinearLayout byokRow=row();byokRow.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView byokMark=new ImageView(this);byokMark.setImageResource(MarketplaceIcons.provider("byok"));byokMark.setColorFilter(byokActive?AgentStyle.BLUE:AgentStyle.MUTED);byokRow.addView(byokMark,new LinearLayout.LayoutParams(dp(20),dp(20)));
-            TextView byokLabel=text("Your own key"+(byokActive?"  ✓":""),14);byokLabel.setPadding(dp(10),0,dp(0),0);byokLabel.setTextColor(byokActive?AgentStyle.BLUE:AgentStyle.TEXT);byokRow.addView(byokLabel,new LinearLayout.LayoutParams(0,-2,1));
-            LinearLayout.LayoutParams byokParams=new LinearLayout.LayoutParams(-1,-2);byokParams.setMargins(dp(4),dp(2),0,dp(2));providerChoices.addView(byokRow,byokParams);
-            byokRow.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider","byok"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Your own key is now the model",Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
-            for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider),installed=entry.optBoolean("installed");
-                LinearLayout row=row();row.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView mark=new ImageView(this);mark.setImageResource(MarketplaceIcons.provider(id));mark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(mark,new LinearLayout.LayoutParams(dp(20),dp(20)));
-                TextView label=text(entry.optString("name")+(installed?"":"  \u00b7 not installed")+(active?"  \u2713":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:installed?AgentStyle.TEXT:AgentStyle.MUTED);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
-                LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);rowParams.setMargins(dp(4),dp(2),0,dp(2));providerChoices.addView(row,rowParams);row.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider",id,"providerModel","default"),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Provider set to "+entry.optString("name"),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
-                if(active){providerMark.setImageResource(MarketplaceIcons.provider(id));providerMark.setVisibility(View.VISIBLE);providerName.setText(entry.optString("name")+"  \u2304");}}
-            providerChoices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
-            // The models are asked of the same place the subscriptions screen asks, so the two name them the same way.
-            if(!currentProvider.equals("byok"))marketplaceRequest("GET","/providers/"+currentProvider+"/models",null,modelsValue->{
-                modelChoices.removeAllViews();JSONObject catalogue=modelsValue instanceof JSONObject?(JSONObject)modelsValue:null;JSONArray models=catalogue==null?null:catalogue.optJSONArray("models");String modelText=currentModel;
-                if(models!=null)for(int j=0;j<models.length();j++){JSONObject model=models.optJSONObject(j);String modelId=model.optString("id");boolean modelActive=modelId.equals(currentModel);if(modelActive)modelText=model.optString("name",modelId);
-                    TextView modelItem=text(model.optString("name",modelId)+(modelActive?"  \u2713":""),14);modelItem.setPadding(dp(10),dp(8),dp(6),dp(8));modelItem.setTextColor(modelActive?AgentStyle.BLUE:AgentStyle.TEXT);
-                    LinearLayout.LayoutParams modelParams=new LinearLayout.LayoutParams(-1,-2);modelParams.setMargins(dp(4),dp(2),0,dp(2));modelChoices.addView(modelItem,modelParams);modelItem.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("providerModel",modelId),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Model set to "+model.optString("name",modelId),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the model",Toast.LENGTH_SHORT).show());});}
-                modelName.setText(modelText+"  \u2304");modelChoices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
-            },error->{});
-        },error->{});
+        // The lists are asked for while the menu opens, so a tap on one of the rows shows what is
+        // in it right away instead of waiting for a round trip.
+        fillProviderChoices(providerChoices,popup,currentProvider,providerMark,providerName);
+        fillModelChoices(modelChoices,popup,currentProvider,currentModel,modelTitle,modelName);
+    }
+    /** The provider list of the chat menu. It is asked for once and kept until it changes. */
+    private void fillProviderChoices(LinearLayout choices,PopupWindow popup,String currentProvider,ImageView mark,TextView title){
+        JSONArray providers=providerList;
+        if(providers==null){
+            marketplaceRequest("GET","/providers",null,value->{if(!(value instanceof JSONArray))return;providerList=(JSONArray)value;fillProviderChoices(choices,popup,currentProvider,mark,title);},error->{});
+            return;
+        }
+        choices.removeAllViews();
+        // Your own key is a provider too: the one connection you made yourself.
+        boolean byokActive=currentProvider.equals("byok");
+        LinearLayout byokRow=row();byokRow.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView byokMark=new ImageView(this);byokMark.setImageResource(MarketplaceIcons.provider("byok"));byokMark.setColorFilter(byokActive?AgentStyle.BLUE:AgentStyle.MUTED);byokRow.addView(byokMark,new LinearLayout.LayoutParams(dp(20),dp(20)));
+        TextView byokLabel=text("Your own key"+(byokActive?"  ✓":""),14);byokLabel.setPadding(dp(10),0,dp(0),0);byokLabel.setTextColor(byokActive?AgentStyle.BLUE:AgentStyle.TEXT);byokRow.addView(byokLabel,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout.LayoutParams byokParams=new LinearLayout.LayoutParams(-1,-2);byokParams.setMargins(dp(4),dp(2),0,dp(2));choices.addView(byokRow,byokParams);
+        byokRow.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider","byok"),saved->{state.put("settings",saved);providerList=null;modelCatalogue=null;refresh(false);Toast.makeText(this,"Your own key is now the model",Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
+        for(int i=0;i<providers.length();i++){JSONObject entry=providers.optJSONObject(i);String id=entry.optString("id");if(!entry.optBoolean("supported"))continue;boolean active=id.equals(currentProvider),installed=entry.optBoolean("installed");
+            LinearLayout row=row();row.setPadding(dp(6),dp(6),dp(6),dp(6));ImageView rowMark=new ImageView(this);rowMark.setImageResource(MarketplaceIcons.provider(id));rowMark.setColorFilter(active?AgentStyle.BLUE:AgentStyle.MUTED);row.addView(rowMark,new LinearLayout.LayoutParams(dp(20),dp(20)));
+            TextView label=text(entry.optString("name")+(installed?"":"  · not installed")+(active?"  ✓":""),14);label.setPadding(dp(10),0,dp(0),0);label.setTextColor(active?AgentStyle.BLUE:installed?AgentStyle.TEXT:AgentStyle.MUTED);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+            LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);rowParams.setMargins(dp(4),dp(2),0,dp(2));choices.addView(row,rowParams);row.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("executionProvider",id,"providerModel","default"),saved->{state.put("settings",saved);providerList=null;modelCatalogue=null;refresh(false);Toast.makeText(this,"Provider set to "+entry.optString("name"),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the provider",Toast.LENGTH_SHORT).show());});
+            if(active){mark.setImageResource(MarketplaceIcons.provider(id));mark.setVisibility(View.VISIBLE);title.setText(entry.optString("name")+"  ⌄");}}
+        choices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
+    }
+    /** The model list of the chat menu, asked of the same place the subscriptions screen asks. */
+    private void fillModelChoices(LinearLayout choices,PopupWindow popup,String currentProvider,String currentModel,String modelTitle,TextView title){
+        if(currentProvider.equals("byok")){title.setText(modelTitle.isEmpty()?"Your own key  ⌄":modelTitle+"  ⌄");choices.removeAllViews();TextView hint=muted("Your own key's model is set in Settings",12);hint.setPadding(dp(10),dp(8),dp(6),dp(8));choices.addView(hint);choices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);return;}
+        JSONObject catalogue=modelCatalogue;
+        if(catalogue==null||!currentProvider.equals(modelCatalogueProvider)){
+            marketplaceRequest("GET","/providers/"+currentProvider+"/models",null,value->{if(!(value instanceof JSONObject))return;modelCatalogue=(JSONObject)value;modelCatalogueProvider=currentProvider;fillModelChoices(choices,popup,currentProvider,currentModel,modelTitle,title);},error->{});
+            return;
+        }
+        choices.removeAllViews();JSONArray models=catalogue.optJSONArray("models");String modelText=modelTitle.isEmpty()?currentModel:modelTitle;
+        if(models!=null)for(int j=0;j<models.length();j++){JSONObject model=models.optJSONObject(j);String modelId=model.optString("id");boolean modelActive=modelId.equals(currentModel);if(modelActive)modelText=model.optString("name",modelId);
+            TextView modelItem=text(model.optString("name",modelId)+(modelActive?"  ✓":""),14);modelItem.setPadding(dp(10),dp(8),dp(6),dp(8));modelItem.setTextColor(modelActive?AgentStyle.BLUE:AgentStyle.TEXT);
+            LinearLayout.LayoutParams modelParams=new LinearLayout.LayoutParams(-1,-2);modelParams.setMargins(dp(4),dp(2),0,dp(2));choices.addView(modelItem,modelParams);modelItem.setOnClickListener(v->{popup.dismiss();requestQuiet("PUT","/settings",json("providerModel",modelId),saved->{state.put("settings",saved);refresh(false);Toast.makeText(this,"Model set to "+model.optString("name",modelId),Toast.LENGTH_SHORT).show();},()->Toast.makeText(this,"Couldn't change the model",Toast.LENGTH_SHORT).show());});}
+        title.setText(modelText+"  ⌄");choices.setPadding(dp(4),dp(2),0,dp(4));popup.update(dp(280),-2);
     }
     private void open(String id){animatePage=false;int epoch=++navigationEpoch;main.postDelayed(()->{if(epoch==navigationEpoch&&detail==null&&!selected.isEmpty()&&root!=null){LoadingSkeleton placeholder=new LoadingSkeleton(this,"chat",6);placeholder.setBackgroundColor(AgentStyle.BACK);root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));}},160);workspace.resetDirectory();saveDraft();follow=true;replyQuote="";selected=id;screen="Chat";draft=getSharedPreferences("bot-chats",0).getString("draft-"+id,"");detail=null;signature="";composer=null;workspace.stop();main.removeCallbacks(poll);refresh(true);}
     void showSetup(){showScreen("Permissions");}

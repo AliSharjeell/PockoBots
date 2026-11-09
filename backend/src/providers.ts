@@ -67,19 +67,25 @@ export class SubscriptionProviders {
   * names travel with the state instead of being fetched again.
   */
  describe(providerId:string,modelId:string){if(!providerId||providerId==="byok")return {providerId:"byok",providerName:"",modelId:modelId||"",modelName:modelId||"Default"};const p=providerCatalog.find(x=>x.id===providerId);const catalog=this.catalog(providerId);const model=catalog.models.find(m=>m.id===modelId);return {providerId,providerName:p?.name||providerId,modelId:modelId||"",modelName:model?.name||modelId||""};}
- async status(){return Promise.all(providerCatalog.map(async p=>{
-  if(!p.supported)return {...p,installed:false,authenticated:false};
-  const version=await probe(p.command,["--version"]),installed=version.code===0;
-  let authenticated:boolean|null=null;
-  if(installed){
-   if(p.id==="codex"||p.id==="claude"){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}
-   else if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
-   else{const auth=await probe(p.command,["login","status"]);authenticated=auth.code===0?true:null;}
-   void this.refreshCatalog(p.id);
-  }
-  const catalog=this.catalog(p.id);
-  return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
- }));}
+ async status(refresh=false){
+  const cached=this.statusCache;
+  if(!refresh&&cached&&Date.now()-cached.at<60000)return cached.value;
+  const value=await Promise.all(providerCatalog.map(async p=>{
+   if(!p.supported)return {...p,installed:false,authenticated:false};
+   const version=await probe(p.command,["--version"]),installed=version.code===0;
+   let authenticated:boolean|null=null;
+   if(installed){
+    if(p.id==="codex"||p.id==="claude"){const auth=await probe(p.command,p.id==="codex"?["login","status"]:["auth","status"]);authenticated=auth.code===0;}
+    else if(p.id==="opencode"||p.id==="gemini"){try{const path=p.id==="opencode"?join(process.env.XDG_DATA_HOME||join(homedir(),".local/share"),"opencode/auth.json"):join(homedir(),".gemini/oauth_creds.json");const credentials=JSON.parse(await readFile(path,"utf8"));authenticated=p.id==="opencode"?Object.values(credentials).some((value:any)=>value?.type==="oauth"&&(value?.refresh||value?.access)):!!credentials.refresh_token;}catch{authenticated=false;}}
+    else{const auth=await probe(p.command,["login","status"]);authenticated=auth.code===0?true:null;}
+    void this.refreshCatalog(p.id);
+   }
+   const catalog=this.catalog(p.id);
+   return {...p,installed,authenticated,signInRequired:!FREE_TIER_PROVIDERS.has(p.id),version:installed?version.text.trim().slice(0,100):"",models:catalog.models,modelSource:catalog.source,note:FREE_TIER_PROVIDERS.has(p.id)?"Its free models run without an account. Signing in adds the models your plan includes.":"Install and sign in on this phone. A subscription does not automatically include API access; the vendor determines eligibility and usage."};
+  }));
+  this.statusCache={value,at:Date.now()};
+  return value;
+ }
  async bridge(id:string,secret:string,operation:string,input:any){const run=this.runs.get(id);if(!run||!timingSafeEqual(createHash("sha256").update(secret).digest(),createHash("sha256").update(run.secret).digest()))throw Error("Provider tool session expired or unauthorized");if(run.signal.aborted)throw Error("Provider task cancelled");if(operation==="list")return {tools:run.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.parameters}))};if(operation!=="call")throw Error("Unknown provider bridge operation");const tool=run.tools.find(t=>t.name===input?.name);if(!tool)throw Error("Unknown provider tool");if(!Value.Check(tool.parameters,input.arguments||{}))throw Error("Invalid provider tool arguments");const callId=randomUUID();run.onActivity?.({type:"tool_execution_start",toolCallId:callId,toolName:tool.name,args:input.arguments||{}});try{const result=await tool.execute(callId,input.arguments||{},run.signal);run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result,isError:!!(result as any).isError});return result;}catch(error){run.onActivity?.({type:"tool_execution_end",toolCallId:callId,toolName:tool.name,result:"Tool failed",isError:true});throw error;}}
  async run(id:string,options:{effort?:Effort;cwd:string;prompt:string;model?:string;tools:AgentTool<any>[];signal:AbortSignal;onText?:(text:string)=>void;onActivity?:(event:any)=>void}){
   const p=provider(id);if(!p.supported)throw Error(p.reason);if(options.signal.aborted)throw Error("Cancelled");
@@ -145,8 +151,8 @@ export const subscriptions=new SubscriptionProviders();
 export function registerProviderRoutes(app:Express,options:{port:number;root:string;processes:Processes;terminals:Terminals;token:string}){
  subscriptions.configure("http://127.0.0.1:"+options.port,options.token,options.root);
  const installations=new Map<string,string>();
- app.get("/api/providers",async(_req,res)=>res.json((await subscriptions.status()).map(p=>({...p,installation:options.processes.jobs.get(installations.get(p.id)||"")||null}))));
- app.get("/api/providers/:id/models",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.models(p.id,true));});
+ app.get("/api/providers",async(req,res)=>res.json((await subscriptions.status(req.query.refresh==="1")).map(p=>({...p,installation:options.processes.jobs.get(installations.get(p.id)||"")||null}))));
+ app.get("/api/providers/:id/models",async(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);res.json(await subscriptions.models(p.id,req.query.refresh==="1"));});
  app.post("/api/providers/:id/install",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const current=options.processes.jobs.get(installations.get(p.id)||"");if(current?.status==="running"){res.json(current);return;}const job=options.processes.start(installCommand(p),options.root,"command",undefined,"Install "+p.name);installations.set(p.id,job.id);res.status(201).json(job);});
  app.get("/api/providers/:id/install/:job",(req,res)=>{provider(req.params.id);const job=options.processes.jobs.get(req.params.job);if(installations.get(req.params.id)!==req.params.job||!job){res.status(404).json({error:"Installation not found. Refresh the provider list."});return;}res.json(job);});
  app.post("/api/providers/:id/login",(req,res)=>{const p=provider(req.params.id);if(!p.supported)throw Error(p.reason);const terminal=options.terminals.start(options.root);options.terminals.input(terminal.id,p.login+"\n");res.status(201).json({...terminal,provider:p.id,instruction:"Complete the vendor's login in this terminal. Credentials stay in the vendor CLI's phone-owned account directory."});});
